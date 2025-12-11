@@ -1,0 +1,23 @@
+[
+  {
+    "id": "999b53c3-f181-4910-86fd-5c5b1f74af7b",
+    "nombre": "Perfumería fina",
+    "created_by": "63b939ab-d077-400a-acd2-89791a9fb8df",
+    "updated_by": "63b939ab-d077-400a-acd2-89791a9fb8df",
+    "updated_at": "2025-07-10T02:08:20.844148+00:00"
+  },
+  {
+    "id": "6944056a-4b9c-4102-a368-7c2b9ff77d5a",
+    "nombre": "Limpia pisos",
+    "created_by": "63b939ab-d077-400a-acd2-89791a9fb8df",
+    "updated_by": "63b939ab-d077-400a-acd2-89791a9fb8df",
+    "updated_at": "2025-07-10T02:09:47.321757+00:00"
+  },
+  {
+    "id": "1849c0c4-929a-4f02-aa50-119bedfbe16f",
+    "nombre": "Aromatizante",
+    "created_by": "4febd601-91a2-445f-8bee-57ae4da5e2dd",
+    "updated_by": "63b939ab-d077-400a-acd2-89791a9fb8df",
+    "updated_at": "2025-10-27T01:02:19.63404+00:00"
+  }
+]

@@ -1,0 +1,43 @@
+# Ignorar node_modules
+node_modules/
+
+# Ignorar archivos de construcción y producción
+dist/
+build/
+out/
+
+# Ignorar archivos de entorno
+.env
+.env.*
+
+# Ignorar dependencias lockfiles
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Ignorar archivos de configuración que no quieras formatear
+*.config.js
+*.config.cjs
+
+# Ignorar carpetas de documentación
+coverage/
+
+# Ignorar cachés
+.cache/
+.next/
+
+# Ignorar archivos específicos
+public/
+static/
+
+# Otros
+.DS_Store
+.idea/
+.vscode/
+
+# Ignorar archivos de salida de pruebas
+*.snap
+
+# Opcional: ignorar todo lo que ya esté ignorado por git
+# si usas prettier-plugin-ignore
+# .gitignore

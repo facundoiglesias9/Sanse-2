@@ -1,0 +1,110 @@
+[
+  {
+    "id": "7bd311f7-af73-4e50-ba2f-8c57416f045b",
+    "nombre": "Etiquetas",
+    "cantidad_necesaria": 1,
+    "cantidad_lote": 422,
+    "precio_lote": 47080,
+    "created_by": "63b939ab-d077-400a-acd2-89791a9fb8df",
+    "updated_by": "63b939ab-d077-400a-acd2-89791a9fb8df",
+    "updated_at": "2025-07-10T02:47:02.747371+00:00",
+    "is_general": true,
+    "insumos_categorias_id": "999b53c3-f181-4910-86fd-5c5b1f74af7b"
+  },
+  {
+    "id": "7c1479ad-7567-46e1-9473-b629aaf5dede",
+    "nombre": "Roll-on",
+    "cantidad_necesaria": 1,
+    "cantidad_lote": 100,
+    "precio_lote": 26500,
+    "created_by": "63b939ab-d077-400a-acd2-89791a9fb8df",
+    "updated_by": "63b939ab-d077-400a-acd2-89791a9fb8df",
+    "updated_at": "2025-07-10T02:47:08.701643+00:00",
+    "is_general": true,
+    "insumos_categorias_id": "999b53c3-f181-4910-86fd-5c5b1f74af7b"
+  },
+  {
+    "id": "f20bd670-b4a8-4c37-be85-61c6eac9f7c6",
+    "nombre": "Bolsas de madera",
+    "cantidad_necesaria": 1,
+    "cantidad_lote": 100,
+    "precio_lote": 20240,
+    "created_by": "63b939ab-d077-400a-acd2-89791a9fb8df",
+    "updated_by": "63b939ab-d077-400a-acd2-89791a9fb8df",
+    "updated_at": "2025-07-10T02:47:13.090564+00:00",
+    "is_general": true,
+    "insumos_categorias_id": "999b53c3-f181-4910-86fd-5c5b1f74af7b"
+  },
+  {
+    "id": "1f826bb3-0f2b-42db-9209-2f7a425a620c",
+    "nombre": "Frascos masculinos",
+    "cantidad_necesaria": 1,
+    "cantidad_lote": 20,
+    "precio_lote": 53485,
+    "created_by": "63b939ab-d077-400a-acd2-89791a9fb8df",
+    "updated_by": "63b939ab-d077-400a-acd2-89791a9fb8df",
+    "updated_at": "2025-09-10T00:45:52.908255+00:00",
+    "is_general": false,
+    "insumos_categorias_id": "999b53c3-f181-4910-86fd-5c5b1f74af7b"
+  },
+  {
+    "id": "64297462-3384-481c-8ac9-77c24f301c8c",
+    "nombre": "Alcohol",
+    "cantidad_necesaria": 80,
+    "cantidad_lote": 5000,
+    "precio_lote": 12800,
+    "created_by": "63b939ab-d077-400a-acd2-89791a9fb8df",
+    "updated_by": "63b939ab-d077-400a-acd2-89791a9fb8df",
+    "updated_at": "2025-09-15T23:43:26.122538+00:00",
+    "is_general": true,
+    "insumos_categorias_id": "999b53c3-f181-4910-86fd-5c5b1f74af7b"
+  },
+  {
+    "id": "53733085-0cf6-4d9e-bdf1-00fae9d71fda",
+    "nombre": "Frascos femeninos",
+    "cantidad_necesaria": 1,
+    "cantidad_lote": 20,
+    "precio_lote": 80780,
+    "created_by": "63b939ab-d077-400a-acd2-89791a9fb8df",
+    "updated_by": "63b939ab-d077-400a-acd2-89791a9fb8df",
+    "updated_at": "2025-09-16T15:12:48.455254+00:00",
+    "is_general": false,
+    "insumos_categorias_id": "999b53c3-f181-4910-86fd-5c5b1f74af7b"
+  },
+  {
+    "id": "0b676f58-2cb6-4ad9-a9d3-08a0ef504b75",
+    "nombre": "Frasco para auto",
+    "cantidad_necesaria": 1,
+    "cantidad_lote": 20,
+    "precio_lote": 31340,
+    "created_by": "4febd601-91a2-445f-8bee-57ae4da5e2dd",
+    "updated_by": "63b939ab-d077-400a-acd2-89791a9fb8df",
+    "updated_at": "2025-10-27T01:02:49.679834+00:00",
+    "is_general": false,
+    "insumos_categorias_id": "1849c0c4-929a-4f02-aa50-119bedfbe16f"
+  },
+  {
+    "id": "8f0dd8ff-9aed-475d-8ac8-03eefc92c048",
+    "nombre": "Bidón (5L)",
+    "cantidad_necesaria": 1,
+    "cantidad_lote": 1,
+    "precio_lote": 1500,
+    "created_by": "4febd601-91a2-445f-8bee-57ae4da5e2dd",
+    "updated_by": "63b939ab-d077-400a-acd2-89791a9fb8df",
+    "updated_at": "2025-11-06T15:35:10.208648+00:00",
+    "is_general": false,
+    "insumos_categorias_id": "6944056a-4b9c-4102-a368-7c2b9ff77d5a"
+  },
+  {
+    "id": "4b33c9ba-7465-4a1c-b173-521431963ed8",
+    "nombre": "Botella (1L)",
+    "cantidad_necesaria": 1,
+    "cantidad_lote": 30,
+    "precio_lote": 20005,
+    "created_by": "4febd601-91a2-445f-8bee-57ae4da5e2dd",
+    "updated_by": "63b939ab-d077-400a-acd2-89791a9fb8df",
+    "updated_at": "2025-11-06T15:36:40.695701+00:00",
+    "is_general": true,
+    "insumos_categorias_id": "6944056a-4b9c-4102-a368-7c2b9ff77d5a"
+  }
+]
