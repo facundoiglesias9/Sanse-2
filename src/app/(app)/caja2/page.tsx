@@ -141,12 +141,20 @@ export default function Caja2Page() {
             .order("created_at", { ascending: false });
         setDeudas(deudasData || []);
 
-        // Fetch ventas
+        // Fetch ventas (exclude reseller sales from main widget)
         const { data: ventasData } = await supabase
             .from("ventas")
             .select("*")
+            .or("is_reseller_sale.is.null,is_reseller_sale.eq.false")
             .order("created_at", { ascending: false });
         setVentas(ventasData || []);
+
+        // Fetch ALL ventas (including reseller) for Sanse total
+        const { data: allVentasData } = await supabase
+            .from("ventas")
+            .select("precio_total");
+
+        const totalAllVentas = (allVentasData || []).reduce((sum, v) => sum + v.precio_total, 0);
 
         setLoading(false);
     };
@@ -311,8 +319,22 @@ export default function Caja2Page() {
         .filter((g) => !g.pagador_id)
         .reduce((sum, g) => sum + g.monto, 0);
 
+    // Regular sales total (for Ganancias widget)
     const totalVentas = ventas.reduce((sum, v) => sum + v.precio_total, 0);
-    const cajaSanse = totalVentas - gastosSanse;
+
+    // ALL sales total (including reseller sales for Sanse calculation)
+    const [totalAllVentas, setTotalAllVentas] = useState(0);
+
+    useEffect(() => {
+        const fetchAllVentas = async () => {
+            const { data } = await supabase.from("ventas").select("precio_total");
+            const total = (data || []).reduce((sum, v) => sum + v.precio_total, 0);
+            setTotalAllVentas(total);
+        };
+        if (!loading) fetchAllVentas();
+    }, [loading]);
+
+    const cajaSanse = totalAllVentas - gastosSanse;
 
     console.log("💰 Debug - Total Facundo:", totalFacundo);
     console.log("💰 Debug - Total Lukas:", totalLukas);

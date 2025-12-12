@@ -1,0 +1,4 @@
+Email: sanseperfumes@gmail.com | ID: 7e28fdf6-6867-43d7-8c17-3b69e0e60b26 | Metadata: {"email_verified":true,"rol":"admin"}
+Email: vmanera34@gmail.com | ID: d4d68d28-5f97-40bb-9169-244862d53b4f | Metadata: {"email_verified":true,"rol":"admin"}
+Email: facundoiglesias9@gmail.com | ID: 4febd601-91a2-445f-8bee-57ae4da5e2dd | Metadata: {"email_verified":true}
+Email: lukasn.otero@gmail.com | ID: 63b939ab-d077-400a-acd2-89791a9fb8df | Metadata: {"email_verified":true,"rol":"admin"}

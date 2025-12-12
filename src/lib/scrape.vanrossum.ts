@@ -9,6 +9,15 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 export const norm = (s: string) =>
   s.normalize("NFKD").replace(/\s+/g, " ").replace(/[^\w\s]/g, "").trim().toLowerCase();
 
+const FORCE_100G = new Set(
+  [
+    "ONE MILLION (PACO RABBANE)",
+    "AZZARO (AZZARO)",
+    "212 (CAROLINA HERRERA)",
+    "FLOWERS (KENZO)",
+    "212 CAROLINA HERRERA (CAROLINA HERRERA)",
+  ].map((n) => norm(n))
+);
 
 async function load$(url: string) {
   const res = await fetch(url, {
@@ -59,18 +68,14 @@ function productLinks($: cheerio.CheerioAPI, base: string) {
 }
 
 // Paginación: rel="next", símbolo › o .pagination .next a
-// Pagina siguiente (mejorada)
 function nextPageUrl($: cheerio.CheerioAPI, base: string) {
-  const cands = [
+  const cand = [
     $('a[rel="next"]').attr("href"),
-    $("a").filter((_, a) => ($(a).text() || "").trim() === "›").attr("href"),
+    $("a").filter((_, a) => $(a).text().trim() === "›").attr("href"),
     $(".pagination .next a").attr("href"),
-    // A veces la flecha es un icono
-    $(".pagination li.active + li a").attr("href"),
-  ];
+  ].find(Boolean) as string | undefined;
 
-  const found = cands.find(Boolean);
-  return found ? new URL(found, base).toString() : null;
+  return cand ? new URL(cand, base).toString() : null;
 }
 
 export type VRDetail = {
@@ -78,50 +83,27 @@ export type VRDetail = {
   nombre: string;
   genero: "femenino" | "masculino" | "";
   externalCode: string | null;
-  precioArs30: number | null;
-  precioArs100: number | null;
+  precioArs: number | null;
+  cantidadGramos: number | null;
   isConsultar: boolean;
 };
 
-export async function extractDetail(productUrl: string, catalogGender?: "femenino" | "masculino"): Promise<VRDetail> {
+export async function extractDetail(productUrl: string): Promise<VRDetail> {
   const $ = await load$(productUrl);
 
   const title = $("h1,h2,h3").first().text().trim() || $("title").text().trim();
-
-  // Try to extract gender from multiple sources
-  let genero: VRDetail["genero"] = "";
-
-  // Method 1: Use catalog gender if provided (most reliable - based on catalog URL)
-  if (catalogGender) {
-    genero = catalogGender;
-  }
-
-  // Method 2: Title-based detection as fallback
-  if (!genero && /\(F\)\s*$/.test(title)) {
-    genero = "femenino";
-  } else if (!genero && /\(M\)\s*$/.test(title)) {
-    genero = "masculino";
-  }
-
-  // Method 3: Breadcrumb as last resort
-  if (!genero) {
-    const breadcrumbText = $(".breadcrumb, nav ol, nav ul, .breadcrumbs, nav")
-      .text()
-      .toUpperCase()
-      .replace(/\s+/g, " ");
-
-    if (breadcrumbText.includes("FEMENINO")) {
-      genero = "femenino";
-    } else if (breadcrumbText.includes("MASCULINO")) {
-      genero = "masculino";
-    }
-  }
+  const genero: VRDetail["genero"] =
+    /\(F\)\s*$/.test(title) ? "femenino" : (/\(M\)\s*$/.test(title) ? "masculino" : "");
 
   const codeLine = $("body").text().match(/Cod:\s*([A-Z0-9]+)/i);
   const externalCode = codeLine ? codeLine[1] : null;
   const nombreLimpio = title.replace(/\((F|M)\)\s*$/, "").trim();
+  const shouldUse100g = FORCE_100G.has(norm(nombreLimpio));
+  const targetGramos = shouldUse100g ? 100 : 30;
 
-  // ---------- PRECIOS (30g y 100g) ----------
+  // ---------- PRECIO preferido (por defecto 30 g, algunas esencias forzadas a 100 g) ----------
+  let precioArs: number | null = null;
+  let cantidadGramos: number | null = null;
 
   const parseARSnum = (s: string) => {
     const n = Number(s.replace(/\./g, "").replace(",", "."));
@@ -163,17 +145,27 @@ export async function extractDetail(productUrl: string, catalogGender?: "femenin
     return precio;
   };
 
-  const p30 = findPrecioFor(30);
-  const p100 = findPrecioFor(100);
+  const assignPrecio = (gramos: number) => {
+    const precio = findPrecioFor(gramos);
+    if (precio != null) {
+      precioArs = precio;
+      cantidadGramos = gramos;
+      return true;
+    }
+    return false;
+  };
+
+  const fallbackGramos = shouldUse100g ? 30 : 100;
+  if (!assignPrecio(targetGramos)) assignPrecio(fallbackGramos);
 
   return {
     productUrl,
     nombre: nombreLimpio,
     genero,
     externalCode,
-    precioArs30: p30,
-    precioArs100: p100,
-    isConsultar: p30 == null && p100 == null,
+    precioArs,
+    cantidadGramos,
+    isConsultar: precioArs == null,
   };
 }
 
@@ -181,34 +173,22 @@ export async function extractDetail(productUrl: string, catalogGender?: "femenin
 export async function scrapeVanRossumCatalog(startUrl: string) {
   const out: VRDetail[] = [];
   let url: string | null = startUrl;
-  let page = 1;
-
-  // Determine gender from catalog URL
-  const catalogGender: "femenino" | "masculino" | undefined =
-    startUrl.includes("/00021") ? "femenino" :
-      startUrl.includes("/00022") ? "masculino" :
-        undefined;
 
   while (url) {
-    console.log(`[Scraper] Page ${page}: ${url}`);
     const $ = await load$(url);
     const links = productLinks($, url);
-    console.log(`[Scraper] Found ${links.length} products on page ${page}`);
 
     for (const href of links) {
       try {
-        const d = await extractDetail(href, catalogGender);
-        // Guardamos si tiene al menos alguno de los dos precios, o si es consultar (ambos null)
-        out.push(d);
-        await sleep(120);
-      } catch (e: any) {
-        console.error(`[Scraper] Error extracting ${href}: ${e.message}`);
+        out.push(await extractDetail(href));
+        await sleep(120); // polite
+      } catch {
+        // continuar con el siguiente
       }
     }
 
     url = nextPageUrl($, url);
-    if (url) await sleep(500); // un poco más de pausa entre páginas
-    page++;
+    await sleep(150);
   }
   return out;
 }

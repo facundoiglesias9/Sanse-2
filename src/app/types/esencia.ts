@@ -3,8 +3,6 @@ export type Esencia = {
   nombre: string;
   precio_usd?: number;
   precio_ars?: number;
-  precio_ars_30g?: number | null;
-  precio_ars_100g?: number | null;
   precio_por_perfume?: number;
   cantidad_gramos?: number;
   proveedor_id: string;

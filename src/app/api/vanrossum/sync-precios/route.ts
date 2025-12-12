@@ -40,7 +40,7 @@ const EXCLUDED_CODES = new Set<string>([
 const EXCLUDED_NAMES = [
   "ML SIMIL BOTTLED MASCULINO",
   "ML SIMIL BOTTLED NIGHT MASCULINO (HUGO BOSS)",
-  "ML SIMIL BOTTLED NIGHT MASCULINO (HUGO BOSS)",
+  "ML SIMIL SAUVAGE MASCULINO",
 ];
 
 /* -------------------------------------------------------------
@@ -431,7 +431,7 @@ export async function POST(req: Request) {
     const now = new Date().toISOString();
     const inserts: any[] = [];
     const orphans: any[] = [];
-    const updates: Array<{ id: string; precio: number | null; cantidadGramos: number | null; precio30: number | null; precio100: number | null; when: string; isConsultar: boolean; }> = [];
+    const updates: Array<{ id: string; precio: number | null; cantidadGramos: number | null; when: string; isConsultar: boolean; }> = [];
     let autoAccepted = 0;
 
     const FUZZY_THRESH = 0.70;
@@ -505,27 +505,14 @@ export async function POST(req: Request) {
           genero: it.genero,
           external_code: it.externalCode,
           url: it.productUrl,
-          // precio_ars_100g legado: usamos el que exista, prefiriendo 100 si hay, sino 30 (o ambos)
-          // Actually, let's just save valid fields
-          precio_ars_100g: it.precioArs100 ?? null, // legacy column usage? or new?
-          // New columns:
-          precio_30g: it.precioArs30 ?? null,
-          precio_100g: it.precioArs100 ?? null,
-
+          precio_ars_100g: it.precioArs ?? null,
           fuente: "vanrossum",
           actualizado_en: now,
         });
         updates.push({
           id: hit.id,
-          precio30: it.precioArs30 ?? null,
-          precio100: it.precioArs100 ?? null,
-          // For legacy/default logic: use 30g as primary if available? Or keep existing logic?
-          // User wants dynamic toggle. Let's just update the specific cols.
-          // But `precio` and `cantidadGramos` might be used by the system as "default".
-          // Let's set default `precio` to 30g if available, else 100g.
-          precio: it.precioArs30 ?? it.precioArs100 ?? null,
-          cantidadGramos: it.precioArs30 ? 30 : (it.precioArs100 ? 100 : null),
-
+          precio: it.precioArs ?? null,
+          cantidadGramos: it.cantidadGramos ?? null,
           when: now,
           isConsultar: it.isConsultar,
         });
@@ -539,18 +526,14 @@ export async function POST(req: Request) {
             genero: it.genero,
             external_code: it.externalCode,
             url: it.productUrl,
-            precio_ars_100g: it.precioArs100 ?? null,
-            precio_30g: it.precioArs30 ?? null,
-            precio_100g: it.precioArs100 ?? null,
+            precio_ars_100g: it.precioArs ?? null,
             fuente: "vanrossum",
             actualizado_en: now,
           });
           updates.push({
             id: best.id,
-            precio30: it.precioArs30 ?? null,
-            precio100: it.precioArs100 ?? null,
-            precio: it.precioArs30 ?? it.precioArs100 ?? null,
-            cantidadGramos: it.precioArs30 ? 30 : (it.precioArs100 ? 100 : null),
+            precio: it.precioArs ?? null,
+            cantidadGramos: it.cantidadGramos ?? null,
             when: now,
             isConsultar: it.isConsultar,
           });
@@ -561,9 +544,7 @@ export async function POST(req: Request) {
             genero: it.genero,
             external_code: it.externalCode,
             url: it.productUrl,
-            precio_ars_100g: it.precioArs100 ?? null, // legacy compat
-            precio_30g: it.precioArs30 ?? null,
-            precio_100g: it.precioArs100 ?? null,
+            precio_ars_100g: it.precioArs ?? null,
             sugerido_esencia_id: best.id,
             sugerido_score: best.score,
             actualizado_en: now,
@@ -574,9 +555,7 @@ export async function POST(req: Request) {
             genero: it.genero,
             external_code: it.externalCode,
             url: it.productUrl,
-            precio_ars_100g: it.precioArs100 ?? null,
-            precio_30g: it.precioArs30 ?? null,
-            precio_100g: it.precioArs100 ?? null,
+            precio_ars_100g: it.precioArs ?? null,
             sugerido_esencia_id: null,
             sugerido_score: null,
             actualizado_en: now,
@@ -588,9 +567,7 @@ export async function POST(req: Request) {
           genero: it.genero,
           external_code: it.externalCode,
           url: it.productUrl,
-          precio_ars_100g: it.precioArs100 ?? null,
-          precio_30g: it.precioArs30 ?? null,
-          precio_100g: it.precioArs100 ?? null,
+          precio_ars_100g: it.precioArs ?? null,
           sugerido_esencia_id: null,
           sugerido_score: null,
           actualizado_en: now,
@@ -614,10 +591,6 @@ export async function POST(req: Request) {
         const values: Record<string, any> = {
           precio_ars: u.precio,
           cantidad_gramos: u.cantidadGramos,
-          // Nuevas columnas en esencias
-          precio_ars_30g: u.precio30,
-          precio_ars_100g: u.precio100,
-
           is_consultar: u.isConsultar,
           ...(SCRAPER_PROFILE_ID ? { updated_by: SCRAPER_PROFILE_ID } : {}),
         };
