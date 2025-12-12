@@ -13,7 +13,7 @@ import { z } from "zod";
 import ModernCardNote from "@/app/(app)/herramientas/notas/components/modern-card-note";
 import { AnimatePresence, motion } from "framer-motion";
 import { Calendar22 } from "@/components/calendar-22";
-import { Loader2, Plus, X } from "lucide-react";
+import { Loader2, Plus } from "lucide-react";
 import {
     Dialog,
     DialogContent,
@@ -36,7 +36,6 @@ import {
     SelectContent,
     SelectItem,
 } from "@/components/ui/select";
-import { cn } from "@/lib/utils";
 
 const FormSchema = z.object({
     titulo: z.string().min(2).max(100),
@@ -50,7 +49,7 @@ const FormSchema = z.object({
 
 export default function Notas2Page() {
     const [notas, setNotas] = useState<Nota[]>([]);
-    const [profiles, setProfiles] = useState<{ id: string; nombre: string | null }[]>([]);
+    const [profiles, setProfiles] = useState<{ id: string; nombre: string | null; }[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [deleteId, setDeleteId] = useState<string | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
@@ -401,7 +400,6 @@ export default function Notas2Page() {
                                     titulo={nota.titulo}
                                     updatedAt={new Date(nota.updated_at)}
                                     nota={nota.nota}
-                                    originalNota={nota.nota}
                                     fechaVencimiento={
                                         nota.fecha_vencimiento
                                             ? new Date(nota.fecha_vencimiento)

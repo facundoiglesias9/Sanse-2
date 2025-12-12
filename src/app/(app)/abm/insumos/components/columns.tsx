@@ -4,7 +4,7 @@ import { ColumnDef } from "@tanstack/react-table";
 import { formatCurrency } from "@/app/helpers/formatCurrency";
 import { formatDate } from "@/app/helpers/formatDate";
 import { Insumo } from "@/app/types/insumo";
-import { Badge } from "@/components/ui/badge";
+
 import { Button } from "@/components/ui/button";
 import { Pencil, Trash2 } from "lucide-react";
 

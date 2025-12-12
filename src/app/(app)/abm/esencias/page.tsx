@@ -36,13 +36,13 @@ export default function EsenciasPage() {
   const [pendingOpen, setPendingOpen] = useState(false);
   const [pendingVR, setPendingVR] = useState<Esencia[]>([]);
 
-  // Toggle 30g / 100g
+  // Alternar 30g / 100g
   const [show100g, setShow100g] = useState(false);
 
   const supabase = createClient();
   const { currencies, isLoading: loadingCurrencies } = useCurrencies();
 
-  // Recalculate helper (for enrichment and dynamic toggle)
+  // Auxiliar de recálculo (para enriquecimiento y alternancia dinámica)
   const calculateDerived = (base: Esencia, activeGrams: number, activePriceArs: number | null | undefined): Esencia => {
     const gramosPor = base.proveedores?.gramos_configurados ?? 1;
 
@@ -76,22 +76,12 @@ export default function EsenciasPage() {
     };
   };
 
-  const enrichEsencias = (data: Esencia[]): Esencia[] => {
-    // This initial enrichment is for the "base" state (usually defaults)
-    // But we will use calculateDerived in the render loop dynamic too.
-    // Let's just return data, and do calc later? 
-    // Actually, `fetchEsencias` sets `esencias`.
-    // We should store raw data or base data, and derive in render?
-    // Current code sets `esencias` with enriched data.
-    // Let's keep `esencias` as the "Base Store" (with scraped defaults)
-    // and derive a `displayedEsencias` for the table.
-    return data;
-  };
+
 
   const fetchEsencias = async () => {
     setLoadingEsencias(true);
 
-    // 1) Esencias (updated query to include new cols)
+    // 1) Esencias (consulta actualizada para incluir nuevas columnas)
     const { data: esenciasDB, error: eEs } = await supabase
       .from("esencias")
       .select("*, proveedores(id, nombre, gramos_configurados, color)")
@@ -103,13 +93,13 @@ export default function EsenciasPage() {
       return;
     }
 
-    // 2) Últimos precios scrapeados (metadata only/legacy)
+    // 2) Últimos precios scrapeados (solo metadatos/legado)
     const { data: ultimos, error: ePv } = await supabase
       .from("precios_vanrossum_latest")
       .select("esencia_id, precio_ars_100g, actualizado_en");
 
     if (ePv) {
-      // Just log, don't block
+      // Solo registrar, no bloquear
       console.error("Error loading VR latest", ePv);
     }
 
@@ -126,17 +116,17 @@ export default function EsenciasPage() {
       ])
     );
 
-    // 3) Enriquecer (Base) + flags
-    // Note: We don't calc per-perfume here anymore, we do it in displayedEsencias
+    // 3) Enriquecer (Base) + banderas
+    // Nota: Ya no calculamos por perfume aquí, lo hacemos en displayedEsencias
     const deco: Esencia[] = (esenciasDB || []).map((e) => {
       const s = scrapedMap.get(e.id);
       const lastUpdate = s?.actualizado_en ?? e.updated_at ?? null;
       let out = { ...e };
 
-      // Metadata fields
+      // Campos de metadatos
       if (s) {
         (out as any)._scrape_fuente = "vanrossum";
-        (out as any)._scrape_consultar = s.precio === null; // Legacy view logic
+        (out as any)._scrape_consultar = s.precio === null; // Lógica de vista heredada
         (out as any)._scrape_time = s.actualizado_en;
       }
       (out as any)._last_update = lastUpdate;
@@ -157,39 +147,38 @@ export default function EsenciasPage() {
 
   useEffect(() => {
     if (!loadingCurrencies) fetchEsencias();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadingCurrencies]);
 
-  // Derived state for display
+  // Estado derivado para visualización
   const displayedEsencias = esencias.map((e) => {
-    // Determine effective grams/price
-    // Default logic: use stored.
-    // Dynamic logic: try to use corresponding column.
+    // Determinar gramos/precio efectivos
+    // Lógica predeterminada: usar guardado.
+    // Lógica dinámica: intentar usar columna correspondiente.
 
     let activePrice: number | null | undefined = e.precio_ars;
     let activeGrams = e.cantidad_gramos ?? 1;
 
-    // Only apply toggle logic for Van Rossum items (or those with the cols)
+    // Solo aplicar lógica de alternancia para ítems de Van Rossum (o aquellos con las columnas)
     if (show100g) {
       if (e.precio_ars_100g) {
         activePrice = e.precio_ars_100g;
         activeGrams = 100;
       } else if ((e.proveedores?.nombre || "").toLowerCase().includes("van rossum")) {
-        // If generic VR item but NO 100g price found, what?
-        // Maybe fallback to 30g logic or stay as is?
-        // If we strictly want 100g view, and it's missing, maybe showing empty/null?
-        // Let's stick to: "If available, switch". Else keep default.
+        // ¿Si es ítem genérico de VR pero NO se encuentra precio de 100g, qué hacer?
+        // ¿Quizás volver a la lógica de 30g o dejar como está?
+        // ¿Si queremos vista estricta de 100g, y falta, quizás mostrar vacío/nulo?
+        // Mantengamos: "Si está disponible, cambiar". Si no, mantener predeterminado.
       }
     } else {
-      // 30g view (default)
-      // Always try to use 30g col if available? 
-      // Or just use `precio_ars` which is usually 30g?
-      // If we want to strictly show 30g price if available:
+      // Vista de 30g (predeterminado)
+      // ¿Siempre intentar usar columna de 30g si está disponible? 
+      // ¿O simplemente usar `precio_ars` que usualmente es 30g?
+      // Si queremos mostrar estrictamente precio de 30g si está disponible:
       if (e.precio_ars_30g) {
         activePrice = e.precio_ars_30g;
         activeGrams = 30;
       } else if (!show100g && e.cantidad_gramos === 100 && e.precio_ars_30g) {
-        // special case: if default was 100g but we want 30g view
+        // caso especial: si el predeterminado era 100g pero queremos vista de 30g
         activePrice = e.precio_ars_30g;
         activeGrams = 30;
       }

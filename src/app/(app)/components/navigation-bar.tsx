@@ -17,10 +17,8 @@ import {
   Sun,
   Monitor,
   SoapDispenserDroplet,
-  PackageOpen,
   Boxes,
   Users,
-  Layers,
 } from "lucide-react";
 import {
   Sheet,

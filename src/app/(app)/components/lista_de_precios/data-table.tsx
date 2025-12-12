@@ -15,7 +15,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NumberInput } from "@/components/ui/number-input";
-import { Switch } from "@/components/ui/switch";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { DataTablePagination } from "@/components/ui/data-table-pagination";
 import { Download, ShoppingCart, Loader2, Trash2, FileSpreadsheet } from "lucide-react";
@@ -422,8 +421,8 @@ export function DataTable({
 
 
   function handleExportClick() {
-    // Do NOT auto-select all if empty. We want to respect the defaults or the user's empty selection.
-    // Initialization happens in useEffect.
+    // NO autoseleccionar todo si está vacío. Queremos respetar los defaults o la selección vacía del usuario.
+    // La inicialización sucede en useEffect.
     setIsExportDialogOpen(true);
   }
 
@@ -453,25 +452,6 @@ export function DataTable({
         if (!prev || p > prev._precioCalc) map.set(key, { ...row, _precioCalc: p });
       }
       return Array.from(map.values());
-    };
-
-    const applyFilters = (rows: Perfume[]) => {
-      return rows.filter(row => {
-        // Provider Filter
-        if (!exportSelectedProviders.includes(row.proveedor_id)) return false;
-
-        // Category Filter
-        const catId = row.insumos_categorias_id;
-        // Handle null category -> usually shouldn't happen but if so, maybe include? or exclude?
-        if (catId && !exportSelectedCategories.includes(catId)) return false;
-
-        // Gender Filter
-        const gen = row.genero || "otro";
-        // Make sure we match the keys in exportSelectedGenders
-        if (!exportSelectedGenders.includes(gen)) return false;
-
-        return true;
-      });
     };
 
     const autoFit = (rows: Record<string, any>[]) => {
@@ -507,20 +487,21 @@ export function DataTable({
     };
 
 
-    // Note: applyFilters already handles gender filtering, but we want to split by gender.
-    // So we should:
-    // 1. Get filtered data (by provider/category).
-    // 2. Loop through selected genders.
-    // 3. For each gender, filter the subset and generate sheet.
+    // Nota: applyFilters ya maneja el filtrado por género, pero queremos dividir por género.
+    // Así que deberíamos:
+    // 1. Obtener datos filtrados (por proveedor/categoría).
+    // 2. Iterar a través de los géneros seleccionados.
+    // 3. Para cada género, filtrar el subconjunto y generar la hoja.
 
-    // Helper: apply NON-GENDER filters first
+    // Auxiliar: aplicar filtros NO GÉNERO primero
     const applyCommonFilters = (rows: Perfume[]) => {
       return rows.filter(row => {
-        // Provider Filter
+        // Filtro de Proveedor
         if (!exportSelectedProviders.includes(row.proveedor_id)) return false;
 
-        // Category Filter
+        // Filtro de Categoría
         const catId = row.insumos_categorias_id;
+        // Manejar categoría nula -> normalmente no debería ocurrir, pero si es así, ¿incluir o excluir?
         if (catId && !exportSelectedCategories.includes(catId)) return false;
 
         return true;
@@ -533,6 +514,7 @@ export function DataTable({
     exportSelectedGenders.forEach(genderKey => {
       const genderData = commonFiltered.filter(row => {
         const rowGen = row.genero || "otro";
+        // Asegurarse de que coincida con las claves en exportSelectedGenders
         return rowGen === genderKey;
       });
 
@@ -541,7 +523,7 @@ export function DataTable({
       const processedData = filtrarMasCaro(genderData, view === "mayorista").map((row) => {
         const obj: any = {};
         if (exportColumns.perfume) obj["Perfume"] = row.nombre;
-        // Use appropriate price based on view
+        // Usar precio apropiado según vista
         if (view === "mayorista") {
           if (exportColumns.precio) obj["Precio Mayorista"] = formatCurrency(precioRedondeado(row, true), "ARS", 0);
         } else {
@@ -643,7 +625,7 @@ export function DataTable({
     }));
     setVentaPerfumes(perfumesConCantidad);
 
-    // Auto-fill client name for revendedores
+    // Autocompletar nombre de cliente para revendedores
     if (userRole === "revendedor") {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
@@ -1382,7 +1364,7 @@ export function DataTable({
                       />
                       <label htmlFor={`ex-gen-${val}`} className="text-sm cursor-pointer">{label}</label>
                     </div>
-                  )
+                  );
                 })}
               </div>
             </div>

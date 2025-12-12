@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { createClient } from "@/utils/supabase/client";
 import {
     Table,
     TableBody,
@@ -20,7 +19,6 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-    DialogTrigger,
 } from "@/components/ui/dialog";
 import {
     AlertDialog,
@@ -67,8 +65,7 @@ export default function GestionUsuariosPage() {
     const [newUserRole, setNewUserRole] = useState("revendedor");
     const [isCreating, setIsCreating] = useState(false);
 
-    const supabase = createClient();
-
+    // Fetch Users
     const fetchProfiles = async () => {
         setIsLoading(true);
         const result = await getUsers();

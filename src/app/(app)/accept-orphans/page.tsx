@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { Loader2, RefreshCw, Info, XCircle, Check, ChevronDown } from "lucide-react";
+import { Loader2, RefreshCw, Info, XCircle, Check, ChevronDown, PlusCircle, Layers } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -23,6 +23,14 @@ import {
   CommandGroup,
   CommandItem,
 } from "@/components/ui/command";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { EsenciaDialog } from "@/app/(app)/abm/esencias/components/esencia-dialog";
 
 const fmtARS = (n: number) =>
   new Intl.NumberFormat("es-AR", {
@@ -87,29 +95,6 @@ function LinearShimmer({ percent }: { percent: number; }) {
   );
 }
 
-/** Bloque skeleton reutilizable */
-function Skeleton({ className = "" }: { className?: string; }) {
-  return (
-    <div className={`relative overflow-hidden rounded bg-muted ${className}`}>
-      <div
-        className="absolute inset-0 -translate-x-full"
-        style={{
-          background:
-            "linear-gradient(90deg, transparent 0%, rgba(255,255,255,.25) 50%, transparent 100%)",
-          animation: "skfade 1.2s infinite linear",
-        }}
-      />
-      <style jsx>{`
-        @keyframes skfade {
-          100% {
-            transform: translateX(100%);
-          }
-        }
-      `}</style>
-    </div>
-  );
-}
-
 /** Filas skeleton para la tabla (se muestran mientras loading=true) */
 function TableSkeleton({ rows = 8 }: { rows?: number; }) {
   return (
@@ -117,23 +102,23 @@ function TableSkeleton({ rows = 8 }: { rows?: number; }) {
       {Array.from({ length: rows }).map((_, i) => (
         <div key={i} className="grid grid-cols-12 items-center px-3 py-3 border-t text-sm">
           <div className="col-span-4 flex flex-col gap-2">
-            <Skeleton className="h-4 w-3/5" />
-            <Skeleton className="h-3 w-4/5" />
+            <div className="h-4 w-3/5 bg-muted rounded animate-pulse" />
+            <div className="h-3 w-4/5 bg-muted rounded animate-pulse" />
           </div>
           <div className="col-span-2">
-            <Skeleton className="h-4 w-24" />
+            <div className="h-4 w-24 bg-muted rounded animate-pulse" />
           </div>
           <div className="col-span-3">
             <div className="flex items-center gap-2">
-              <Skeleton className="h-4 w-40" />
-              <Skeleton className="h-5 w-16 rounded" />
+              <div className="h-4 w-40 bg-muted rounded animate-pulse" />
+              <div className="h-5 w-16 bg-muted rounded animate-pulse" />
             </div>
           </div>
           <div className="col-span-2">
-            <Skeleton className="h-4 w-28" />
+            <div className="h-4 w-28 bg-muted rounded animate-pulse" />
           </div>
           <div className="col-span-1 flex justify-end">
-            <Skeleton className="h-8 w-20 rounded" />
+            <div className="h-8 w-20 bg-muted rounded animate-pulse" />
           </div>
         </div>
       ))}
@@ -147,8 +132,16 @@ export default function OrphansPage() {
   const [orphans, setOrphans] = useState<Orphan[]>([]);
   const [suggestedMap, setSuggestedMap] = useState<Map<string, EsenciaLite>>(new Map());
   const [loading, setLoading] = useState(false);
-  const [onlyWithSuggestion, setOnlyWithSuggestion] = useState(true);
+
+  // Filtros
+  const [onlyWithSuggestion, setOnlyWithSuggestion] = useState(false);
+  const [genderFilter, setGenderFilter] = useState<"all" | "masculino" | "femenino" | "unisex">("all");
+
   const [acceptingId, setAcceptingId] = useState<string | null>(null);
+
+  // Diálogo de creación manual
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [orphanToCreate, setOrphanToCreate] = useState<Orphan | null>(null);
 
   const [showHelp, setShowHelp] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -173,7 +166,7 @@ export default function OrphansPage() {
     }
     progressTimer.current = window.setInterval(() => {
       setProgress((p) => {
-        const next = p + Math.random() * 12;
+        const next = p + 8; // Fixed increment instead of random
         return next < 90 ? next : 90;
       });
     }, 300);
@@ -216,7 +209,6 @@ export default function OrphansPage() {
     } catch (err: any) {
       toast.error(err?.message || "Error al cargar huérfanos");
     } finally {
-      // asegura que el loader/skeleton se vea al menos MIN_LOADING_MS
       const elapsed = performance.now() - t0;
       const remaining = Math.max(0, MIN_LOADING_MS - elapsed);
       window.setTimeout(() => {
@@ -228,11 +220,19 @@ export default function OrphansPage() {
 
   useEffect(() => {
     fetchData();
-  }, []); // eslint-disable-line
+  }, []);
 
   const filtered = useMemo(
-    () => orphans.filter((o) => (onlyWithSuggestion ? Boolean(o.sugerido_esencia_id) : true)),
-    [orphans, onlyWithSuggestion],
+    () => orphans.filter((o) => {
+      if (onlyWithSuggestion && !o.sugerido_esencia_id) return false;
+      if (genderFilter !== "all") {
+        const g = (o.genero || "").toLowerCase();
+        // simple match
+        if (g !== genderFilter) return false;
+      }
+      return true;
+    }),
+    [orphans, onlyWithSuggestion, genderFilter],
   );
 
   const acceptOrphan = async (id: string, overrideEsenciaId?: string) => {
@@ -253,6 +253,37 @@ export default function OrphansPage() {
       toast.error(e?.message || "Error al aceptar");
     } finally {
       setAcceptingId(null);
+    }
+  };
+
+  const createFromOrphan = async (orphan: Orphan) => {
+    // Consultar ID del proveedor Van Rossum
+    const { data: provs } = await supabase.from("proveedores").select("id, nombre");
+    const vanRossum = (provs ?? []).find((p) => (p.nombre || "").trim().toLowerCase() === "van rossum");
+
+    // Consultar ID de categoría Perfumería Fina  
+    const { data: cats } = await supabase.from("insumos_categorias").select("id, nombre");
+    const perfumeriaFina = (cats ?? []).find((c) => (c.nombre || "").trim().toLowerCase() === "perfumería fina");
+
+    setOrphanToCreate({
+      ...orphan,
+      vanRossumId: vanRossum?.id,
+      perfumeriaFinaId: perfumeriaFina?.id,
+    } as any);
+    setCreateDialogOpen(true);
+  };
+
+  const handleCreateSuccess = async (newEsencia: any) => {
+    if (!orphanToCreate) return;
+    try {
+      // Use existing acceptOrphan logic but with the new essence ID to link them
+      await acceptOrphan(orphanToCreate.id, newEsencia.id);
+      setCreateDialogOpen(false);
+      setOrphanToCreate(null);
+      // Refresh list is handled by acceptOrphan via local state update normally,
+      // but acceptOrphan updates `orphans` state directly.
+    } catch (_e) {
+      toast.error("Error al vincular el huérfano con la nueva esencia");
     }
   };
 
@@ -289,7 +320,8 @@ export default function OrphansPage() {
     setVrOptions(normed);
   };
 
-  const clearSuggestion = async (id: string) => {
+  const clearSuggestion = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation(); // prevent row click
     try {
       const { error } = await supabase
         .from("precios_vanrossum_orphans")
@@ -321,45 +353,61 @@ export default function OrphansPage() {
   );
 
   return (
-    <div className="p-4 max-w-6xl mx-auto">
+    <div className="p-4 max-w-7xl mx-auto pb-20">
       {/* Título */}
       <div className="mb-3">
         <h1 className="text-2xl font-bold">Huérfanos del proveedor Van Rossum</h1>
       </div>
 
       {/* Controles superiores */}
-      <div className="mb-4 flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-3">
+      <div className="mb-4 flex items-center justify-between gap-3 flex-wrap bg-card p-3 rounded-lg border shadow-sm">
+        <div className="flex items-center gap-4 flex-wrap">
           <div className="flex items-center gap-2">
             <Switch
               id="switch-only-suggestion"
               checked={onlyWithSuggestion}
               onCheckedChange={(v) => setOnlyWithSuggestion(Boolean(v))}
             />
-            <label htmlFor="switch-only-suggestion" className="text-sm cursor-pointer select-none">
+            <label htmlFor="switch-only-suggestion" className="text-sm cursor-pointer select-none font-medium">
               Solo con sugerencia
             </label>
           </div>
 
-          <Button variant="ghost" size="icon" onClick={() => setShowHelp(true)} title="¿Qué es Sugerencia y Score?">
-            <Info className="h-4 w-4" />
-          </Button>
+          <div className="h-6 w-px bg-border hidden sm:block" />
+
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium">Género:</span>
+            <Select value={genderFilter} onValueChange={(v: any) => setGenderFilter(v)}>
+              <SelectTrigger className="w-[130px] h-8">
+                <SelectValue placeholder="Todos" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="masculino">Masculino</SelectItem>
+                <SelectItem value="femenino">Femenino</SelectItem>
+                <SelectItem value="unisex">Unisex</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          <Button variant="outline" onClick={fetchData} disabled={loading} className="gap-2">
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="icon" onClick={() => setShowHelp(true)} title="Ayuda">
+            <Info className="h-4 w-4" />
+          </Button>
+          <Button variant="outline" size="sm" onClick={fetchData} disabled={loading} className="gap-2">
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
             Refrescar
           </Button>
         </div>
       </div>
 
-      {/* Loader fachero (visible al menos 900ms) */}
+      {/* Loader */}
       {progress > 0 && <LinearShimmer percent={Math.min(progress, 100)} />}
 
       {/* Tabla */}
-      <div className="rounded-md border overflow-hidden">
-        <div className="grid grid-cols-12 px-3 py-2 bg-muted text-xs font-medium">
+      <div className="rounded-md border overflow-hidden bg-background">
+        <div className="grid grid-cols-12 px-3 py-2 bg-muted/50 text-xs font-medium sticky top-0 z-10">
           <div className="col-span-4">Esencia</div>
           <div className="col-span-2">Precio 100g</div>
           <div className="col-span-3">Sugerencia</div>
@@ -370,146 +418,182 @@ export default function OrphansPage() {
         {loading ? (
           <TableSkeleton rows={8} />
         ) : filtered.length === 0 ? (
-          <div className="p-6 text-sm text-muted-foreground">No hay huérfanos para mostrar.</div>
+          <div className="p-8 text-center text-sm text-muted-foreground flex flex-col items-center gap-2">
+            <div className="h-10 w-10 text-muted-foreground/30"><Info className="h-full w-full" /></div>
+            No hay huérfanos que coincidan con los filtros.
+          </div>
         ) : (
-          filtered.map((o) => {
-            const sug = o.sugerido_esencia_id ? suggestedMap.get(o.sugerido_esencia_id) : null;
-            const precioTxt = o.precio_ars_100g === null ? "Consultar" : fmtARS(o.precio_ars_100g || 0);
+          <div className="divide-y">
+            {filtered.map((o) => {
+              const sug = o.sugerido_esencia_id ? suggestedMap.get(o.sugerido_esencia_id) : null;
+              const precioTxt = o.precio_ars_100g === null ? "Consultar" : fmtARS(o.precio_ars_100g || 0);
 
-            const generoBadge =
-              o.genero === "masculino"
-                ? { text: "M", variant: "indigo" as const }
-                : o.genero === "femenino"
-                  ? { text: "F", variant: "pink" as const }
-                  : null;
+              const generoBadge =
+                o.genero === "masculino"
+                  ? { text: "M", variant: "indigo" as const }
+                  : o.genero === "femenino"
+                    ? { text: "F", variant: "pink" as const }
+                    : null;
 
-            return (
-              <div key={o.id} className="grid grid-cols-12 items-center px-3 py-3 border-t text-sm">
-                {/* Esencia */}
-                <div className="col-span-4 flex flex-col gap-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold">{o.nombre}</span>
-                    {generoBadge && (
-                      <Badge variant={generoBadge.variant} className="px-1.5">
-                        {generoBadge.text}
-                      </Badge>
-                    )}
-                  </div>
-                  {o.url && (
-                    <Link href={o.url} target="_blank" className="text-xs text-muted-foreground hover:underline">
-                      {o.url}
-                    </Link>
-                  )}
-                </div>
+              const isProcessing = acceptingId === o.id;
 
-                {/* Precio */}
-                <div className="col-span-2">
-                  {o.precio_ars_100g === null ? (
-                    <span className="text-destructive font-medium">Consultar</span>
-                  ) : (
-                    <span className="font-semibold">{precioTxt}</span>
-                  )}
-                </div>
 
-                {/* Sugerencia */}
-                <div className="col-span-3 flex flex-col">
-                  {sug ? (
-                    <>
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">{sug.nombre}</span>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6"
-                          title="Quitar sugerencia"
-                          onClick={() => clearSuggestion(o.id)}
-                        >
-                          <XCircle className="h-4 w-4 text-muted-foreground" />
-                        </Button>
-                      </div>
-                      {o.sugerido_score !== null && (
-                        <Badge
-                          variant={
-                            o.sugerido_score >= 0.85 ? "success" : o.sugerido_score >= 0.7 ? "warning" : "destructive"
-                          }
-                          className="w-fit mt-1"
-                        >
-                          {`Score: ${(o.sugerido_score * 100).toFixed(0)}%`}
+              return (
+                <div
+                  key={o.id}
+                  className={`grid grid-cols-12 items-center px-3 py-3 text-sm transition-colors hover:bg-muted/30`}
+                >
+                  {/* Esencia */}
+                  <div className="col-span-4 flex flex-col gap-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold">{o.nombre}</span>
+                      {generoBadge && (
+                        <Badge variant={generoBadge.variant} className="px-1.5 text-[10px] h-5">
+                          {generoBadge.text}
                         </Badge>
                       )}
-                    </>
-                  ) : (
-                    <span className="text-muted-foreground">Sin sugerencia</span>
-                  )}
-                </div>
-
-                {/* Fecha */}
-                <div className="col-span-2">
-                  {new Date(o.actualizado_en).toLocaleString("es-AR", {
-                    year: "numeric",
-                    month: "2-digit",
-                    day: "2-digit",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                </div>
-
-                {/* Acción */}
-                <div className="col-span-1">
-                  <div className="flex justify-end gap-2">
-                    {sug ? (
-                      <>
-                        <Button size="sm" variant="outline" onClick={() => openChoose(o.id)}>
-                          Elegir…
-                        </Button>
-                        <Button size="sm" onClick={() => acceptOrphan(o.id)} disabled={acceptingId === o.id}>
-                          {acceptingId === o.id ? <Loader2 className="h-4 w-4 animate-spin" /> : "Aceptar"}
-                        </Button>
-                      </>
-                    ) : (
-                      <Button size="sm" onClick={() => openChoose(o.id)} disabled={acceptingId === o.id}>
-                        {acceptingId === o.id ? <Loader2 className="h-4 w-4 animate-spin" /> : "Elegir…"}
-                      </Button>
+                    </div>
+                    {o.url && (
+                      <Link href={o.url} target="_blank" className="text-xs text-muted-foreground hover:underline truncate max-w-[90%]">
+                        Link producto
+                      </Link>
                     )}
                   </div>
+
+                  {/* Precio */}
+                  <div className="col-span-2">
+                    {o.precio_ars_100g === null ? (
+                      <span className="text-destructive font-medium text-xs">Consultar</span>
+                    ) : (
+                      <span className="font-semibold">{precioTxt}</span>
+                    )}
+                  </div>
+
+                  {/* Sugerencia */}
+                  <div className="col-span-3 flex flex-col justify-center min-h-[2.5rem]">
+                    {sug ? (
+                      <div className="flex flex-col items-start gap-1">
+                        <div className="flex items-center gap-1 w-full">
+                          <span className="font-medium truncate text-primary/90" title={sug.nombre}>{sug.nombre}</span>
+                          <button
+                            onClick={(e) => clearSuggestion(o.id, e)}
+                            title="Descartar sugerencia"
+                            className="text-muted-foreground hover:text-destructive transition-colors ml-auto"
+                          >
+                            <XCircle className="h-4 w-4" />
+                          </button>
+                        </div>
+
+                        {o.sugerido_score !== null && (
+                          <div className="flex items-center gap-2 text-xs">
+                            <div className="h-1.5 w-16 bg-muted rounded-full overflow-hidden">
+                              <div
+                                className={`h-full ${o.sugerido_score >= 0.9 ? "bg-emerald-500" : o.sugerido_score >= 0.7 ? "bg-amber-500" : "bg-red-500"}`}
+                                style={{ width: `${o.sugerido_score * 100}%` }}
+                              />
+                            </div>
+                            <span className="text-muted-foreground">{Math.round(o.sugerido_score * 100)}%</span>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground text-xs italic">Sin sugerencia</span>
+                    )}
+                  </div>
+
+                  {/* Fecha */}
+                  <div className="col-span-2 text-xs text-muted-foreground">
+                    {new Date(o.actualizado_en).toLocaleDateString("es-AR", {
+                      day: "2-digit", month: "2-digit", year: "2-digit"
+                    })}
+                  </div>
+
+                  {/* Acción */}
+                  <div className="col-span-1">
+                    <div className="flex justify-end gap-2">
+                      {sug ? (
+                        <Button
+                          size="sm"
+                          onClick={() => acceptOrphan(o.id)}
+                          disabled={isProcessing}
+                          className="h-8 px-3"
+                        >
+                          {acceptingId === o.id ? <Loader2 className="h-4 w-4 animate-spin" /> : "Aceptar"}
+                        </Button>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => createFromOrphan(o)}
+                          disabled={isProcessing}
+                          title="Crear como nueva esencia"
+                          className="h-8 px-3 gap-1"
+                        >
+                          <PlusCircle className="h-3.5 w-3.5" /> Crear
+                        </Button>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 w-8 p-0"
+                        onClick={() => openChoose(o.id)}
+                        title="Elegir manualmente..."
+                      >
+                        <Layers className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            );
-          })
+              );
+            })}
+          </div>
         )}
       </div>
+
+      <EsenciaDialog
+        open={createDialogOpen}
+        onOpenChange={setCreateDialogOpen}
+        defaultValues={
+          orphanToCreate
+            ? {
+              nombre: orphanToCreate.nombre,
+              precio_ars: orphanToCreate.precio_ars_100g || 0,
+              cantidad_gramos: 100, // Default to 100g
+              genero:
+                orphanToCreate.genero === "masculino" ||
+                  orphanToCreate.genero === "femenino" ||
+                  orphanToCreate.genero === "ambiente" ||
+                  orphanToCreate.genero === "otro"
+                  ? (orphanToCreate.genero as any)
+                  : "otro",
+              proveedor_id: (orphanToCreate as any).vanRossumId || "",
+              insumos_categorias_id: (orphanToCreate as any).perfumeriaFinaId || "",
+              is_consultar: !orphanToCreate.precio_ars_100g, // true if no price
+            }
+            : {}
+        }
+        onSuccess={handleCreateSuccess}
+        dolarARS={0}
+        generoPorDefault="masculino"
+      />
 
       {/* Modal de ayuda */}
       <Dialog open={showHelp} onOpenChange={setShowHelp}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>¿Qué significan “Sugerencia” y “Score”?</DialogTitle>
+            <DialogTitle>Ayuda sobre Huérfanos</DialogTitle>
             <DialogDescription>
-              Breve explicación de cómo matcheamos productos scrapeados con tu base.
+              Gestión de productos scrapeados que no se encontraron en tu base de datos.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 text-sm">
-            <div>
-              <p className="font-medium">Sugerencia</p>
-              <p className="text-muted-foreground">
-                Cuando el nombre del esencia no coincide exacto (ni por alias), proponemos la esencia más parecida
-                según el nombre y el género. Esa coincidencia candidata es la <strong>Sugerencia</strong>.
-              </p>
-            </div>
-
-            <div>
-              <p className="font-medium">Score</p>
-              <p className="text-muted-foreground">
-                Es el porcentaje (0–100%) que indica qué tan parecidos son los nombres. Se calcula con un algoritmo de
-                similitud de texto (tipo Dice/bigramas). Un score alto sugiere que probablemente sea la misma esencia.
-              </p>
-            </div>
-
-            <div className="rounded-md bg-muted p-3 text-xs text-muted-foreground">
-              Consejo: aceptá primero las sugerencias con score alto (&gt;= 85%). Si no coincide, podés quitar la
-              sugerencia o elegir otra.
-            </div>
+            <ul className="list-disc pl-5 space-y-2 text-muted-foreground">
+              <li><strong>Sugerencia:</strong> El sistema intenta adivinar qué esencia es por el nombre.</li>
+              <li><strong>Aceptar:</strong> Vincula el huérfano con la sugerencia detectada. Se crea un alias automáticamente.</li>
+              <li><strong>Crear:</strong> Crea una <em>nueva esencia</em> en la base de datos con los datos del huérfano (Nombre, Precio, etc) y la asigna a Van Rossum.</li>
+              <li><strong>Elegir manualmente:</strong> Si la sugerencia es incorrecta (o no hay), podés buscar manualmente la esencia correcta.</li>
+            </ul>
           </div>
         </DialogContent>
       </Dialog>

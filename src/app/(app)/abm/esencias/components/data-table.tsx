@@ -77,12 +77,10 @@ export function DataTable<TData>({
   const [proveedores, setProveedores] = useState<
     { id: string; nombre: string; }[]
   >([]);
-  const [loadingProveedores, setLoadingProveedores] = useState(false);
   const supabase = createClient();
 
   useEffect(() => {
     const fetchProveedores = async () => {
-      setLoadingProveedores(true);
       const { data, error } = await supabase
         .from("proveedores")
         .select("id, nombre")
@@ -98,7 +96,6 @@ export function DataTable<TData>({
           })),
         );
       }
-      setLoadingProveedores(false);
     };
 
     fetchProveedores();
@@ -119,7 +116,7 @@ export function DataTable<TData>({
   const filterValue =
     (table.getColumn(filterColumnId)?.getFilterValue() as string) ?? "";
 
-  // Handle Edit Mode from props
+  // Manejar modo de edición desde propiedades
   useEffect(() => {
     if (esenciaToEdit) {
       setIsDialogOpen(true);

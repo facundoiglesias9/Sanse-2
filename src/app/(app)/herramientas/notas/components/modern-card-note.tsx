@@ -30,7 +30,6 @@ export interface CardNoteProps {
     titulo: string;
     updatedAt: Date;
     nota: string;
-    originalNota: string;
     fechaVencimiento: Date | null;
     prioridad: string;
     isEditing?: boolean;
@@ -48,7 +47,7 @@ export interface CardNoteProps {
     onDelete?: () => void;
     onSaveEdit?: () => void;
     onCancelEdit?: () => void;
-    profiles?: { id: string; nombre: string | null }[];
+    profiles?: { id: string; nombre: string | null; }[];
 }
 
 function priorityStyles(prioridad: string) {
@@ -85,7 +84,6 @@ export default function ModernCardNote({
     titulo,
     updatedAt,
     nota,
-    originalNota,
     fechaVencimiento,
     prioridad,
     isEditing = false,

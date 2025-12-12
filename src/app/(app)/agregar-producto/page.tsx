@@ -29,7 +29,7 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { Loader2, Plus, Sparkles, Car, Droplets, Trash2, Calculator, Package, Check, ChevronsUpDown, Search, FlaskConical, Filter, User, TrendingUp, Wallet, ArrowRight, DollarSign } from "lucide-react";
+import { Loader2, Plus, Sparkles, Car, Droplets, Trash2, Calculator, Package, Check, ChevronsUpDown, FlaskConical, Filter, User, Wallet } from "lucide-react";
 import {
     Table,
     TableBody,
@@ -75,23 +75,23 @@ type FormValues = z.infer<typeof formSchema>;
 
 export default function AgregarProductoPage() {
     const [activeTab, setActiveTab] = useState("perfumeria");
-    const [proveedores, setProveedores] = useState<{ id: string; nombre: string }[]>([]);
+    const [proveedores, setProveedores] = useState<{ id: string; nombre: string; }[]>([]);
     const [insumos, setInsumos] = useState<any[]>([]);
     const [esencias, setEsencias] = useState<any[]>([]);
-    const [categories, setCategories] = useState<{ id: string; nombre: string }[]>([]);
+    const [categories, setCategories] = useState<{ id: string; nombre: string; }[]>([]);
 
-    // Add Category State
+    // Estado de agregar categoría
     const [isAddCategoryOpen, setIsAddCategoryOpen] = useState(false);
     const [newCategoryName, setNewCategoryName] = useState("");
     const [creatingCategory, setCreatingCategory] = useState(false);
 
     const [dollarRate, setDollarRate] = useState<number>(0);
 
-    // Calculator State
+    // Estado de calculadora
     const [itemType, setItemType] = useState<"insumo" | "esencia">("insumo");
     const [openCombobox, setOpenCombobox] = useState(false);
 
-    // Filters for Esencias
+    // Filtros para Esencias
     const [filterGenero, setFilterGenero] = useState<string>("todos");
     const [filterProveedor, setFilterProveedor] = useState<string>("todos");
 
@@ -138,7 +138,7 @@ export default function AgregarProductoPage() {
                 const { data: insData } = await supabase.from("insumos").select("*").order("nombre");
                 if (insData) setInsumos(insData);
 
-                // Fetch Esencias
+                // Obtener Esencias
                 const { data: esenciasData } = await supabase
                     .from("esencias")
                     .select(`
@@ -158,7 +158,7 @@ export default function AgregarProductoPage() {
                     .order("nombre");
                 if (esenciasData) setEsencias(esenciasData);
 
-                // Fetch Dollar Rate
+                // Obtener Tasa de Dólar
                 const res = await fetch("/api/exchange-rate");
                 const rates = await res.json();
                 if (rates && rates.ARS) setDollarRate(rates.ARS);
@@ -289,7 +289,7 @@ export default function AgregarProductoPage() {
         const newInsumos = [...selectedInsumos];
         newInsumos.splice(index, 1);
         setSelectedInsumos(newInsumos);
-    }
+    };
 
     async function onSubmit(data: FormValues) {
         setLoading(true);

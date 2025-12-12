@@ -3,26 +3,25 @@
 import { useState, useEffect } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { useCurrencies } from "@/app/contexts/CurrencyContext";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Plus, Trash2, ShoppingCart, Loader2 } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency } from "@/app/helpers/formatCurrency";
-import { motion, AnimatePresence } from "framer-motion";
+import { AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import {
     Dialog,
     DialogContent,
     DialogDescription,
-    DialogFooter,
     DialogHeader,
     DialogTitle,
     DialogTrigger,
 } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
+// import { Label } from "@/components/ui/label"; // Check if Label is used, lint said unused. Will remove if confirmed.
+
 
 export default function PedidoMayoristaPage() {
     const supabase = createClient();
@@ -68,8 +67,8 @@ export default function PedidoMayoristaPage() {
 
             // 3. Process and Merge
             const processedEsencias = (esenciasData || []).map((e: any) => {
-                const gramosPor = e.proveedores?.gramos_configurados ?? 1;
-                const perfumesPorCantidad = e.cantidad_gramos && gramosPor > 0 ? e.cantidad_gramos / gramosPor : 1;
+                // const gramosPor = e.proveedores?.gramos_configurados ?? 1;
+                // const perfumesPorCantidad = e.cantidad_gramos && gramosPor > 0 ? e.cantidad_gramos / gramosPor : 1;
 
                 let precioFinal = 0;
                 if (e.precio_usd && currencies["ARS"]) {

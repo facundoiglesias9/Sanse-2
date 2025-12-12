@@ -19,7 +19,7 @@ export default function ListaDePreciosPage() {
   const supabase = createClient();
   const { currencies, isLoading: loadingCurrencies } = useCurrencies();
 
-  // Fetch user role
+  // Obtener rol del usuario
   useEffect(() => {
     const getUserRole = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -37,7 +37,7 @@ export default function ListaDePreciosPage() {
     getUserRole();
   }, []);
 
-  // Determine view: revendedores always see mayorista
+  // Determinar vista: revendedores siempre ven mayorista
   const requestedView = searchParams.get("view") as "minorista" | "mayorista";
   const view = userRole === "revendedor" ? "mayorista" : (requestedView || "minorista");
 
@@ -69,19 +69,6 @@ export default function ListaDePreciosPage() {
 
     const { data: insumos } = await supabase.from("insumos").select("*");
 
-    const frascoFemenino = insumos?.find(
-      (i) => i.nombre === "Frascos femeninos",
-    );
-    const frascoMasculino = insumos?.find(
-      (i) => i.nombre === "Frascos masculinos",
-    );
-
-    const calcularCostoFrasco = (insumo: any) =>
-      insumo && insumo.cantidad_lote > 0
-        ? (insumo.precio_lote / insumo.cantidad_lote) *
-        insumo.cantidad_necesaria
-        : 0;
-
     const DESCUENTO_MAYORISTA = 0.85; // 15% de descuento
 
     const perfumesCalculados: Perfume[] = (esencias ?? [])
@@ -112,7 +99,7 @@ export default function ListaDePreciosPage() {
         let costoFrasco = 0;
         let costoOtrosInsumos = 0;
 
-        // Priority: Custom Insumos (FULL OVERRIDE)
+        // Prioridad: Insumos Personalizados (SOBREESCRIBIR TODO)
         if (esencia.custom_insumos && Array.isArray(esencia.custom_insumos) && esencia.custom_insumos.length > 0) {
           costoFrasco = 0; // Custom list assumes full responsibility
           costoOtrosInsumos = esencia.custom_insumos.reduce((acc: number, customIns: any) => {
@@ -129,8 +116,8 @@ export default function ListaDePreciosPage() {
             return acc;
           }, 0);
         } else {
-          // Fallback logic removed as part of Category decoupling.
-          // If no custom_insumos are defined, the product has no extra costs.
+          // Lógica de respaldo eliminada como parte del desacoplamiento de Categoría.
+          // Si no se definen insumos personalizados, el producto no tiene costos extra.
           costoFrasco = 0;
           costoOtrosInsumos = 0;
         }
@@ -166,7 +153,7 @@ export default function ListaDePreciosPage() {
           precio_ars: esencia.precio_ars,
           precio_usd: esencia.precio_usd,
           cantidad_gramos: esencia.cantidad_gramos,
-          // Custom fields passthrough
+          // Paso de campos personalizados
           margen_minorista: esencia.margen_minorista,
           margen_mayorista: esencia.margen_mayorista,
           custom_insumos: esencia.custom_insumos,
@@ -183,7 +170,7 @@ export default function ListaDePreciosPage() {
     }
   }, [currencies, loadingCurrencies]);
 
-  // Filter for Van Rossum only if user is revendedor
+  // Filtrar solo para Van Rossum si el usuario es revendedor
   const filteredPerfumes = userRole === "revendedor"
     ? perfumes.filter(p => p.proveedores?.nombre?.toLowerCase() === "van rossum")
     : perfumes;

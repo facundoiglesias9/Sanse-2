@@ -91,7 +91,7 @@ export default function Caja2Page() {
     const [profiles, setProfiles] = useState<Record<string, string>>({});
     const [loading, setLoading] = useState(true);
 
-    // Dialog state
+    // Estado del diálogo
     const [dialogOpen, setDialogOpen] = useState(false);
     const [detalle, setDetalle] = useState("");
     const [monto, setMonto] = useState<number>(0);
@@ -116,7 +116,7 @@ export default function Caja2Page() {
     const fetchData = async () => {
         setLoading(true);
 
-        // Fetch profiles
+        // Obtener perfiles
         const { data: profilesData } = await supabase
             .from("profiles")
             .select("id, nombre");
@@ -127,34 +127,27 @@ export default function Caja2Page() {
         });
         setProfiles(profilesMap);
 
-        // Fetch gastos
+        // Get expenses
         const { data: gastosData } = await supabase
             .from("gastos")
             .select("*")
             .order("created_at", { ascending: false });
         setGastos(gastosData || []);
 
-        // Fetch deudas
+        // Fetch debts
         const { data: deudasData } = await supabase
             .from("deudas")
             .select("*")
             .order("created_at", { ascending: false });
         setDeudas(deudasData || []);
 
-        // Fetch ventas (exclude reseller sales from main widget)
+        // Get sales (exclude reseller sales from main widget)
         const { data: ventasData } = await supabase
             .from("ventas")
             .select("*")
             .or("is_reseller_sale.is.null,is_reseller_sale.eq.false")
             .order("created_at", { ascending: false });
         setVentas(ventasData || []);
-
-        // Fetch ALL ventas (including reseller) for Sanse total
-        const { data: allVentasData } = await supabase
-            .from("ventas")
-            .select("precio_total");
-
-        const totalAllVentas = (allVentasData || []).reduce((sum, v) => sum + v.precio_total, 0);
 
         setLoading(false);
     };
@@ -204,56 +197,52 @@ export default function Caja2Page() {
         fetchData();
     };
 
-    const handleSaldar = (expense: UnifiedExpense) => {
-        setSelectedExpense(expense);
-        setMontoSaldar(expense.monto);
-        setSaldarDialogOpen(true);
-    };
-
     const handleConfirmSaldar = async () => {
         if (!selectedExpense || montoSaldar <= 0) {
             toast.error("Monto inválido");
             return;
         }
 
-        console.log("💰 Intentando saldar:", {
+        console.log("💰 Attempting to settle:", {
             detalle: selectedExpense.detalle,
             pagador: selectedExpense.pagador,
             monto: montoSaldar,
             montoType: typeof montoSaldar
         });
 
-        console.log("👥 Profiles disponibles:", profiles);
+        console.log("👥 Available Profiles:", profiles);
 
-        // Find the acreedor ID based on the pagador name
+        // Find the creditor ID based on the payer's name
         const acreedorId = Object.entries(profiles).find(
-            ([id, nombre]) => nombre.toLowerCase().includes(selectedExpense.pagador.toLowerCase())
+            ([_id, nombre]) => nombre.toLowerCase().includes(selectedExpense.pagador.toLowerCase())
         )?.[0];
 
-        console.log("🔍 Acreedor encontrado:", acreedorId);
+        console.log("🔍 Creditor found:", acreedorId);
 
         if (!acreedorId) {
-            console.error("❌ No se encontró acreedor para:", selectedExpense.pagador);
-            toast.error(`No se pudo encontrar el inversor: ${selectedExpense.pagador}`);
+            console.error("❌ Creditor not found for:", selectedExpense.pagador);
+            toast.error(`Could not find investor: ${selectedExpense.pagador}`);
             return;
         }
 
         // Create TWO expenses:
-        // 1. Positive expense paid by Sanse (money going out)
+        // 1. "Debt payment" for the payer (positive amount)
         const { error: error1 } = await supabase.from("gastos").insert({
-            detalle: `pago deuda a: ${selectedExpense.pagador}`,
+            detalle: `pago deuda a ${selectedExpense.pagador}`,
             monto: montoSaldar,
             pagador_id: null, // Sanse (common fund)
             created_at: new Date().toISOString(),
         });
 
         if (error1) {
-            console.error("❌ Error al crear gasto de Sanse:", error1);
-            toast.error(`Error al saldar: ${error1.message}`);
+            console.error("❌ Error creating Sanse expense:", error1);
+            toast.error(`Error settling: ${error1.message}`);
             return;
         }
 
-        // 2. Negative expense for the acreedor to reduce their investment
+        // 2. "Debt collection" for Sanse (negative amount to reduce investment)
+        // This is tricky: if we "pay" a debt with cash, no money actually leaves our physical cash register,
+        // but rather it comes from a "virtual Sanse cash"
         const { error: error2 } = await supabase.from("gastos").insert({
             detalle: `cobro deuda desde Sanse`,
             monto: -montoSaldar, // NEGATIVE to reduce their balance
