@@ -10,6 +10,7 @@ import { LoaderTable } from "@/app/(app)/components/loader-table";
 import { useCurrencies } from "@/app/contexts/CurrencyContext";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2 } from "lucide-react";
 import type { ColumnFiltersState, SortingState } from "@tanstack/react-table";
 import {
@@ -35,35 +36,62 @@ export default function EsenciasPage() {
   const [pendingOpen, setPendingOpen] = useState(false);
   const [pendingVR, setPendingVR] = useState<Esencia[]>([]);
 
+  // Toggle 30g / 100g
+  const [show100g, setShow100g] = useState(false);
+
   const supabase = createClient();
   const { currencies, isLoading: loadingCurrencies } = useCurrencies();
 
+  // Recalculate helper (for enrichment and dynamic toggle)
+  const calculateDerived = (base: Esencia, activeGrams: number, activePriceArs: number | null | undefined): Esencia => {
+    const gramosPor = base.proveedores?.gramos_configurados ?? 1;
+
+    // Si activePriceArs es null/undefined, precioFinal será 0 o basado en USD
+    // Pero si estamos "simulando" 100g y no hay precio, debería ser 0 o null?
+    // Mantengamos lógica original fallbacks
+
+    let precioFinal = 0;
+    if (base.precio_usd && currencies["ARS"]) {
+      // Si tiene precio USD, ¿ignoramos el toggle de ARS?
+      // Usualmente si hay precio USD, manda sobre ARS.
+      // Pero para VanRossum (scraping), suele ser ARS.
+      precioFinal = base.precio_usd * currencies["ARS"];
+    } else if (activePriceArs) {
+      precioFinal = activePriceArs;
+    }
+
+    const perfumesPorCantidad =
+      activeGrams && gramosPor > 0
+        ? activeGrams / gramosPor
+        : 1;
+
+    const precio_por_perfume =
+      perfumesPorCantidad > 0 ? precioFinal / perfumesPorCantidad : 0;
+
+    return {
+      ...base,
+      precio_ars: activePriceArs ?? base.precio_ars, // Visual override
+      cantidad_gramos: activeGrams,                  // Visual override
+      precio_por_perfume,
+    };
+  };
+
   const enrichEsencias = (data: Esencia[]): Esencia[] => {
-    return data.map((esencia) => {
-      const gramosPor = esencia.proveedores?.gramos_configurados ?? 1;
-      const perfumesPorCantidad =
-        esencia.cantidad_gramos && gramosPor > 0
-          ? esencia.cantidad_gramos / gramosPor
-          : 1;
-
-      let precioFinal = 0;
-      if (esencia.precio_usd && currencies["ARS"]) {
-        precioFinal = esencia.precio_usd * currencies["ARS"];
-      } else if (esencia.precio_ars) {
-        precioFinal = esencia.precio_ars;
-      }
-
-      const precio_por_perfume =
-        perfumesPorCantidad > 0 ? precioFinal / perfumesPorCantidad : 0;
-
-      return { ...esencia, precio_por_perfume };
-    });
+    // This initial enrichment is for the "base" state (usually defaults)
+    // But we will use calculateDerived in the render loop dynamic too.
+    // Let's just return data, and do calc later? 
+    // Actually, `fetchEsencias` sets `esencias`.
+    // We should store raw data or base data, and derive in render?
+    // Current code sets `esencias` with enriched data.
+    // Let's keep `esencias` as the "Base Store" (with scraped defaults)
+    // and derive a `displayedEsencias` for the table.
+    return data;
   };
 
   const fetchEsencias = async () => {
     setLoadingEsencias(true);
 
-    // 1) Esencias
+    // 1) Esencias (updated query to include new cols)
     const { data: esenciasDB, error: eEs } = await supabase
       .from("esencias")
       .select("*, proveedores(id, nombre, gramos_configurados, color)")
@@ -75,13 +103,14 @@ export default function EsenciasPage() {
       return;
     }
 
-    // 2) Últimos precios scrapeados
+    // 2) Últimos precios scrapeados (metadata only/legacy)
     const { data: ultimos, error: ePv } = await supabase
       .from("precios_vanrossum_latest")
       .select("esencia_id, precio_ars_100g, actualizado_en");
 
     if (ePv) {
-      toast.error("Error al cargar precios de Van Rossum");
+      // Just log, don't block
+      console.error("Error loading VR latest", ePv);
     }
 
     const scrapedMap = new Map<
@@ -97,35 +126,32 @@ export default function EsenciasPage() {
       ])
     );
 
-    // 3) Enriquecer + flags de scraping + _last_update
-    const enriquecidas = esenciasDB ? enrichEsencias(esenciasDB) : [];
-    const decoradas = enriquecidas.map((e) => {
+    // 3) Enriquecer (Base) + flags
+    // Note: We don't calc per-perfume here anymore, we do it in displayedEsencias
+    const deco: Esencia[] = (esenciasDB || []).map((e) => {
       const s = scrapedMap.get(e.id);
       const lastUpdate = s?.actualizado_en ?? e.updated_at ?? null;
+      let out = { ...e };
+
+      // Metadata fields
       if (s) {
-        return {
-          ...e,
-          _scrape_fuente: "vanrossum",
-          _scrape_consultar: s.precio === null,
-          _scrape_time: s.actualizado_en, // para el puntito
-          _last_update: lastUpdate,       // para la columna
-        } as any;
+        (out as any)._scrape_fuente = "vanrossum";
+        (out as any)._scrape_consultar = s.precio === null; // Legacy view logic
+        (out as any)._scrape_time = s.actualizado_en;
       }
-      return {
-        ...e,
-        _last_update: lastUpdate,
-      } as any;
+      (out as any)._last_update = lastUpdate;
+      return out;
     });
 
     // 4) Calcular pendientes VR
-    const vrEsencias = decoradas.filter(
+    const vrEsencias = deco.filter(
       (ee) => (ee.proveedores?.nombre || "").trim().toLowerCase() === "van rossum"
     );
     const scrapedIds = new Set(scrapedMap.keys());
     const pendientes = vrEsencias.filter((ee) => !scrapedIds.has(ee.id));
-    setPendingVR(pendientes);
 
-    setEsencias(decoradas as Esencia[]);
+    setPendingVR(pendientes);
+    setEsencias(deco);
     setLoadingEsencias(false);
   };
 
@@ -133,6 +159,44 @@ export default function EsenciasPage() {
     if (!loadingCurrencies) fetchEsencias();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadingCurrencies]);
+
+  // Derived state for display
+  const displayedEsencias = esencias.map((e) => {
+    // Determine effective grams/price
+    // Default logic: use stored.
+    // Dynamic logic: try to use corresponding column.
+
+    let activePrice: number | null | undefined = e.precio_ars;
+    let activeGrams = e.cantidad_gramos ?? 1;
+
+    // Only apply toggle logic for Van Rossum items (or those with the cols)
+    if (show100g) {
+      if (e.precio_ars_100g) {
+        activePrice = e.precio_ars_100g;
+        activeGrams = 100;
+      } else if ((e.proveedores?.nombre || "").toLowerCase().includes("van rossum")) {
+        // If generic VR item but NO 100g price found, what?
+        // Maybe fallback to 30g logic or stay as is?
+        // If we strictly want 100g view, and it's missing, maybe showing empty/null?
+        // Let's stick to: "If available, switch". Else keep default.
+      }
+    } else {
+      // 30g view (default)
+      // Always try to use 30g col if available? 
+      // Or just use `precio_ars` which is usually 30g?
+      // If we want to strictly show 30g price if available:
+      if (e.precio_ars_30g) {
+        activePrice = e.precio_ars_30g;
+        activeGrams = 30;
+      } else if (!show100g && e.cantidad_gramos === 100 && e.precio_ars_30g) {
+        // special case: if default was 100g but we want 30g view
+        activePrice = e.precio_ars_30g;
+        activeGrams = 30;
+      }
+    }
+
+    return calculateDerived(e, activeGrams, activePrice);
+  });
 
   const confirmDelete = (id: string) => {
     setDeleteId(id);
@@ -167,7 +231,19 @@ export default function EsenciasPage() {
   return (
     <div className="flex flex-col gap-4 p-4 max-w-7xl mx-auto">
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <h1 className="text-3xl font-bold">Gestión de esencias</h1>
+        <div className="flex items-center gap-4">
+          <h1 className="text-3xl font-bold">Gestión de esencias</h1>
+          <Tabs
+            value={show100g ? "100g" : "30g"}
+            onValueChange={(val) => setShow100g(val === "100g")}
+            className="w-auto"
+          >
+            <TabsList>
+              <TabsTrigger value="30g">30g (Default)</TabsTrigger>
+              <TabsTrigger value="100g">100g</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
 
         {/* Botón de pendientes: solo si hay > 0 y no está cargando */}
         {!loadingEsencias && pendingVR.length > 0 && (
@@ -186,7 +262,7 @@ export default function EsenciasPage() {
       ) : (
         <DataTable
           columns={columnasMasculinas(confirmDelete, handleEdit)}
-          data={esencias}
+          data={displayedEsencias}
           sorting={sorting}
           setSorting={setSorting}
           columnFilters={columnFilters}

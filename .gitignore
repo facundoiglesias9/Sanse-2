@@ -41,3 +41,5 @@ yarn-error.log*
 
 # dumps
 emails_dump.txt
+users.txt
+full_users.txt
