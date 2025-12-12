@@ -81,12 +81,20 @@ const linksUserbar = [
   { href: "/perfil", label: "Perfil" },
   { href: "/registro_de_actividad", label: "Registro de actividad" },
   { href: "/accept-orphans", label: "Aceptar Huérfanos" },
+  { href: "/gestion-usuarios", label: "Gestión de usuarios" },
 ];
+
+/* 
+   ... imports ...
+*/
+
+// ... (previous imports)
 
 export function NavigationBar() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [session, setSession] = useState<any>(null);
+  const [userRole, setUserRole] = useState<string>("revendedor"); // Default safe
   const router = useRouter();
   const supabase = createClient();
   const { currencies, isLoading: loadingCurrencies } = useCurrencies();
@@ -95,10 +103,22 @@ export function NavigationBar() {
 
   // Verificar si hay una sesión activa
   useEffect(() => {
-    supabase.auth.getSession().then((currentSession) => {
-      setSession(currentSession.data.session);
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      setSession(session);
+      if (session?.user) {
+        // Attempt to get role from profiles, fallback to metadata
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('rol')
+          .eq('id', session.user.id)
+          .single();
+
+        const role = profile?.rol || session.user.user_metadata?.rol || "revendedor";
+        setUserRole(role);
+      }
     });
   }, []);
+
 
   const handleLogout = async () => {
     await supabase.auth.signOut(); // Cierra la sesión en Supabase
@@ -106,7 +126,49 @@ export function NavigationBar() {
     router.push("/login"); // Redirige al login
   };
 
+
+  // Filter Links Based on Role
+  const isAdmin = userRole === "admin";
+
+  // Admin sees everything. Revendedor sees restricted list.
+  // Revendedor: Lista de precios (and implied 'Pedidio Mayorista' maybe? No, strict to request: "Lista precios" & "Agregar ventas").
+  // "Agregar ventas" functionality is usually embedded in the main view or a specific /ventas page. 
+  // Assuming "/" (Lista de precios) contains the sales logic.
+
+  // Navbar: 
+  // Admin: All (Lista, Agregar Prod, Inventario, Pedidos)
+  // Revendedor: Lista de precios.
+  const filteredNavbar = linksNavbar.filter(link => {
+    if (isAdmin) return true;
+    return ["/"].includes(link.href);
+  });
+
+  // ABM:
+  // Admin: All
+  // Revendedor: None
+  const filteredABM = isAdmin ? abmLinks : [];
+
+  // Herramientas:
+  // Admin: All
+  // Revendedor: None
+  const filteredHerramientas = isAdmin ? herramientasLinks : [];
+
+  // Caja:
+  // Admin: Yes
+  // Revendedor: No
+  const showCaja = isAdmin;
+
+  // Userbar:
+  // Admin: All
+  // Revendedor: Perfil, Registro. (No Gestion Usuarios)
+  const filteredUserbar = linksUserbar.filter(link => {
+    if (isAdmin) return true;
+    return link.href !== "/gestion-usuarios";
+  });
+
   return (
+    // ... Render with filtered lists ...
+    // (I will reconstruct the component using these filtered variables)
     <header
       className={clsx(
         "sticky top-0 z-50 flex items-center justify-between w-full backdrop-blur-lg bg-background/70 py-3 md:py-4 shadow-sm transition-all",
@@ -123,8 +185,9 @@ export function NavigationBar() {
       {/* Navegación Desktop */}
       <NavigationMenu viewport={false} className="hidden md:flex">
         <NavigationMenuList>
-          {linksNavbar.map((link) => {
-            if (link.href === "/") {
+          {filteredNavbar.map((link) => {
+            // Admin gets dropdown for "Lista de precios", Revendedor gets simple link
+            if (link.href === "/" && isAdmin) {
               return (
                 <NavigationMenuItem key={link.href}>
                   <NavigationMenuTrigger className={pathname === "/" ? "bg-accent text-accent-foreground" : ""}>Lista de precios</NavigationMenuTrigger>
@@ -160,6 +223,23 @@ export function NavigationBar() {
                   </NavigationMenuContent>
                 </NavigationMenuItem>
               );
+            } else if (link.href === "/" && !isAdmin) {
+              // Revendedor: Simple link to mayorista only
+              return (
+                <NavigationMenuItem key={link.href}>
+                  <NavigationMenuLink asChild>
+                    <Link
+                      href="/?view=mayorista"
+                      className={clsx(
+                        navigationMenuTriggerStyle(),
+                        pathname === "/" && "bg-accent text-accent-foreground"
+                      )}
+                    >
+                      Lista de precios
+                    </Link>
+                  </NavigationMenuLink>
+                </NavigationMenuItem>
+              );
             }
             return (
               <NavigationMenuItem key={link.href}>
@@ -178,64 +258,102 @@ export function NavigationBar() {
             );
           })}
         </NavigationMenuList>
-        <NavigationMenuList>
-          <NavigationMenuItem>
-            <NavigationMenuTrigger className={pathname.startsWith("/abm") && !pathname.startsWith("/abm/inventario") ? "bg-accent text-accent-foreground" : ""}>ABMs</NavigationMenuTrigger>
-            <NavigationMenuContent>
-              <ul className="grid w-[200px] gap-2">
-                {abmLinks.map((link) => {
-                  return (
-                    <li key={link.href}>
+
+        {(filteredABM.length > 0 || showCaja || filteredHerramientas.length > 0) && (
+          <NavigationMenuList>
+            {filteredABM.length > 0 && (
+              <NavigationMenuItem>
+                <NavigationMenuTrigger className={pathname.startsWith("/abm") && !pathname.startsWith("/abm/inventario") ? "bg-accent text-accent-foreground" : ""}>ABMs</NavigationMenuTrigger>
+                <NavigationMenuContent>
+                  <ul className="grid w-[200px] gap-2">
+                    {filteredABM.map((link) => {
+                      return (
+                        <li key={link.href}>
+                          <NavigationMenuLink asChild>
+                            <Link
+                              href={link.href}
+                              className="flex-row items-center gap-x-3"
+                            >
+                              {link.icon}
+                              {link.label}
+                            </Link>
+                          </NavigationMenuLink>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </NavigationMenuContent>
+              </NavigationMenuItem>
+            )}
+
+            {showCaja && (
+              <NavigationMenuItem>
+                <NavigationMenuTrigger className={pathname.startsWith("/caja2") ? "bg-accent text-accent-foreground" : ""}>Caja</NavigationMenuTrigger>
+                <NavigationMenuContent>
+                  <ul className="grid w-[300px] gap-2">
+                    <li>
                       <NavigationMenuLink asChild>
                         <Link
-                          href={link.href}
-                          className="flex-row items-center gap-x-3"
+                          href="/caja2"
+                          className={clsx(
+                            "block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground",
+                            pathname === "/caja2" && "bg-accent text-accent-foreground"
+                          )}
                         >
-                          {link.icon}
-                          {link.label}
+                          <div className="text-sm font-medium leading-none">Caja Unificada</div>
+                          <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
+                            Ver ganancias, gastos y deudas
+                          </p>
                         </Link>
                       </NavigationMenuLink>
                     </li>
-                  );
-                })}
-              </ul>
-            </NavigationMenuContent>
-          </NavigationMenuItem>
-          <NavigationMenuItem>
-            <NavigationMenuLink asChild>
-              <Link
-                href="/caja2"
-                className={clsx(
-                  navigationMenuTriggerStyle(),
-                  pathname === "/caja2" && "bg-accent text-accent-foreground"
-                )}
-              >
-                Caja
-              </Link>
-            </NavigationMenuLink>
-          </NavigationMenuItem>
-          <NavigationMenuItem>
-            <NavigationMenuTrigger className={pathname.startsWith("/herramientas") ? "bg-accent text-accent-foreground" : ""}>Herramientas</NavigationMenuTrigger>
-            <NavigationMenuContent>
-              <ul className="grid w-[300px] gap-2">
-                {herramientasLinks.map((link) => {
-                  return (
-                    <li key={link.href}>
+                    <li>
                       <NavigationMenuLink asChild>
-                        <Link href={link.href}>
-                          <div className="font-medium">{link.label}</div>
-                          <div className="text-muted-foreground">
-                            {link.description}
-                          </div>
+                        <Link
+                          href="/caja2/ventas-revendedores"
+                          className={clsx(
+                            "block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground",
+                            pathname === "/caja2/ventas-revendedores" && "bg-accent text-accent-foreground"
+                          )}
+                        >
+                          <div className="text-sm font-medium leading-none">Ventas Revendedores</div>
+                          <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
+                            Historial de ventas por revendedor
+                          </p>
                         </Link>
                       </NavigationMenuLink>
                     </li>
-                  );
-                })}
-              </ul>
-            </NavigationMenuContent>
-          </NavigationMenuItem>
-        </NavigationMenuList>
+                  </ul>
+                </NavigationMenuContent>
+              </NavigationMenuItem>
+            )}
+
+            {filteredHerramientas.length > 0 && (
+              <NavigationMenuItem>
+                <NavigationMenuTrigger className={pathname.startsWith("/herramientas") ? "bg-accent text-accent-foreground" : ""}>Herramientas</NavigationMenuTrigger>
+                <NavigationMenuContent>
+                  <ul className="grid w-[300px] gap-2">
+                    {filteredHerramientas.map((link) => {
+                      return (
+                        <li key={link.href}>
+                          <NavigationMenuLink asChild>
+                            <Link href={link.href}>
+                              <div className="font-medium">{link.label}</div>
+                              <div className="text-muted-foreground">
+                                {link.description}
+                              </div>
+                            </Link>
+                          </NavigationMenuLink>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </NavigationMenuContent>
+              </NavigationMenuItem>
+            )}
+          </NavigationMenuList>
+        )}
+
       </NavigationMenu>
 
       {/* Sección derecha */}
@@ -265,7 +383,7 @@ export function NavigationBar() {
                 </Avatar>
               </DropdownMenuTrigger>
               <DropdownMenuContent>
-                <DropdownMenuLabel>Mi cuenta</DropdownMenuLabel>
+                <DropdownMenuLabel>Mi cuenta ({userRole === 'admin' ? 'Admin' : 'Revendedor'})</DropdownMenuLabel>
                 <DropdownMenuSub>
                   <DropdownMenuSubTrigger>Modo de color</DropdownMenuSubTrigger>
                   <DropdownMenuPortal>
@@ -283,7 +401,7 @@ export function NavigationBar() {
                   </DropdownMenuPortal>
                 </DropdownMenuSub>
                 <DropdownMenuSeparator />
-                {linksUserbar.map((link) => {
+                {filteredUserbar.map((link) => {
                   return (
                     <DropdownMenuItem key={link.href} asChild>
                       <Link href={link.href}>{link.label}</Link>
@@ -333,29 +451,46 @@ export function NavigationBar() {
               </div>
 
               <nav className="flex flex-col gap-2 mt-2">
-                <p className="text-sm font-medium text-muted-foreground mb-1">Lista de precios</p>
-                <Link
-                  href="/"
-                  className={clsx(
-                    "text-lg font-semibold hover:text-foreground pl-4",
-                    pathname === "/" && searchParams.get("view") !== "mayorista" ? "text-foreground" : "text-muted-foreground",
-                  )}
-                  onClick={() => setOpen(false)}
-                >
-                  Minorista
-                </Link>
-                <Link
-                  href="/?view=mayorista"
-                  className={clsx(
-                    "text-lg font-semibold hover:text-foreground pl-4",
-                    searchParams.get("view") === "mayorista" ? "text-foreground" : "text-muted-foreground",
-                  )}
-                  onClick={() => setOpen(false)}
-                >
-                  Mayorista
-                </Link>
+                {isAdmin && (
+                  <>
+                    <p className="text-sm font-medium text-muted-foreground mb-1">Lista de precios</p>
+                    <Link
+                      href="/"
+                      className={clsx(
+                        "text-lg font-semibold hover:text-foreground pl-4",
+                        pathname === "/" && searchParams.get("view") !== "mayorista" ? "text-foreground" : "text-muted-foreground",
+                      )}
+                      onClick={() => setOpen(false)}
+                    >
+                      Minorista
+                    </Link>
+                    <Link
+                      href="/?view=mayorista"
+                      className={clsx(
+                        "text-lg font-semibold hover:text-foreground pl-4",
+                        searchParams.get("view") === "mayorista" ? "text-foreground" : "text-muted-foreground",
+                      )}
+                      onClick={() => setOpen(false)}
+                    >
+                      Mayorista
+                    </Link>
+                  </>
+                )}
 
-                {linksNavbar.filter(l => l.href !== "/").map((link) => {
+                {!isAdmin && (
+                  <Link
+                    href="/?view=mayorista"
+                    className={clsx(
+                      "text-lg font-semibold hover:text-foreground",
+                      pathname === "/" ? "text-foreground" : "text-muted-foreground",
+                    )}
+                    onClick={() => setOpen(false)}
+                  >
+                    Lista de precios
+                  </Link>
+                )}
+
+                {filteredNavbar.filter(l => l.href !== "/").map((link) => {
                   const isActive = pathname === link.href;
                   return (
                     <Link
@@ -372,7 +507,7 @@ export function NavigationBar() {
                   );
                 })}
 
-                {abmLinks.map((link) => {
+                {filteredABM.map((link) => {
                   const isActive = pathname === link.href;
                   return (
                     <Link
@@ -389,20 +524,22 @@ export function NavigationBar() {
                   );
                 })}
 
-                <Link
-                  href="/caja2"
-                  className={clsx(
-                    "text-lg font-semibold hover:text-foreground",
-                    pathname === "/caja2"
-                      ? "text-foreground"
-                      : "text-muted-foreground"
-                  )}
-                  onClick={() => setOpen(false)}
-                >
-                  Caja
-                </Link>
+                {showCaja && (
+                  <Link
+                    href="/caja2"
+                    className={clsx(
+                      "text-lg font-semibold hover:text-foreground",
+                      pathname === "/caja2"
+                        ? "text-foreground"
+                        : "text-muted-foreground"
+                    )}
+                    onClick={() => setOpen(false)}
+                  >
+                    Caja
+                  </Link>
+                )}
 
-                {linksUserbar.map((link) => {
+                {filteredUserbar.map((link) => {
                   const isActive = pathname === link.href;
                   return (
                     <Link

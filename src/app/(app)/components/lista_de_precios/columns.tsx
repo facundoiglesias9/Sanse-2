@@ -266,9 +266,16 @@ const allColumns: ColumnDef<Perfume>[] = [
 ];
 
 export const getListaPreciosColumns = (
-  view: "minorista" | "mayorista" = "minorista"
+  view: "minorista" | "mayorista" = "minorista",
+  userRole: string = "admin"
 ): ColumnDef<Perfume>[] => {
   const columns = allColumns.filter((col) => {
+    // Hide 'acciones' column for revendedores
+    if (col.id === "acciones" && userRole === "revendedor") return false;
+
+    // Hide 'proveedor' column for revendedores
+    if ("accessorKey" in col && (col as any).accessorKey === "proveedor_id" && userRole === "revendedor") return false;
+
     // If column has no accessorKey, it's likely 'select' or 'acciones', keep them always?
     // 'select' has id='select'
     // 'acciones' has id='acciones'

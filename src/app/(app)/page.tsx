@@ -9,21 +9,37 @@ import { createClient } from "@/utils/supabase/client";
 import { useCurrencies } from "@/app/contexts/CurrencyContext";
 import { LoaderTable } from "@/app/(app)/components/loader-table";
 
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-
 export default function ListaDePreciosPage() {
   const [perfumes, setPerfumes] = useState<Perfume[]>([]);
   const [loadingTableListaDePrecios, setLoadingTableListaDePrecios] =
     useState(false);
-
-  const [show100g, setShow100g] = useState(false);
+  const [userRole, setUserRole] = useState<string>("revendedor");
 
   const searchParams = useSearchParams();
-  const view = (searchParams.get("view") as "minorista" | "mayorista") || "minorista";
-
   const supabase = createClient();
   const { currencies, isLoading: loadingCurrencies } = useCurrencies();
+
+  // Fetch user role
+  useEffect(() => {
+    const getUserRole = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('rol')
+          .eq('id', session.user.id)
+          .single();
+
+        const role = profile?.rol || session.user.user_metadata?.rol || "revendedor";
+        setUserRole(role);
+      }
+    };
+    getUserRole();
+  }, []);
+
+  // Determine view: revendedores always see mayorista
+  const requestedView = searchParams.get("view") as "minorista" | "mayorista";
+  const view = userRole === "revendedor" ? "mayorista" : (requestedView || "minorista");
 
   const fetchListaDePrecios = async () => {
     setLoadingTableListaDePrecios(true);
@@ -39,8 +55,17 @@ export default function ListaDePreciosPage() {
       )
       .order("nombre", { ascending: true });
 
-    // Ya no dependemos de "precios_vanrossum_latest" para el precio activo, usamos columnas en esencias
-    // Pero mantenemos compatibilidad por si acaso (aunque priorizamos esencias.precio_ars_100g/30g)
+    // Traemos el último precio 100g por esencia desde la vista
+    const { data: ultimos } = await supabase
+      .from("precios_vanrossum_latest")
+      .select("esencia_id, precio_ars_100g");
+
+    // Mapeo rápido por esencia_id (uuid -> número)
+    const precio100gByEsencia = new Map<string, number>(
+      (ultimos ?? [])
+        .filter((u) => typeof u.precio_ars_100g === "number")
+        .map((u) => [u.esencia_id as string, u.precio_ars_100g as number]),
+    );
 
     const { data: insumos } = await supabase.from("insumos").select("*");
 
@@ -63,78 +88,25 @@ export default function ListaDePreciosPage() {
       .filter((esencia) => !esencia.is_consultar)
       .map((esencia) => {
         let precioFinalArs = 0;
-        let cantidadParaCalculo = 1;
 
-        // Lógica dinámica de precio
-        if (show100g) {
-          if (esencia.precio_ars_100g) {
-            precioFinalArs = esencia.precio_ars_100g;
-            cantidadParaCalculo = 100;
-          } else {
-            // Fallback si no hay 100g específico pero queremos ver eso... 
-            // O usamos la lógica legacy de "si es VanRossum intentar 100"
-            // Si no hay dato, usamos precio_ars base
-            if (esencia.precio_usd && currencies["ARS"]) {
-              precioFinalArs = esencia.precio_usd * currencies["ARS"];
-              cantidadParaCalculo = esencia.cantidad_gramos ?? 1;
-            } else if (esencia.precio_ars) {
-              // Aquí podríamos entrar si es un producto manual
-              precioFinalArs = esencia.precio_ars;
-              cantidadParaCalculo = esencia.cantidad_gramos ?? 1;
-            }
-          }
-        } else {
-          // 30g mode (Default)
-          if (esencia.precio_ars_30g) {
-            precioFinalArs = esencia.precio_ars_30g;
-            cantidadParaCalculo = 30;
-          } else {
-            // Fallback
-            if (esencia.precio_usd && currencies["ARS"]) {
-              precioFinalArs = esencia.precio_usd * currencies["ARS"];
-              cantidadParaCalculo = esencia.cantidad_gramos ?? 1;
-            } else if (esencia.precio_ars) {
-              precioFinalArs = esencia.precio_ars;
-              cantidadParaCalculo = esencia.cantidad_gramos ?? 1;
-
-              // Corrección legacy: si precio_ars era de 100g pero estamos en 30g mode?
-              // Asumimos precio_ars es "el que está configurado como default".
-            }
-          }
+        // Prioridad al precio de 100g, si existe
+        const precio100g = precio100gByEsencia.get(esencia.id);
+        if (typeof precio100g === "number" && !Number.isNaN(precio100g)) {
+          precioFinalArs = precio100g;
+        } else if (esencia.precio_usd && currencies["ARS"]) {
+          precioFinalArs = esencia.precio_usd * currencies["ARS"];
+        } else if (esencia.precio_ars) {
+          precioFinalArs = esencia.precio_ars;
         }
 
         const gramosPor = esencia.proveedores?.gramos_configurados ?? 1;
-        // Normalizamos precio unitario
-        // Si cantidadParaCalculo = 100, precioFinalArs = $X. 
-        // Costo x perfume = (Precio / CantidadParaCalculo) * (Gramos x Perfume ? No)
+        const perfumesPorCantidad =
+          esencia.cantidad_gramos && gramosPor > 0
+            ? esencia.cantidad_gramos / gramosPor
+            : 1;
 
-        // Wait, logic above was:
-        // perfumesPorCantidad = esencia.cantidad_gramos / gramosPor
-        // costo = precioFinal / perfumesPorCantidad
-
-        // Nueva lógica:
-        // Tenemos $X por Y gramos.
-        // Costo por gramo = $X / Y
-        // Un perfume usa Z gramos (1?).
-        // Ajustemos:
-
-        const gramosBase = cantidadParaCalculo; // 30 o 100 (o lo que tenga la esencia)
-        const costoPorGramo = gramosBase > 0 ? (precioFinalArs / gramosBase) : 0;
-        const gramosPorPerfume = gramosPor; // "gramos_configurados" es lo que usa un perfume?
-        // En código original: "perfumesPorCantidad = cantidad_gramos / gramosPor" => "Cuantos perfumes saco de esta botella"
-        // Ej: Botella 100g, un perfume usa 30g? No, gramos_configurados suele ser 50g o 100g?
-        // "esencia.proveedores.gramos_configurados" -> 1.
-        // Asumamos que el costo materia prima es unitario si gramosPor=1.
-
-        // Legacy:
-        // perfumesPorCantidad = (100 / 1) = 100.
-        // precio_por_perfume = (10000 / 100) = 100.
-
-        // Vamos a respetar la formula anterior adaptando los inputs:
-        // Input: "esencia.cantidad_gramos" ahora es dinámico "cantidadParaCalculo"
-
-        const perfumesPorCantidad = cantidadParaCalculo / gramosPor;
-        const costoMateriaPrima = perfumesPorCantidad > 0 ? precioFinalArs / perfumesPorCantidad : 0;
+        const costoMateriaPrima =
+          perfumesPorCantidad > 0 ? precioFinalArs / perfumesPorCantidad : 0;
 
         // Cálculo del frasco según género
         let costoFrasco = 0;
@@ -191,9 +163,9 @@ export default function ListaDePreciosPage() {
           proveedores: esencia.proveedores,
           insumos_categorias_id: esencia.insumos_categorias?.id,
           insumos_categorias: esencia.insumos_categorias,
-          precio_ars: precioFinalArs,
+          precio_ars: esencia.precio_ars,
           precio_usd: esencia.precio_usd,
-          cantidad_gramos: cantidadParaCalculo,
+          cantidad_gramos: esencia.cantidad_gramos,
           // Custom fields passthrough
           margen_minorista: esencia.margen_minorista,
           margen_mayorista: esencia.margen_mayorista,
@@ -209,35 +181,28 @@ export default function ListaDePreciosPage() {
     if (!loadingCurrencies) {
       fetchListaDePrecios();
     }
-  }, [currencies, loadingCurrencies, show100g]);
+  }, [currencies, loadingCurrencies]);
+
+  // Filter for Van Rossum only if user is revendedor
+  const filteredPerfumes = userRole === "revendedor"
+    ? perfumes.filter(p => p.proveedores?.nombre?.toLowerCase() === "van rossum")
+    : perfumes;
 
   return (
     <div className="flex flex-col gap-4 p-4 max-w-6xl mx-auto">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-center">
-          Lista de precios {view === "mayorista" ? "mayorista" : "minorista"}
-        </h1>
-        <Tabs
-          value={show100g ? "100g" : "30g"}
-          onValueChange={(val) => setShow100g(val === "100g")}
-          className="w-auto"
-        >
-          <TabsList>
-            <TabsTrigger value="30g">30g</TabsTrigger>
-            <TabsTrigger value="100g">100g</TabsTrigger>
-          </TabsList>
-        </Tabs>
-      </div>
-
+      <h1 className="text-3xl font-bold text-center mb-6">
+        Lista de precios {view === "mayorista" ? "mayorista" : "minorista"}
+      </h1>
       {loadingTableListaDePrecios ? (
         <LoaderTable />
       ) : (
         <DataTable
-          columns={getListaPreciosColumns(view)}
-          data={perfumes}
+          columns={getListaPreciosColumns(view, userRole)}
+          data={filteredPerfumes}
           isLoading={false}
           onDataUpdate={fetchListaDePrecios}
           view={view}
+          userRole={userRole}
         />
       )}
     </div>
