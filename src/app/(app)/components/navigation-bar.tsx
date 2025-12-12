@@ -80,6 +80,7 @@ const herramientasLinks = [
 const linksUserbar = [
   { href: "/perfil", label: "Perfil" },
   { href: "/registro_de_actividad", label: "Registro de actividad" },
+  { href: "/accept-orphans", label: "Aceptar Huérfanos" },
 ];
 
 export function NavigationBar() {
