@@ -47,25 +47,25 @@ export default function GestionUsuariosPage() {
     const [profiles, setProfiles] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
-    // Edit Dialog State
+    // Estado del diálogo de edición
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [selectedUser, setSelectedUser] = useState<any>(null);
     const [newPassword, setNewPassword] = useState("");
     const [isSaving, setIsSaving] = useState(false);
 
-    // Delete Dialog State
+    // Estado del diálogo de eliminación
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [userToDelete, setUserToDelete] = useState<any>(null);
     const [isDeleting, setIsDeleting] = useState(false);
 
-    // Create User State
+    // Estado de creación de usuario
     const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
     const [newUserUsername, setNewUserUsername] = useState("");
     const [newUserPassword, setNewUserPassword] = useState("");
     const [newUserRole, setNewUserRole] = useState("revendedor");
     const [isCreating, setIsCreating] = useState(false);
 
-    // Fetch Users
+    // Obtener usuarios
     const fetchProfiles = async () => {
         setIsLoading(true);
         const result = await getUsers();
@@ -162,13 +162,13 @@ export default function GestionUsuariosPage() {
     };
 
     const handleRoleChange = async (userId: string, newRole: string) => {
-        // Optimistic update
+        // Actualización optimista
         setProfiles(prev => prev.map(p => p.id === userId ? { ...p, rol: newRole } : p));
 
         const result = await updateUserRole(userId, newRole);
         if (result.error) {
             toast.error("Error al actualizar rol");
-            // Revert
+            // Revertir
             fetchProfiles();
         } else {
             toast.success("Rol actualizado");
@@ -259,7 +259,7 @@ export default function GestionUsuariosPage() {
                 </CardContent>
             </Card>
 
-            {/* Edit Password Dialog */}
+            {/* Diálogo Editar Contraseña */}
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                 <DialogContent>
                     <DialogHeader>
@@ -301,7 +301,7 @@ export default function GestionUsuariosPage() {
                 </DialogContent>
             </Dialog>
 
-            {/* Delete Confirmation Alert */}
+            {/* Alerta de Confirmación de Eliminación */}
             <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
@@ -330,7 +330,7 @@ export default function GestionUsuariosPage() {
                 </AlertDialogContent>
             </AlertDialog>
 
-            {/* Create User Dialog */}
+            {/* Diálogo Crear Usuario */}
             <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
                 <DialogContent>
                     <DialogHeader>

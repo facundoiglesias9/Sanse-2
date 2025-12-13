@@ -61,12 +61,14 @@ const allColumns: ColumnDef<Perfume>[] = [
     enableHiding: false,
   },
   {
+
     accessorKey: "nombre",
     header: ({ column }) => {
       return (
         <Button
           variant="ghost"
           onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          className="pl-0 hover:bg-transparent"
         >
           Perfume
           <ArrowUpDown className="ml-2 h-4 w-4" />
@@ -76,26 +78,28 @@ const allColumns: ColumnDef<Perfume>[] = [
     cell: ({ row }) => <p className="font-bold">{row.getValue("nombre")}</p>,
   },
   {
-    accessorKey: "insumos_categorias.nombre", // Accessor for potential sorting
+    accessorKey: "insumos_categorias.nombre", // Accessor para ordenamiento potencial
     id: "categoria",
-    header: "Categoría",
+    header: ({ column }) => <div className="text-center">Categoría</div>,
     cell: ({ row }) => {
       const categoria = row.original.insumos_categorias?.nombre;
 
-      if (!categoria) return <Badge variant="outline">Sin categoría</Badge>;
+      if (!categoria) return <div className="flex justify-center"><Badge variant="outline">Sin categoría</Badge></div>;
 
       // Override específico para "Perfumería fina" como pidió el usuario
       if (categoria.toLowerCase().includes("perfumería fina") || categoria.toLowerCase() === "fina") {
         return (
-          <Badge className="bg-lime-100 text-lime-800 hover:bg-lime-200 border-transparent" variant="outline">
-            {categoria}
-          </Badge>
+          <div className="flex justify-center">
+            <Badge className="bg-lime-100 text-lime-800 hover:bg-lime-200 border-transparent" variant="outline">
+              {categoria}
+            </Badge>
+          </div>
         );
       }
 
       // Función simple para generar un índice consistente basado en el string
       const getHash = (str: string) => {
-        let hash = 5381; // Starting with a prime number DJB2-ish
+        let hash = 5381; // Empezando con un número primo estilo DJB2
         for (let i = 0; i < str.length; i++) {
           hash = (hash * 33) ^ str.charCodeAt(i);
         }
@@ -105,39 +109,41 @@ const allColumns: ColumnDef<Perfume>[] = [
       // Paleta de colores pastel modificada para evitar colisiones con el violeta/lila de los proveedores
       // Se eliminaron violet, fuchsia, indigo. Se priorizan colores frescos y distintos.
       const PASTEL_COLORS = [
-        "bg-teal-100 text-teal-800 hover:bg-teal-200 border-transparent",      // 0: Teal
-        "bg-orange-100 text-orange-800 hover:bg-orange-200 border-transparent", // 1: Orange
-        "bg-sky-100 text-sky-800 hover:bg-sky-200 border-transparent",          // 2: Sky Blue
-        "bg-lime-100 text-lime-800 hover:bg-lime-200 border-transparent",       // 3: Lime
-        "bg-rose-100 text-rose-800 hover:bg-rose-200 border-transparent",       // 4: Rose (Distinct enough from purple)
-        "bg-amber-100 text-amber-800 hover:bg-amber-200 border-transparent",    // 5: Amber
-        "bg-emerald-100 text-emerald-800 hover:bg-emerald-200 border-transparent", // 6: Emerald
-        "bg-cyan-100 text-cyan-800 hover:bg-cyan-200 border-transparent",       // 7: Cyan
-        "bg-yellow-100 text-yellow-800 hover:bg-yellow-200 border-transparent", // 8: Yellow
-        "bg-slate-100 text-slate-800 hover:bg-slate-200 border-transparent",    // 9: Slate (Neutral)
+        "bg-teal-100 text-teal-800 hover:bg-teal-200 border-transparent",      // 0: Verde azulado
+        "bg-orange-100 text-orange-800 hover:bg-orange-200 border-transparent", // 1: Naranja
+        "bg-sky-100 text-sky-800 hover:bg-sky-200 border-transparent",          // 2: Azul cielo
+        "bg-lime-100 text-lime-800 hover:bg-lime-200 border-transparent",       // 3: Lima
+        "bg-rose-100 text-rose-800 hover:bg-rose-200 border-transparent",       // 4: Rosa (Lo suficientemente distinto del púrpura)
+        "bg-amber-100 text-amber-800 hover:bg-amber-200 border-transparent",    // 5: Ámbar
+        "bg-emerald-100 text-emerald-800 hover:bg-emerald-200 border-transparent", // 6: Esmeralda
+        "bg-cyan-100 text-cyan-800 hover:bg-cyan-200 border-transparent",       // 7: Cian
+        "bg-yellow-100 text-yellow-800 hover:bg-yellow-200 border-transparent", // 8: Amarillo
+        "bg-slate-100 text-slate-800 hover:bg-slate-200 border-transparent",    // 9: Pizarra (Neutral)
       ];
 
       const colorIndex = Math.abs(getHash(categoria)) % PASTEL_COLORS.length;
       const colorClass = PASTEL_COLORS[colorIndex];
 
       return (
-        <Badge className={colorClass} variant="outline">
-          {categoria}
-        </Badge>
+        <div className="flex justify-center">
+          <Badge className={colorClass} variant="outline">
+            {categoria}
+          </Badge>
+        </div>
       );
     },
   },
   {
     accessorKey: "costo",
-    header: "Al costo",
+    header: () => <div className="text-center">Al costo</div>,
     cell: ({ row }) => {
       const costo = row.getValue("costo") as number;
-      return <p>{formatCurrency(costo, "ARS", 0)}</p>;
+      return <div className="text-center font-medium text-muted-foreground">{formatCurrency(costo, "ARS", 0)}</div>;
     },
   },
   {
     accessorKey: "precio",
-    header: "Precio",
+    header: () => <div className="text-center">Precio</div>,
     cell: ({ row }) => {
       const precio = row.getValue("precio") as number;
       const precioRedondeadoCien = redondearAlCienMasCercano(precio);
@@ -145,17 +151,17 @@ const allColumns: ColumnDef<Perfume>[] = [
       const insumosCategoriasId = row.original.insumos_categorias_id;
 
       return (
-        <p className="font-bold">
+        <div className="text-center font-bold">
           {insumosCategoriasId === "999b53c3-f181-4910-86fd-5c5b1f74af7b"
             ? formatCurrency(precioRedondeadoMil, "ARS", 0)
             : formatCurrency(precioRedondeadoCien, "ARS", 0)}
-        </p>
+        </div>
       );
     },
   },
   {
     accessorKey: "precio_mayorista",
-    header: "Precio mayorista",
+    header: () => <div className="text-center">Precio mayorista</div>,
     cell: ({ row }) => {
       const precioMayorista = row.getValue("precio_mayorista") as number;
       const precioMayoristaRedondeadoCien =
@@ -165,84 +171,88 @@ const allColumns: ColumnDef<Perfume>[] = [
       const insumosCategoriasId = row.original.insumos_categorias_id;
 
       return (
-        <p className="font-bold">
+        <div className="text-center font-bold">
           {insumosCategoriasId === "999b53c3-f181-4910-86fd-5c5b1f74af7b"
             ? formatCurrency(precioMayoristaRedondeadoMil, "ARS", 0)
             : formatCurrency(precioMayoristaRedondeadoCien, "ARS", 0)}
-        </p>
+        </div>
       );
     },
   },
   {
     accessorKey: "proveedor_id",
-    header: "Proveedor",
+    header: () => <div className="text-center">Proveedor</div>,
     filterFn: (row, id, value) => {
       if (!value) return true;
       return row.getValue(id) === value;
     },
     cell: ({ row }) => {
       const proveedor = row.original.proveedores;
-      if (!proveedor) return <Badge variant="outline">N/A</Badge>;
+      if (!proveedor) return <div className="flex justify-center"><Badge variant="outline">N/A</Badge></div>;
       return (
-        <Badge
-          variant={
-            [
-              "default",
-              "secondary",
-              "destructive",
-              "outline",
-              "warning",
-              "success",
-              "indigo",
-              "pink",
-              "purple",
-            ].includes(proveedor.color as string)
-              ? (proveedor.color as
-                | "default"
-                | "secondary"
-                | "destructive"
-                | "outline"
-                | "warning"
-                | "success"
-                | "indigo"
-                | "pink"
-                | "purple")
-              : "default"
-          }
-        >
-          {proveedor.nombre}
-        </Badge>
+        <div className="flex justify-center">
+          <Badge
+            variant={
+              [
+                "default",
+                "secondary",
+                "destructive",
+                "outline",
+                "warning",
+                "success",
+                "indigo",
+                "pink",
+                "purple",
+              ].includes(proveedor.color as string)
+                ? (proveedor.color as
+                  | "default"
+                  | "secondary"
+                  | "destructive"
+                  | "outline"
+                  | "warning"
+                  | "success"
+                  | "indigo"
+                  | "pink"
+                  | "purple")
+                : "default"
+            }
+          >
+            {proveedor.nombre}
+          </Badge>
+        </div>
       );
     },
   },
   {
     accessorKey: "genero",
-    header: "Género",
+    header: () => <div className="text-center">Género</div>,
     cell: ({ row }) => {
       const genero = row.getValue("genero") as string;
       return (
-        <Badge
-          variant={genero === "masculino"
-            ? "indigo"
-            : genero === "femenino"
-              ? "pink"
-              : genero === "ambiente"
-                ? "warning"
-                : "default"
-          }
-        >
-          {capitalizeFirstLetter(genero)}
-        </Badge>
+        <div className="flex justify-center">
+          <Badge
+            variant={genero === "masculino"
+              ? "indigo"
+              : genero === "femenino"
+                ? "pink"
+                : genero === "ambiente"
+                  ? "warning"
+                  : "default"
+            }
+          >
+            {capitalizeFirstLetter(genero)}
+          </Badge>
+        </div>
       );
     },
   },
   {
     id: "acciones",
-    header: "Acciones",
+    header: () => <div className="text-center">Acciones</div>,
     cell: ({ row, table }) => {
       const meta = table.options.meta as any;
       return (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center justify-center gap-2">
           <Button
             variant="ghost"
             size="icon"
@@ -270,25 +280,25 @@ export const getListaPreciosColumns = (
   userRole: string = "admin"
 ): ColumnDef<Perfume>[] => {
   const columns = allColumns.filter((col) => {
-    // Hide 'acciones' column for revendedores
+    // Ocultar columna 'acciones' para revendedores
     if (col.id === "acciones" && userRole === "revendedor") return false;
 
-    // Hide 'proveedor' column for revendedores
+    // Ocultar columna 'proveedor' para revendedores
     if ("accessorKey" in col && (col as any).accessorKey === "proveedor_id" && userRole === "revendedor") return false;
 
-    // If column has no accessorKey, it's likely 'select' or 'acciones', keep them always?
-    // 'select' has id='select'
-    // 'acciones' has id='acciones'
-    // 'insumos_categorias.nombre' has id='categoria'
+    // Si la columna no tiene accessorKey, es probablemente 'select' o 'acciones', ¿mantenerlas siempre?
+    // 'select' tiene id='select'
+    // 'acciones' tiene id='acciones'
+    // 'insumos_categorias.nombre' tiene id='categoria'
     if (!("accessorKey" in col) && col.id !== "select" && col.id !== "acciones" && col.id !== "categoria") return true;
 
     const key = (col as any).accessorKey;
 
     if (view === "minorista") {
-      // In minorista, hide wholesale price
+      // En minorista, ocultar precio mayorista
       if (key === "precio_mayorista") return false;
     } else if (view === "mayorista") {
-      // In mayorista, hide 'costo' and retail 'precio'
+      // En mayorista, ocultar 'costo' y 'precio' minorista
       if (key === "costo") return false;
       if (key === "precio") return false;
     }
@@ -296,6 +306,6 @@ export const getListaPreciosColumns = (
     return true;
   });
 
-  // Always use the cart select column for both views
+  // Siempre usar la columna de selección del carrito para ambas vistas
   return columns.map(col => col.id === "select" ? cartSelectColumn : col);
 };

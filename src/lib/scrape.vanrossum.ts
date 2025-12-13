@@ -88,22 +88,22 @@ export async function extractDetail(productUrl: string, catalogGender?: "femenin
 
   const title = $("h1,h2,h3").first().text().trim() || $("title").text().trim();
 
-  // Try to extract gender from multiple sources
+  // Intentar extraer género de múltiples fuentes
   let genero: VRDetail["genero"] = "";
 
-  // Method 1: Use catalog gender if provided (most reliable - based on catalog URL)
+  // Método 1: Usar género del catálogo si se proporciona (más confiable - basado en URL del catálogo)
   if (catalogGender) {
     genero = catalogGender;
   }
 
-  // Method 2: Title-based detection as fallback
+  // Método 2: Detección basada en título como alternativa
   if (!genero && /\(F\)\s*$/.test(title)) {
     genero = "femenino";
   } else if (!genero && /\(M\)\s*$/.test(title)) {
     genero = "masculino";
   }
 
-  // Method 3: Breadcrumb as last resort
+  // Método 3: Migas de pan como último recurso
   if (!genero) {
     const breadcrumbText = $(".breadcrumb, nav ol, nav ul, .breadcrumbs, nav")
       .text()
@@ -183,7 +183,7 @@ export async function scrapeVanRossumCatalog(startUrl: string) {
   let url: string | null = startUrl;
   let page = 1;
 
-  // Determine gender from catalog URL
+  // Determinar género desde URL del catálogo
   const catalogGender: "femenino" | "masculino" | undefined =
     startUrl.includes("/00021") ? "femenino" :
       startUrl.includes("/00022") ? "masculino" :

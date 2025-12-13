@@ -52,6 +52,9 @@ import {
 const linksNavbar = [
   { href: "/", label: "Lista de precios" },
   { href: "/agregar-producto", label: "Agregar producto" },
+];
+
+const stockLinks = [
   { href: "/abm/inventario", label: "Inventario" },
   { href: "/pedido-mayorista", label: "Pedido Mayorista" },
 ];
@@ -92,7 +95,7 @@ export function NavigationBar() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [session, setSession] = useState<any>(null);
-  const [userRole, setUserRole] = useState<string>("revendedor"); // Default safe
+  const [userRole, setUserRole] = useState<string>("revendedor"); // Seguro por defecto
   const router = useRouter();
   const supabase = createClient();
   const { currencies, isLoading: loadingCurrencies } = useCurrencies();
@@ -125,16 +128,16 @@ export function NavigationBar() {
   };
 
 
-  // Filter Links Based on Role
+  // Filtrar enlaces basados en el rol
   const isAdmin = userRole === "admin";
 
-  // Admin sees everything. Revendedor sees restricted list.
-  // Revendedor: Lista de precios (and implied 'Pedidio Mayorista' maybe? No, strict to request: "Lista precios" & "Agregar ventas").
-  // "Agregar ventas" functionality is usually embedded in the main view or a specific /ventas page. 
-  // Assuming "/" (Lista de precios) contains the sales logic.
+  // Admin ve todo. Revendedor ve lista restringida.
+  // Revendedor: Lista de precios (y ¿'Pedido Mayorista' implícito quizás? No, estricto a la solicitud: "Lista precios" y "Agregar ventas").
+  // La funcionalidad "Agregar ventas" suele estar integrada en la vista principal o en una página específica /ventas.
+  // Asumiendo que "/" (Lista de precios) contiene la lógica de ventas.
 
-  // Navbar: 
-  // Admin: All (Lista, Agregar Prod, Inventario, Pedidos)
+  // Barra de navegación:
+  // Admin: Todo (Lista, Agregar Prod, Inventario, Pedidos)
   // Revendedor: Lista de precios.
   const filteredNavbar = linksNavbar.filter(link => {
     if (isAdmin) return true;
@@ -142,31 +145,31 @@ export function NavigationBar() {
   });
 
   // ABM:
-  // Admin: All
-  // Revendedor: None
+  // Admin: Todo
+  // Revendedor: Ninguno
   const filteredABM = isAdmin ? abmLinks : [];
 
   // Herramientas:
-  // Admin: All
-  // Revendedor: None
+  // Admin: Todo
+  // Revendedor: Ninguno
   const filteredHerramientas = isAdmin ? herramientasLinks : [];
 
   // Caja:
-  // Admin: Yes
+  // Admin: Sí
   // Revendedor: No
   const showCaja = isAdmin;
 
-  // Userbar:
-  // Admin: All
-  // Revendedor: Perfil, Registro. (No Gestion Usuarios)
+  // Barra de usuario:
+  // Admin: Todo
+  // Revendedor: Perfil, Registro. (No Gestión de Usuarios)
   const filteredUserbar = linksUserbar.filter(link => {
     if (isAdmin) return true;
     return link.href !== "/gestion-usuarios";
   });
 
   return (
-    // ... Render with filtered lists ...
-    // (I will reconstruct the component using these filtered variables)
+    // ... Renderizar con listas filtradas ...
+    // (Reconstruiré el componente usando estas variables filtradas)
     <header
       className={clsx(
         "sticky top-0 z-50 flex items-center justify-between w-full backdrop-blur-lg bg-background/70 py-3 md:py-4 shadow-sm transition-all",
@@ -184,7 +187,7 @@ export function NavigationBar() {
       <NavigationMenu viewport={false} className="hidden md:flex">
         <NavigationMenuList>
           {filteredNavbar.map((link) => {
-            // Admin gets dropdown for "Lista de precios", Revendedor gets simple link
+            // Admin obtiene desplegable para "Lista de precios", Revendedor obtiene enlace simple
             if (link.href === "/" && isAdmin) {
               return (
                 <NavigationMenuItem key={link.href}>
@@ -222,7 +225,7 @@ export function NavigationBar() {
                 </NavigationMenuItem>
               );
             } else if (link.href === "/" && !isAdmin) {
-              // Revendedor: Simple link to mayorista only
+              // Revendedor: Enlace simple solo a mayorista
               return (
                 <NavigationMenuItem key={link.href}>
                   <NavigationMenuLink asChild>
@@ -256,6 +259,35 @@ export function NavigationBar() {
             );
           })}
         </NavigationMenuList>
+
+        {isAdmin && (
+          <NavigationMenuList>
+            <NavigationMenuItem>
+              <NavigationMenuTrigger className={pathname.startsWith("/abm/inventario") || pathname === "/pedido-mayorista" ? "bg-accent text-accent-foreground" : ""}>
+                Stock
+              </NavigationMenuTrigger>
+              <NavigationMenuContent>
+                <ul className="grid w-[200px] gap-2 p-2">
+                  {stockLinks.map((link) => (
+                    <li key={link.href}>
+                      <NavigationMenuLink asChild>
+                        <Link
+                          href={link.href}
+                          className={clsx(
+                            navigationMenuTriggerStyle(),
+                            pathname === link.href && "bg-accent text-accent-foreground"
+                          )}
+                        >
+                          {link.label}
+                        </Link>
+                      </NavigationMenuLink>
+                    </li>
+                  ))}
+                </ul>
+              </NavigationMenuContent>
+            </NavigationMenuItem>
+          </NavigationMenuList>
+        )}
 
         {(filteredABM.length > 0 || showCaja || filteredHerramientas.length > 0) && (
           <NavigationMenuList>
@@ -489,6 +521,23 @@ export function NavigationBar() {
                 )}
 
                 {filteredNavbar.filter(l => l.href !== "/").map((link) => {
+                  const isActive = pathname === link.href;
+                  return (
+                    <Link
+                      key={link.href}
+                      href={link.href}
+                      className={clsx(
+                        "text-lg font-semibold hover:text-foreground",
+                        isActive ? "text-foreground" : "text-muted-foreground",
+                      )}
+                      onClick={() => setOpen(false)}
+                    >
+                      {link.label}
+                    </Link>
+                  );
+                })}
+
+                {isAdmin && stockLinks.map((link) => {
                   const isActive = pathname === link.href;
                   return (
                     <Link

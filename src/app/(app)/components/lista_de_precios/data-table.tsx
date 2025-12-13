@@ -17,7 +17,8 @@ import { Input } from "@/components/ui/input";
 import { NumberInput } from "@/components/ui/number-input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { DataTablePagination } from "@/components/ui/data-table-pagination";
-import { Download, ShoppingCart, Loader2, Trash2, FileSpreadsheet } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
+import { Loader2, Plus, Trash2, ShoppingCart, FileSpreadsheet, Download, Copy, Check } from "lucide-react";
 import {
   ColumnDef,
   ColumnFiltersState,
@@ -90,8 +91,10 @@ export function DataTable({
   const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({});
   const [ventaPerfumes, setVentaPerfumes] = useState<VentaPerfumeItem[]>([]);
   const [cliente, setCliente] = useState("");
+  const [metodoPago, setMetodoPago] = useState<"Efectivo" | "Transferencia">("Efectivo");
+  const [copied, setCopied] = useState(false);
 
-  // Edit / Delete State
+  // Estado de Editar/Eliminar
   const [productToDelete, setProductToDelete] = useState<Perfume | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
@@ -101,7 +104,7 @@ export function DataTable({
   const [editPrecioArs, setEditPrecioArs] = useState("");
   const [editPrecioUsd, setEditPrecioUsd] = useState("");
 
-  // New Edit State
+  // Nuevo estado de Edición
   const [editMargenMinorista, setEditMargenMinorista] = useState("");
   const [editMargenMayorista, setEditMargenMayorista] = useState("");
   const [editInsumos, setEditInsumos] = useState<InsumoLite[]>([]);
@@ -220,7 +223,7 @@ export function DataTable({
     })();
   }, []);
 
-  // Handlers
+  // Manejadores
   const handleDeleteProduct = (product: Perfume) => {
     setProductToDelete(product);
     setIsDeleteDialogOpen(true);
@@ -263,7 +266,7 @@ export function DataTable({
           // Priorizamos datos vivos para costos, pero mantenemos la cantidad de la receta
           cantidad_necesaria: ci.cantidad_necesaria || ci.cantidad || 0,
           precio_lote: live?.precio_lote || 0,
-          cantidad_lote: live?.cantidad_lote || 1, // Avoid division by zero
+          cantidad_lote: live?.cantidad_lote || 1, // Evitar división por cero
           is_general: live?.is_general ?? ci.is_general,
           insumos_categorias_id: live?.insumos_categorias_id ?? ci.insumos_categorias_id,
           nombre: live?.nombre || ci.nombre,
@@ -376,7 +379,7 @@ export function DataTable({
   const filterValue =
     (table.getColumn(filterColumnId)?.getFilterValue() as string) ?? "";
 
-  // Export State
+  // Estado de Exportación
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
   const [exportColumns, setExportColumns] = useState<Record<string, boolean>>({
     perfume: true,
@@ -390,16 +393,16 @@ export function DataTable({
   const [exportSelectedCategories, setExportSelectedCategories] = useState<string[]>([]);
   const [exportSelectedGenders, setExportSelectedGenders] = useState<string[]>(["masculino", "femenino"]);
 
-  // Set default selections matching user preference
+  // Establecer selecciones por defecto coincidiendo con la preferencia del usuario
   useEffect(() => {
     if (proveedores.length > 0 && exportSelectedProviders.length === 0) {
-      // Default: Only "Van Rossum"
+      // Por defecto: Solo "Van Rossum"
       const defaultProvs = proveedores
         .filter(p => p.nombre.toLowerCase().includes("van rossum"))
         .map(p => p.id);
 
-      // If found, set it. if not found (e.g. name changed), we might fallback to all or none.
-      // Let's fallback to "None" so user sees empty (or check if array empty).
+      // Si se encuentra, establecerlo. Si no (p.ej. nombre cambiado), podríamos alternar a todos o ninguno.
+      // Alternemos a "Ninguno" para que el usuario vea vacío (o verificar si el array está vacío).
       if (defaultProvs.length > 0) {
         setExportSelectedProviders(defaultProvs);
       }
@@ -408,7 +411,7 @@ export function DataTable({
 
   useEffect(() => {
     if (insumosCategorias.length > 0 && exportSelectedCategories.length === 0) {
-      // Default: Only "Perfumería fina"
+      // Por defecto: Solo "Perfumería fina"
       const defaultCats = insumosCategorias
         .filter(c => c.nombre.toLowerCase().includes("perfumería fina") || c.nombre.toLowerCase().includes("perfumeria fina"))
         .map(c => c.id);
@@ -510,7 +513,7 @@ export function DataTable({
 
     const commonFiltered = applyCommonFilters(view === "minorista" ? data : data);
 
-    // Loop through selected genders to create sheets
+    // Iterar a través de géneros seleccionados para crear hojas
     exportSelectedGenders.forEach(genderKey => {
       const genderData = commonFiltered.filter(row => {
         const rowGen = row.genero || "otro";
@@ -518,7 +521,7 @@ export function DataTable({
         return rowGen === genderKey;
       });
 
-      if (genderData.length === 0) return; // Skip empty sheets
+      if (genderData.length === 0) return; // Omitir hojas vacías
 
       const processedData = filtrarMasCaro(genderData, view === "mayorista").map((row) => {
         const obj: any = {};
@@ -536,7 +539,7 @@ export function DataTable({
       });
 
       const sheetName = capitalizeFirstLetter(genderKey);
-      // Sanitize sheet name just in case (max 31 chars, etc, though likely fine here)
+      // Desinfectar nombre de hoja por si acaso (max 31 caracteres, etc, aunque probablemente bien aquí)
       crearHojaConTitulo(processedData, sheetName);
     });
 
@@ -589,6 +592,7 @@ export function DataTable({
         precio_total: totalPrice,
         perfumes: conjuntoDePerfumes,
         is_reseller_sale: userRole === "revendedor",
+        metodo_pago: metodoPago,
       },
     ]);
 
@@ -597,8 +601,39 @@ export function DataTable({
       console.error("Error al agregar la venta:", error);
     } else {
       toast.success("¡Venta agregada correctamente!");
+
+      // Enviar notificación por email si es revendedor
+      if (userRole === "revendedor") {
+        const itemsForEmail = perfumesVendidos.map((item) => {
+          const { perfume, genero, cantidad, frascoLP, devuelveEnvase, priceType } = item;
+          const precioBaseUnit = computePrecioUnitario(perfume, view === "mayorista", frascoLP, priceType);
+          const descuentoEnvase = devuelveEnvase ? getEnvaseUnitCost(perfume, frascoLP) : 0;
+          const precioUnitFinal = Math.max(0, precioBaseUnit - descuentoEnvase);
+
+          return {
+            nombre: perfume.nombre,
+            genero: genero,
+            cantidad: cantidad,
+            precioUnitario: precioUnitFinal
+          };
+        });
+
+        // Disparar y olvidar (no esperar para retrasar la UI)
+        fetch("/api/emails/new-order", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            items: itemsForEmail,
+            total: totalPrice,
+            clientName: cliente,
+            metodoPago: metodoPago
+          })
+        }).catch(console.error);
+      }
+
       setVentaPerfumes([]);
       setCliente("");
+      setMetodoPago("Efectivo");
       setIsDialogOpen(false);
     }
 
@@ -640,6 +675,9 @@ export function DataTable({
         }
       }
     }
+
+    // Restablecer valores por defecto
+    setMetodoPago("Efectivo");
 
     setIsDialogOpen(true);
   };
@@ -1017,129 +1055,185 @@ export function DataTable({
             </TableFooter>
           </Table>
 
-          <div className="mt-4 flex justify-end gap-x-2">
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span>
-                    <Button
-                      size="sm"
-                      disabled={isLoadingForm || cliente.trim() === ""}
-                      onClick={() => {
-                        let total = 0;
-                        const ventaConCliente = ventaPerfumes.map((item) => {
-                          const base = computePrecioUnitario(item.perfume, view === "mayorista", item.frascoLP, item.priceType);
-                          const d = item.devuelveEnvase ? getEnvaseUnitCost(item.perfume, item.frascoLP) : 0;
-                          total += Math.max(0, base - d) * item.cantidad;
-                          return { ...item, cliente: cliente.trim() };
-                        });
-                        handleSubmit(total, ventaConCliente);
-                      }}
-                    >
-                      {isLoadingForm && <Loader2 width={18} className="animate-spin" />}
-                      Agregar venta
-                    </Button>
-                  </span>
-                </TooltipTrigger>
-                {isLoadingForm ? (
-                  <TooltipContent>Procesando la venta...</TooltipContent>
-                ) : cliente.trim() === "" ? (
-                  <TooltipContent>Ingresa el nombre del cliente para continuar</TooltipContent>
-                ) : null}
-              </Tooltip>
-            </TooltipProvider>
-            <Button variant="secondary" size="sm" onClick={handleCloseModal}>
-              Cancelar
-            </Button>
+          <div className="mt-4 flex flex-col md:flex-row items-center justify-between gap-4">
+            {/* Payment Method Selection for Resellers (Left) */}
+            <div className="w-full md:w-auto flex flex-col gap-3">
+              {userRole === "revendedor" && (
+                <>
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-medium whitespace-nowrap">Método de Pago:</span>
+                    <Select value={metodoPago} onValueChange={(val: any) => setMetodoPago(val)}>
+                      <SelectTrigger className="w-[180px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Efectivo">Efectivo</SelectItem>
+                        <SelectItem value="Transferencia">Transferencia</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Payment Info Display */}
+                  <AnimatePresence mode="wait">
+                    {metodoPago === "Transferencia" && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="bg-muted/50 p-3 rounded-lg border border-border text-sm max-w-sm"
+                      >
+                        <p className="text-muted-foreground mb-1 text-xs">Alias para transferencia:</p>
+                        <div className="flex items-center gap-2 font-mono font-bold text-lg select-all">
+                          SANSE.PERFUMES
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-6 w-6 ml-auto"
+                            onClick={() => {
+                              navigator.clipboard.writeText("SANSE.PERFUMES");
+                              setCopied(true);
+                              setTimeout(() => setCopied(false), 2000);
+                            }}
+                          >
+                            {copied ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
+                          </Button>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </>
+              )}
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex justify-end gap-x-2 w-full md:w-auto">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span>
+                      <Button
+                        size="sm"
+                        disabled={isLoadingForm || cliente.trim() === ""}
+                        onClick={() => {
+                          let total = 0;
+                          const ventaConCliente = ventaPerfumes.map((item) => {
+                            const base = computePrecioUnitario(item.perfume, view === "mayorista", item.frascoLP, item.priceType);
+                            const d = item.devuelveEnvase ? getEnvaseUnitCost(item.perfume, item.frascoLP) : 0;
+                            total += Math.max(0, base - d) * item.cantidad;
+                            return { ...item, cliente: cliente.trim() };
+                          });
+                          handleSubmit(total, ventaConCliente);
+                        }}
+                      >
+                        {isLoadingForm && <Loader2 width={18} className="animate-spin" />}
+                        Agregar venta
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  {isLoadingForm ? (
+                    <TooltipContent>Procesando la venta...</TooltipContent>
+                  ) : cliente.trim() === "" ? (
+                    <TooltipContent>Ingresa el nombre del cliente para continuar</TooltipContent>
+                  ) : null}
+                </Tooltip>
+              </TooltipProvider>
+              <Button variant="secondary" size="sm" onClick={handleCloseModal}>
+                Cancelar
+              </Button>
+            </div>
           </div>
         </DialogContent>
-      </Dialog>
+      </Dialog >
 
-      {userRole === "admin" && (
-        <div className="flex items-center gap-x-4 mb-4">
-          <div className="relative max-w-sm">
-            <Input
-              placeholder="Buscar por nombre..."
-              value={filterValue}
-              onChange={(event) => table.getColumn("nombre")?.setFilterValue(event.target.value)}
-              className="pr-10"
-            />
-          </div>
-          <Select
-            onValueChange={(value) =>
-              table.getColumn("genero")?.setFilterValue(value === "todos" ? undefined : value)
-            }
-          >
-            <SelectTrigger className="w-[150px]">
-              <SelectValue placeholder="Filtrar por género" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todos</SelectItem>
-              <SelectItem value="masculino">Masculino</SelectItem>
-              <SelectItem value="femenino">Femenino</SelectItem>
-              <SelectItem value="ambiente">Ambiente</SelectItem>
-              <SelectItem value="otro">Otro</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select
-            onValueChange={(value) =>
-              table.getColumn("categoria")?.setFilterValue(value === "todos" ? undefined : value)
-            }
-          >
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Filtrar por categoría" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todas">Todas</SelectItem>
-              {insumosCategorias.filter(c => c.nombre.toLowerCase() !== 'otro').map((c) => (
-                <SelectItem key={c.id} value={c.nombre}>
-                  {c.nombre}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select
-            value={
-              typeof table.getColumn("proveedor_id")?.getFilterValue() === "string"
-                ? (table.getColumn("proveedor_id")?.getFilterValue() as string)
-                : "todos"
-            }
-            onValueChange={(value) =>
-              table.getColumn("proveedor_id")?.setFilterValue(value === "todos" ? undefined : value)
-            }
-          >
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Filtrar por proveedor" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todos</SelectItem>
-              {proveedores.map((p) => (
-                <SelectItem key={p.id} value={p.id}>
-                  {p.nombre}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+      <div className="flex flex-col xl:flex-row gap-4 items-start xl:items-center justify-between mb-6">
+        <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
+          {userRole === "admin" && (
+            <>
+              <div className="relative w-full sm:w-64">
+                <Input
+                  placeholder="Buscar por nombre..."
+                  value={filterValue}
+                  onChange={(event) => table.getColumn("nombre")?.setFilterValue(event.target.value)}
+                  className="pr-10"
+                />
+              </div>
+              <Select
+                onValueChange={(value) =>
+                  table.getColumn("genero")?.setFilterValue(value === "todos" ? undefined : value)
+                }
+              >
+                <SelectTrigger className="w-[150px]">
+                  <SelectValue placeholder="Filtrar por género" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos</SelectItem>
+                  <SelectItem value="masculino">Masculino</SelectItem>
+                  <SelectItem value="femenino">Femenino</SelectItem>
+                  <SelectItem value="ambiente">Ambiente</SelectItem>
+                  <SelectItem value="otro">Otro</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select
+                onValueChange={(value) =>
+                  table.getColumn("categoria")?.setFilterValue(value === "todos" ? undefined : value)
+                }
+              >
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Filtrar por categoría" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todas">Todas</SelectItem>
+                  {insumosCategorias.filter(c => c.nombre.toLowerCase() !== 'otro').map((c) => (
+                    <SelectItem key={c.id} value={c.nombre}>
+                      {c.nombre}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select
+                value={
+                  typeof table.getColumn("proveedor_id")?.getFilterValue() === "string"
+                    ? (table.getColumn("proveedor_id")?.getFilterValue() as string)
+                    : "todos"
+                }
+                onValueChange={(value) =>
+                  table.getColumn("proveedor_id")?.setFilterValue(value === "todos" ? undefined : value)
+                }
+              >
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Filtrar por proveedor" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos</SelectItem>
+                  {proveedores.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.nombre}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </>
+          )}
         </div>
-      )}
 
-      <div className="flex items-center gap-x-4 mb-4">
-        <Button
-          size="sm"
-          onClick={handleExportClick}
-          className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm hover:shadow transition-all font-medium gap-2"
-        >
-          <FileSpreadsheet size={16} />
-          Exportar {view === "mayorista" ? "Mayorista" : "Minorista"}
-        </Button>
-        <Button
-          size="sm"
-          onClick={handleAgregarVenta}
-          className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm hover:shadow transition-all font-medium gap-2"
-        >
-          <ShoppingCart size={16} />
-          {Object.keys(rowSelection).length > 0 ? `Ver Carrito (${Object.keys(rowSelection).length})` : "Ver Carrito"}
-        </Button>
+        <div className="flex items-center gap-3 ml-auto xl:ml-0 flex-shrink-0">
+          <Button
+            size="sm"
+            onClick={handleExportClick}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm hover:shadow transition-all font-medium gap-2"
+          >
+            <FileSpreadsheet size={16} />
+            Exportar {view === "mayorista" ? "Mayorista" : "Minorista"}
+          </Button>
+          <Button
+            size="sm"
+            onClick={handleAgregarVenta}
+            className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm hover:shadow transition-all font-medium gap-2"
+          >
+            <ShoppingCart size={16} />
+            {Object.keys(rowSelection).length > 0 ? `Ver Carrito (${Object.keys(rowSelection).length})` : "Ver Carrito"}
+          </Button>
+        </div>
       </div>
 
       <div className="rounded-md border">

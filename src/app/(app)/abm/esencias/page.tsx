@@ -219,30 +219,20 @@ export default function EsenciasPage() {
 
   return (
     <div className="flex flex-col gap-4 p-4 max-w-7xl mx-auto">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-4">
-          <h1 className="text-3xl font-bold">Gestión de esencias</h1>
-          <Tabs
-            value={show100g ? "100g" : "30g"}
-            onValueChange={(val) => setShow100g(val === "100g")}
-            className="w-auto"
-          >
-            <TabsList>
-              <TabsTrigger value="30g">30g (Default)</TabsTrigger>
-              <TabsTrigger value="100g">100g</TabsTrigger>
-            </TabsList>
-          </Tabs>
-        </div>
+      <div className="relative flex items-center justify-center mb-8">
+        <h1 className="text-3xl font-bold text-center">Gestión de esencias</h1>
 
-        {/* Botón de pendientes: solo si hay > 0 y no está cargando */}
+        {/* Botón de pendientes: esquinado a la derecha */}
         {!loadingEsencias && pendingVR.length > 0 && (
-          <Button
-            variant="outline"
-            onClick={() => setPendingOpen(true)}
-            title="Ver esencias sin datos de scraping en la última corrida"
-          >
-            Pendientes de scraping: {pendingVR.length}
-          </Button>
+          <div className="absolute right-0 top-1/2 -translate-y-1/2">
+            <Button
+              variant="outline"
+              onClick={() => setPendingOpen(true)}
+              title="Ver esencias sin datos de scraping en la última corrida"
+            >
+              Pendientes de scraping: {pendingVR.length}
+            </Button>
+          </div>
         )}
       </div>
 
@@ -262,6 +252,18 @@ export default function EsenciasPage() {
           onEditReset={resetEdit}
           dolarARS={currencies["ARS"]}
           generoPorDefault="masculino"
+          headerChildren={
+            <Tabs
+              value={show100g ? "100g" : "30g"}
+              onValueChange={(val) => setShow100g(val === "100g")}
+              className="w-auto"
+            >
+              <TabsList>
+                <TabsTrigger value="30g">30g (Default)</TabsTrigger>
+                <TabsTrigger value="100g">100g</TabsTrigger>
+              </TabsList>
+            </Tabs>
+          }
         />
       )}
 

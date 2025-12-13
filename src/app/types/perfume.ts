@@ -34,12 +34,12 @@ export type Perfume = {
   insumos_categorias_id?: string | null;
   insumos_categorias?: InsumoCategoriaLite | null;
 
-  // Raw DB fields for editing
+  // Campos crudos de BD para edición
   precio_ars?: number | null;
   precio_usd?: number | null;
   cantidad_gramos?: number | null;
 
-  // Customization fields
+  // Campos de personalización
   margen_minorista?: number | null;
   margen_mayorista?: number | null;
   custom_insumos?: any | null;

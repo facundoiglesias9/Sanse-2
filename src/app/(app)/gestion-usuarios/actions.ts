@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@supabase/supabase-js";
+import { createClient as createServerClient } from "@/utils/supabase/server";
 
 export async function updateUserPassword(userId: string, password: string) {
     try {
@@ -44,11 +45,41 @@ export async function deleteUser(userId: string) {
             }
         );
 
-        const { error } = await supabase.auth.admin.deleteUser(userId);
+        // Obtener el ID del usuario administrador actual para heredar las referencias
+        const serverSupabase = await createServerClient();
+        const { data: { user: adminUser } } = await serverSupabase.auth.getUser();
 
-        if (error) {
-            console.error("Error deleting user:", error);
-            return { error: error.message };
+        const inheritorId = adminUser?.id;
+
+        if (inheritorId) {
+            // Reasignar registros de inventario al administrador
+            await supabase.from('inventario').update({ updated_by: inheritorId }).eq('updated_by', userId);
+            await supabase.from('inventario').update({ created_by: inheritorId }).eq('created_by', userId);
+            // Reasignar ventas al administrador
+            await supabase.from('ventas').update({ user_id: inheritorId }).eq('user_id', userId);
+        } else {
+            // Alternativa: intentar establecer en nulo (puede fallar si la columna no admite nulos)
+            await supabase.from('inventario').update({ updated_by: null }).eq('updated_by', userId);
+            await supabase.from('inventario').update({ created_by: null }).eq('created_by', userId);
+            // Intentar establecer user_id de ventas en nulo (probablemente fallará si no admite nulos)
+            await supabase.from('ventas').update({ user_id: null }).eq('user_id', userId);
+        }
+
+        // Eliminar registros de actividad
+        await supabase.from('activity_logs').delete().eq('user_id', userId);
+
+        // Eliminar perfil
+        const { error: profileError } = await supabase.from('profiles').delete().eq('id', userId);
+
+        if (profileError) {
+            console.error("Error deleting profile:", profileError);
+            return { error: `Error DB: ${profileError.message}. Detalle: ${profileError.details || 'Sin detalles extra'}` };
+        }
+
+        // Eliminar usuario de autenticación
+        const { error: authError } = await supabase.auth.admin.deleteUser(userId);
+        if (authError) {
+            return { error: authError.message };
         }
 
         return { success: true };
@@ -74,17 +105,17 @@ export async function createUser(data: { username: string; password: string; rol
             }
         );
 
-        // Generate a fake email from username
+        // Generar un email falso a partir del nombre de usuario
         const email = `${data.username.toLowerCase().replace(/\s/g, '')}@sanseperfumes.local`;
 
-        // 1. Create User in Auth
+        // 1. Crear usuario en Auth
         const { data: userData, error } = await supabase.auth.admin.createUser({
             email: email,
             password: data.password,
             email_confirm: true,
             user_metadata: {
                 nombre: data.username,
-                // We keep metadata for legacy/triggers, but main source of truth is now profiles table
+                // Mantenemos metadatos para legado/triggers, pero la fuente principal de verdad ahora es la tabla de perfiles
             },
         });
 
@@ -94,20 +125,21 @@ export async function createUser(data: { username: string; password: string; rol
         }
 
         if (userData.user) {
-            // 2. Explicitly update the profile role
-            // We use a small delay or retry logic in case the trigger hasn't fired yet? 
-            // Better: Upsert to ensure it exists and set the role.
+            // 2. Actualizar explícitamente el rol del perfil
+            // ¿Usamos un pequeño retraso o lógica de reintento en caso de que el trigger no se haya disparado aún?
+            // Mejor: Upsert para asegurar que existe y establecer el rol.
             const { error: profileError } = await supabase
                 .from('profiles')
                 .upsert({
                     id: userData.user.id,
+                    email: email,
                     nombre: data.username,
                     rol: data.rol
                 }, { onConflict: 'id' });
 
             if (profileError) {
                 console.error("Error creating/updating profile role:", profileError);
-                // Not fatal, but good to know
+                // No es fatal, pero bueno saberlo
             }
         }
 
@@ -131,26 +163,26 @@ export async function getUsers() {
             }
         );
 
-        // 1. Get Auth Data (ID, Email)
+        // 1. Obtener datos de autenticación (ID, Email)
         const { data: authData, error: authError } = await supabase.auth.admin.listUsers();
         if (authError) throw authError;
 
-        // 2. Get Profiles Data (ID, Nombre, Rol)
-        // We use the service role key so we can access all profiles regardless of RLS
+        // 2. Obtener datos de perfiles (ID, Nombre, Rol)
+        // Usamos la clave de rol de servicio para poder acceder a todos los perfiles independientemente de RLS
         const { data: profilesData, error: profilesError } = await supabase
             .from('profiles')
             .select('id, nombre, rol');
 
         if (profilesError) throw profilesError;
 
-        // 3. Merge Data
+        // 3. Fusionar datos
         const users = authData.users.map(u => {
             const profile = profilesData?.find(p => p.id === u.id);
             return {
                 id: u.id,
                 email: u.email,
                 nombre: profile?.nombre || u.user_metadata?.nombre || "Sin nombre",
-                rol: profile?.rol || "revendedor", // Default from profile or fallback
+                rol: profile?.rol || "revendedor",
                 last_sign_in_at: u.last_sign_in_at
             };
         });
@@ -176,7 +208,7 @@ export async function updateUserRole(userId: string, rol: string) {
             }
         );
 
-        // Update Profiles Table directly
+        // Actualizar la tabla de perfiles directamente
         const { error } = await supabase
             .from('profiles')
             .update({ rol: rol })

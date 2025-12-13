@@ -194,7 +194,7 @@ export function DataTable<TData>({
 
   return (
     <>
-      <div className="flex items-center gap-x-4">
+      <div className="flex items-center justify-between gap-x-4">
         <div className="relative max-w-sm">
           <Input
             placeholder="Buscar por nombre..."

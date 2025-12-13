@@ -49,7 +49,7 @@ export function LoginForm({
   const handleSubmit = async (values: LoginFormValues) => {
     const supabase = createClient();
 
-    // Check if input is an email (contains @) or a username
+    // Verificar si la entrada es un correo electrónico (contiene @) o un nombre de usuario
     const isEmail = values.username.includes('@');
     const email = isEmail
       ? values.username

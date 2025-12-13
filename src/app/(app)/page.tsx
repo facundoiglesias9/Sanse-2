@@ -101,7 +101,7 @@ export default function ListaDePreciosPage() {
 
         // Prioridad: Insumos Personalizados (SOBREESCRIBIR TODO)
         if (esencia.custom_insumos && Array.isArray(esencia.custom_insumos) && esencia.custom_insumos.length > 0) {
-          costoFrasco = 0; // Custom list assumes full responsibility
+          costoFrasco = 0; // La lista personalizada asume toda la responsabilidad
           costoOtrosInsumos = esencia.custom_insumos.reduce((acc: number, customIns: any) => {
             // Buscamos el insumo ACTUAL en la base de datos para tener precio actualizado
             const insumoReal = insumos?.find((i) => i.id === customIns.id);

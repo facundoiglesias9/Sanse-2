@@ -13,7 +13,7 @@ import { z } from "zod";
 import ModernCardNote from "@/app/(app)/herramientas/notas/components/modern-card-note";
 import { AnimatePresence, motion } from "framer-motion";
 import { Calendar22 } from "@/components/calendar-22";
-import { Loader2, Plus } from "lucide-react";
+import { Loader2, Plus, User, Flag, Calendar, Filter } from "lucide-react";
 import {
     Dialog,
     DialogContent,
@@ -48,6 +48,7 @@ const FormSchema = z.object({
 });
 
 export default function Notas2Page() {
+    console.log("Renderizando Notas2Page"); // Debug log
     const [notas, setNotas] = useState<Nota[]>([]);
     const [profiles, setProfiles] = useState<{ id: string; nombre: string | null; }[]>([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -63,14 +64,48 @@ export default function Notas2Page() {
     const [createDialogOpen, setCreateDialogOpen] = useState(false);
     const [session, setSession] = useState<any>(null);
 
+    // Filtros
+    const [filterUser, setFilterUser] = useState<string>("all");
+    const [filterPriority, setFilterPriority] = useState<string>("all");
+    const [filterDate, setFilterDate] = useState<string>("all");
+
     const prioridades = ["alta", "normal", "baja"];
     const supabase = createClient();
-    // ... (omitting intermediate code, use existing context or multiple chunks if needed. Wait, single chunk replacement is easier if I target the state definition first, then the function, then the render)
 
-    // Actually, I can do it in one ReplaceFileContent if the file isn't too huge, but it's large.
-    // I will split into multiple chunks in MultiReplaceFileContent for safety and clarity? No, the tool is ReplaceFileContent (singular).
-    // I will use MultiReplaceFileContent for multiple edits in the same file.
+    const filteredNotas = notas.filter((nota) => {
+        // Filtrar por Usuario
+        if (filterUser !== "all") {
+            // Comparamos con 'created_by'
+            if (nota.created_by !== filterUser) return false;
+        }
 
+        // Filtrar por Prioridad
+        if (filterPriority !== "all") {
+            if (nota.prioridad !== filterPriority) return false;
+        }
+
+        // Filtrar por Fecha (Vencimiento)
+        if (filterDate !== "all") {
+            if (!nota.fecha_vencimiento) return false;
+            const due = new Date(nota.fecha_vencimiento);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            if (filterDate === "today") {
+                if (due.toDateString() !== today.toDateString()) return false;
+            } else if (filterDate === "expired") {
+                // La fecha de vencimiento es estrictamente anterior a hoy
+                if (due >= today) return false;
+            } else if (filterDate === "this_week") {
+                // Próximos 7 días
+                const nextWeek = new Date(today);
+                nextWeek.setDate(nextWeek.getDate() + 7);
+                if (due < today || due > nextWeek) return false;
+            }
+        }
+
+        return true;
+    });
 
     async function fetchProfiles() {
         const { data } = await supabase.from("profiles").select("id, nombre");
@@ -88,18 +123,24 @@ export default function Notas2Page() {
 
         if (data) {
             const sorted = data.sort((a, b) => {
-                // 1. Sort by Expiration Date (Ascending: Sooner first)
-                // Null dates should be at the end? Or beginning? Usually end for "future tasks without deadline".
-                // Let's assume nulls at the end.
+                // 1. Ordenar por Fecha de Vencimiento
                 if (a.fecha_vencimiento && !b.fecha_vencimiento) return -1;
                 if (!a.fecha_vencimiento && b.fecha_vencimiento) return 1;
+
                 if (a.fecha_vencimiento && b.fecha_vencimiento) {
-                    const dateA = new Date(a.fecha_vencimiento).getTime();
-                    const dateB = new Date(b.fecha_vencimiento).getTime();
-                    if (dateA !== dateB) return dateA - dateB;
+                    const dateA = new Date(a.fecha_vencimiento);
+                    const dateB = new Date(b.fecha_vencimiento);
+
+                    // Restablecer hora para comparar estrictamente por día calendario
+                    dateA.setHours(0, 0, 0, 0);
+                    dateB.setHours(0, 0, 0, 0);
+
+                    if (dateA.getTime() !== dateB.getTime()) {
+                        return dateA.getTime() - dateB.getTime();
+                    }
                 }
 
-                // 2. Sort by Priority (Alta -> Normal -> Baja)
+                // 2. Ordenar por Prioridad
                 const priorityOrder: Record<string, number> = { "alta": 1, "normal": 2, "baja": 3 };
                 const pA = priorityOrder[a.prioridad] || 99;
                 const pB = priorityOrder[b.prioridad] || 99;
@@ -139,8 +180,6 @@ export default function Notas2Page() {
             fecha_vencimiento: data.fecha_vencimiento ?? null,
         };
 
-        // If a user is selected, assign it to them (created_by)
-        // Otherwise, supabase might use default or we can let it be (it will use current user usually via trigger or RLS, but here we can force it)
         if (data.assigned_to) {
             payload.created_by = data.assigned_to;
         } else if (session?.user?.id) {
@@ -175,17 +214,24 @@ export default function Notas2Page() {
             .delete()
             .match({ id: deleteId });
         setIsDeleting(false);
-        setDeleteId(null);
+
         if (!error) {
-            setNotas(notas.filter((n) => n.id !== deleteId));
-            toast.success("Nota eliminada");
+            const idToDelete = deleteId;
+            setDeleteId(null);
+
+            // Se eliminó comentario largo para evitar errores ocultos
+            setTimeout(() => {
+                setNotas((currentNotas) => currentNotas.filter((n) => n.id !== idToDelete));
+                toast.success("Nota eliminada");
+            }, 500);
         } else {
+            setDeleteId(null);
             toast.error("Error al eliminar la nota");
         }
     };
 
     const confirmDelete = (id: string) => {
-        setDeleteId(id);
+        setTimeout(() => setDeleteId(id), 50);
     };
 
     const comenzarEdit = (nota: Nota) => {
@@ -238,15 +284,70 @@ export default function Notas2Page() {
     return (
         <div className="flex flex-col min-h-screen bg-background text-foreground p-6 md:p-12 transition-colors duration-500">
             <div className="max-w-7xl mx-auto w-full">
-                <div className="flex items-center justify-between mb-12">
-                    <div>
-                        <h1 className="text-4xl font-extrabold tracking-tight mb-2">Notas</h1>
-                        <p className="text-muted-foreground">Gestiona tus tareas y recordatorios con estilo.</p>
+                <div className="text-center mb-10">
+                    <h1 className="text-4xl font-extrabold tracking-tight mb-2">Notas</h1>
+                    <p className="text-muted-foreground">Gestiona tus tareas y recordatorios con estilo.</p>
+                </div>
+
+                <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-8">
+                    <div className="flex flex-wrap gap-3 justify-center md:justify-start w-full md:w-auto">
+                        <Select value={filterUser} onValueChange={setFilterUser}>
+                            <SelectTrigger className="w-full md:w-[200px] h-11 bg-zinc-900/50 backdrop-blur-md border-zinc-800 hover:bg-zinc-800/50 hover:border-zinc-700 transition-all rounded-2xl shadow-sm ring-offset-0 focus:ring-0">
+                                <div className="flex items-center gap-2 text-zinc-400">
+                                    <User className="w-4 h-4" />
+                                    <SelectValue placeholder="Usuario" />
+                                </div>
+                            </SelectTrigger>
+                            <SelectContent className="bg-zinc-900 border-zinc-800 rounded-xl">
+                                <SelectItem value="all" className="focus:bg-zinc-800 focus:text-zinc-100 cursor-pointer rounded-lg my-1">Todos los usuarios</SelectItem>
+                                {profiles.map(p => (
+                                    <SelectItem key={p.id} value={p.id} className="focus:bg-zinc-800 focus:text-zinc-100 cursor-pointer rounded-lg my-1">
+                                        {p.nombre || "Usuario"}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+
+                        <Select value={filterPriority} onValueChange={setFilterPriority}>
+                            <SelectTrigger className="w-full md:w-[220px] h-11 bg-zinc-900/50 backdrop-blur-md border-zinc-800 hover:bg-zinc-800/50 hover:border-zinc-700 transition-all rounded-2xl shadow-sm ring-offset-0 focus:ring-0">
+                                <div className="flex items-center gap-2 text-zinc-400">
+                                    <Flag className="w-4 h-4" />
+                                    <SelectValue placeholder="Prioridad" />
+                                </div>
+                            </SelectTrigger>
+                            <SelectContent className="bg-zinc-900 border-zinc-800 rounded-xl">
+                                <SelectItem value="all" className="focus:bg-zinc-800 focus:text-zinc-100 cursor-pointer rounded-lg my-1">Todas las prioridades</SelectItem>
+                                <SelectItem value="alta" className="text-red-400 focus:bg-red-500/10 focus:text-red-300 cursor-pointer rounded-lg my-1">
+                                    Alta
+                                </SelectItem>
+                                <SelectItem value="normal" className="text-blue-400 focus:bg-blue-500/10 focus:text-blue-300 cursor-pointer rounded-lg my-1">
+                                    Normal
+                                </SelectItem>
+                                <SelectItem value="baja" className="text-green-400 focus:bg-green-500/10 focus:text-green-300 cursor-pointer rounded-lg my-1">
+                                    Baja
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+
+                        <Select value={filterDate} onValueChange={setFilterDate}>
+                            <SelectTrigger className="w-full md:w-[180px] h-11 bg-zinc-900/50 backdrop-blur-md border-zinc-800 hover:bg-zinc-800/50 hover:border-zinc-700 transition-all rounded-2xl shadow-sm ring-offset-0 focus:ring-0">
+                                <div className="flex items-center gap-2 text-zinc-400">
+                                    <Calendar className="w-4 h-4" />
+                                    <SelectValue placeholder="Fecha" />
+                                </div>
+                            </SelectTrigger>
+                            <SelectContent className="bg-zinc-900 border-zinc-800 rounded-xl">
+                                <SelectItem value="all" className="focus:bg-zinc-800 focus:text-zinc-100 cursor-pointer rounded-lg my-1">Cualquier fecha</SelectItem>
+                                <SelectItem value="expired" className="text-orange-400 focus:bg-orange-500/10 focus:text-orange-300 cursor-pointer rounded-lg my-1">Vencidas</SelectItem>
+                                <SelectItem value="today" className="text-emerald-400 focus:bg-emerald-500/10 focus:text-emerald-300 cursor-pointer rounded-lg my-1">Vence Hoy</SelectItem>
+                                <SelectItem value="this_week" className="focus:bg-zinc-800 focus:text-zinc-100 cursor-pointer rounded-lg my-1">Vence esta semana</SelectItem>
+                            </SelectContent>
+                        </Select>
                     </div>
 
                     <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
                         <DialogTrigger asChild>
-                            <Button size="lg" className="rounded-full shadow-lg hover:shadow-xl transition-all font-semibold gap-2">
+                            <Button size="lg" className="rounded-full shadow-lg hover:shadow-xl transition-all font-semibold gap-2 w-full md:w-auto">
                                 <Plus className="w-5 h-5" />
                                 Nueva Nota
                             </Button>
@@ -386,7 +487,7 @@ export default function Notas2Page() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                     <AnimatePresence mode="popLayout">
-                        {notas.map((nota) => (
+                        {filteredNotas.map((nota) => (
                             <motion.div
                                 key={nota.id}
                                 initial={{ opacity: 0, scale: 0.9, y: 20 }}
@@ -426,43 +527,43 @@ export default function Notas2Page() {
                             </motion.div>
                         ))}
                     </AnimatePresence>
-                    {notas.length === 0 && !isLoading && (
+                    {filteredNotas.length === 0 && !isLoading && (
                         <div className="col-span-full py-20 text-center opacity-40">
-                            <p className="text-xl font-medium">No hay notas creadas.</p>
+                            <p className="text-xl font-medium">No se encontraron notas con estos filtros.</p>
                         </div>
                     )}
                 </div>
-            </div>
 
-            <Dialog
-                open={!!deleteId}
-                onOpenChange={(open) => !open && setDeleteId(null)}
-            >
-                <DialogContent className="sm:max-w-md">
-                    <DialogHeader>
-                        <DialogTitle>¿Eliminar nota?</DialogTitle>
-                    </DialogHeader>
-                    <p className="text-muted-foreground">
-                        Esta acción no se puede deshacer.
-                    </p>
-                    <div className="mt-4 flex justify-end gap-2">
-                        <Button variant="ghost" onClick={() => setDeleteId(null)}>
-                            Cancelar
-                        </Button>
-                        <Button
-                            variant="destructive"
-                            onClick={handleDelete}
-                            disabled={isDeleting}
-                        >
-                            {isDeleting ? (
-                                <Loader2 className="animate-spin h-4 w-4" />
-                            ) : (
-                                "Eliminar"
-                            )}
-                        </Button>
-                    </div>
-                </DialogContent>
-            </Dialog>
+                <Dialog
+                    open={!!deleteId}
+                    onOpenChange={(open) => !open && setDeleteId(null)}
+                >
+                    <DialogContent className="sm:max-w-md">
+                        <DialogHeader>
+                            <DialogTitle>¿Eliminar nota?</DialogTitle>
+                        </DialogHeader>
+                        <p className="text-muted-foreground">
+                            Esta acción no se puede deshacer.
+                        </p>
+                        <div className="mt-4 flex justify-end gap-2">
+                            <Button variant="ghost" onClick={() => setDeleteId(null)}>
+                                Cancelar
+                            </Button>
+                            <Button
+                                variant="destructive"
+                                onClick={handleDelete}
+                                disabled={isDeleting}
+                            >
+                                {isDeleting ? (
+                                    <Loader2 className="animate-spin h-4 w-4" />
+                                ) : (
+                                    "Eliminar"
+                                )}
+                            </Button>
+                        </div>
+                    </DialogContent>
+                </Dialog>
+            </div>
         </div>
     );
 }
