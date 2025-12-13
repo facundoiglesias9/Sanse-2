@@ -161,7 +161,7 @@ export function EsenciaDialog({
     }
   }, [open]);
 
-  // Pricing calculation for Ezentie
+  // Cálculo de precios para Ezentie
   useEffect(() => {
     const prov = proveedores.find((p) => p.id === proveedor_id);
     if (prov && isEzentieNombre(prov.nombre)) {

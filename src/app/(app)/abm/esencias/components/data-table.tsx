@@ -56,6 +56,7 @@ interface DataTableProps<TData> {
   onEditReset?: () => void;
   dolarARS: number;
   generoPorDefault: "masculino" | "femenino";
+  headerChildren?: React.ReactNode;
 }
 
 export function DataTable<TData>({
@@ -72,17 +73,16 @@ export function DataTable<TData>({
   onEditReset,
   dolarARS,
   generoPorDefault,
+  headerChildren,
 }: DataTableProps<TData>) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [proveedores, setProveedores] = useState<
     { id: string; nombre: string; }[]
   >([]);
-  const [loadingProveedores, setLoadingProveedores] = useState(false);
   const supabase = createClient();
 
   useEffect(() => {
     const fetchProveedores = async () => {
-      setLoadingProveedores(true);
       const { data, error } = await supabase
         .from("proveedores")
         .select("id, nombre")
@@ -98,7 +98,6 @@ export function DataTable<TData>({
           })),
         );
       }
-      setLoadingProveedores(false);
     };
 
     fetchProveedores();
@@ -119,7 +118,7 @@ export function DataTable<TData>({
   const filterValue =
     (table.getColumn(filterColumnId)?.getFilterValue() as string) ?? "";
 
-  // Handle Edit Mode from props
+  // Manejar modo de edición desde propiedades
   useEffect(() => {
     if (esenciaToEdit) {
       setIsDialogOpen(true);
@@ -142,79 +141,85 @@ export function DataTable<TData>({
 
   return (
     <>
-      <div className="flex items-center gap-x-4 mb-4">
-        <div className="relative max-w-sm">
-          <Input
-            placeholder="Buscar por nombre..."
-            value={filterValue}
-            onChange={(event) =>
-              table.getColumn("nombre")?.setFilterValue(event.target.value)
+      <div className="flex flex-col xl:flex-row items-center justify-between gap-4 mb-4">
+        <div className="flex flex-wrap items-center gap-4 w-full xl:w-auto">
+          <div className="relative max-w-sm w-full sm:w-auto">
+            <Input
+              placeholder="Buscar por nombre..."
+              value={filterValue}
+              onChange={(event) =>
+                table.getColumn("nombre")?.setFilterValue(event.target.value)
+              }
+              className="pr-10"
+            />
+            {filterValue !== "" && (
+              <Button
+                size="icon"
+                variant="ghost"
+                className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6"
+                onClick={() => table.getColumn("nombre")?.setFilterValue("")}
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            )}
+          </div>
+          <Select
+            value={
+              typeof table.getColumn("genero")?.getFilterValue() === "string"
+                ? (table.getColumn("genero")?.getFilterValue() as string)
+                : "todos"
             }
-            className="pr-10"
-          />
-          {filterValue !== "" && (
-            <Button
-              size="icon"
-              variant="ghost"
-              className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6"
-              onClick={() => table.getColumn("nombre")?.setFilterValue("")}
-            >
-              <X className="w-4 h-4" />
-            </Button>
-          )}
+            onValueChange={(value) =>
+              table
+                .getColumn("genero")
+                ?.setFilterValue(value === "todos" ? undefined : value)
+            }
+          >
+            <SelectTrigger className="w-[150px]">
+              <SelectValue placeholder="Filtrar por género" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos</SelectItem>
+              <SelectItem value="masculino">Masculino</SelectItem>
+              <SelectItem value="femenino">Femenino</SelectItem>
+              <SelectItem value="ambiente">Ambiente</SelectItem>
+              <SelectItem value="otro">Otro</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select
+            value={
+              typeof table.getColumn("proveedor_id")?.getFilterValue() ===
+                "string"
+                ? (table.getColumn("proveedor_id")?.getFilterValue() as string)
+                : "todos"
+            }
+            onValueChange={(value) =>
+              table
+                .getColumn("proveedor_id")
+                ?.setFilterValue(value === "todos" ? undefined : value)
+            }
+          >
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Filtrar por proveedor" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos</SelectItem>
+              {proveedores.map((p) => (
+                <SelectItem key={p.id} value={p.id}>
+                  {p.nombre}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
-        <Select
-          value={
-            typeof table.getColumn("genero")?.getFilterValue() === "string"
-              ? (table.getColumn("genero")?.getFilterValue() as string)
-              : "todos"
-          }
-          onValueChange={(value) =>
-            table
-              .getColumn("genero")
-              ?.setFilterValue(value === "todos" ? undefined : value)
-          }
-        >
-          <SelectTrigger className="w-[150px]">
-            <SelectValue placeholder="Filtrar por género" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="todos">Todos</SelectItem>
-            <SelectItem value="masculino">Masculino</SelectItem>
-            <SelectItem value="femenino">Femenino</SelectItem>
-            <SelectItem value="ambiente">Ambiente</SelectItem>
-            <SelectItem value="otro">Otro</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select
-          value={
-            typeof table.getColumn("proveedor_id")?.getFilterValue() ===
-              "string"
-              ? (table.getColumn("proveedor_id")?.getFilterValue() as string)
-              : "todos"
-          }
-          onValueChange={(value) =>
-            table
-              .getColumn("proveedor_id")
-              ?.setFilterValue(value === "todos" ? undefined : value)
-          }
-        >
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Filtrar por proveedor" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="todos">Todos</SelectItem>
-            {proveedores.map((p) => (
-              <SelectItem key={p.id} value={p.id}>
-                {p.nombre}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Button size="sm" className="gap-x-2" onClick={handleNew}>
-          <Plus width={18} />
-          Agregar esencia
-        </Button>
+
+        <div className="flex items-center gap-4 w-full xl:w-auto justify-end">
+          {headerChildren}
+          <Button size="sm" className="gap-x-2" onClick={handleNew}>
+            <Plus width={18} />
+            Agregar esencia
+          </Button>
+        </div>
       </div>
 
       <EsenciaDialog

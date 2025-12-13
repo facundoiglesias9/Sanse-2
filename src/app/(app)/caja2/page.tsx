@@ -91,22 +91,22 @@ export default function Caja2Page() {
     const [profiles, setProfiles] = useState<Record<string, string>>({});
     const [loading, setLoading] = useState(true);
 
-    // Dialog state
+    // Estado del diálogo
     const [dialogOpen, setDialogOpen] = useState(false);
     const [detalle, setDetalle] = useState("");
     const [monto, setMonto] = useState<number>(0);
     const [pagadorId, setPagadorId] = useState<string>("sanse");
 
-    // Settlement dialog state
+    // Estado del diálogo de saldo
     const [saldarDialogOpen, setSaldarDialogOpen] = useState(false);
     const [selectedExpense, setSelectedExpense] = useState<UnifiedExpense | null>(null);
     const [montoSaldar, setMontoSaldar] = useState<number>(0);
 
-    // Delete confirmation dialog state
+    // Estado del diálogo de confirmación de eliminación
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [gastoToDelete, setGastoToDelete] = useState<string | null>(null);
 
-    // Pagination state
+    // Estado de paginación
     const [visibleSalesCount, setVisibleSalesCount] = useState(10);
 
     useEffect(() => {
@@ -116,7 +116,7 @@ export default function Caja2Page() {
     const fetchData = async () => {
         setLoading(true);
 
-        // Fetch profiles
+        // Obtener perfiles
         const { data: profilesData } = await supabase
             .from("profiles")
             .select("id, nombre");
@@ -127,24 +127,25 @@ export default function Caja2Page() {
         });
         setProfiles(profilesMap);
 
-        // Fetch gastos
+        // Obtener gastos
         const { data: gastosData } = await supabase
             .from("gastos")
             .select("*")
             .order("created_at", { ascending: false });
         setGastos(gastosData || []);
 
-        // Fetch deudas
+        // Obtener deudas
         const { data: deudasData } = await supabase
             .from("deudas")
             .select("*")
             .order("created_at", { ascending: false });
         setDeudas(deudasData || []);
 
-        // Fetch ventas
+        // Obtener ventas (excluir ventas de revendedores del widget principal)
         const { data: ventasData } = await supabase
             .from("ventas")
             .select("*")
+            .or("is_reseller_sale.is.null,is_reseller_sale.eq.false")
             .order("created_at", { ascending: false });
         setVentas(ventasData || []);
 
@@ -196,59 +197,55 @@ export default function Caja2Page() {
         fetchData();
     };
 
-    const handleSaldar = (expense: UnifiedExpense) => {
-        setSelectedExpense(expense);
-        setMontoSaldar(expense.monto);
-        setSaldarDialogOpen(true);
-    };
-
     const handleConfirmSaldar = async () => {
         if (!selectedExpense || montoSaldar <= 0) {
             toast.error("Monto inválido");
             return;
         }
 
-        console.log("💰 Intentando saldar:", {
+        console.log("💰 Attempting to settle:", {
             detalle: selectedExpense.detalle,
             pagador: selectedExpense.pagador,
             monto: montoSaldar,
             montoType: typeof montoSaldar
         });
 
-        console.log("👥 Profiles disponibles:", profiles);
+        console.log("👥 Available Profiles:", profiles);
 
-        // Find the acreedor ID based on the pagador name
+        // Encontrar el ID del acreedor basado en el nombre del pagador
         const acreedorId = Object.entries(profiles).find(
-            ([id, nombre]) => nombre.toLowerCase().includes(selectedExpense.pagador.toLowerCase())
+            ([_id, nombre]) => nombre.toLowerCase().includes(selectedExpense.pagador.toLowerCase())
         )?.[0];
 
-        console.log("🔍 Acreedor encontrado:", acreedorId);
+        console.log("🔍 Creditor found:", acreedorId);
 
         if (!acreedorId) {
-            console.error("❌ No se encontró acreedor para:", selectedExpense.pagador);
-            toast.error(`No se pudo encontrar el inversor: ${selectedExpense.pagador}`);
+            console.error("❌ Creditor not found for:", selectedExpense.pagador);
+            toast.error(`Could not find investor: ${selectedExpense.pagador}`);
             return;
         }
 
-        // Create TWO expenses:
-        // 1. Positive expense paid by Sanse (money going out)
+        // Crear DOS gastos:
+        // 1. "Pago de deuda" para el pagador (monto positivo)
         const { error: error1 } = await supabase.from("gastos").insert({
-            detalle: `pago deuda a: ${selectedExpense.pagador}`,
+            detalle: `pago deuda a ${selectedExpense.pagador}`,
             monto: montoSaldar,
-            pagador_id: null, // Sanse (common fund)
+            pagador_id: null, // Sanse (fondo común)
             created_at: new Date().toISOString(),
         });
 
         if (error1) {
-            console.error("❌ Error al crear gasto de Sanse:", error1);
-            toast.error(`Error al saldar: ${error1.message}`);
+            console.error("❌ Error creating Sanse expense:", error1);
+            toast.error(`Error settling: ${error1.message}`);
             return;
         }
 
-        // 2. Negative expense for the acreedor to reduce their investment
+        // 2. "Cobro de deuda" para Sanse (monto negativo para reducir inversión)
+        // Esto es truculento: si "pagamos" una deuda con efectivo, el dinero no sale realmente de nuestra caja registradora física,
+        // sino que proviene de un "efectivo virtual de Sanse"
         const { error: error2 } = await supabase.from("gastos").insert({
             detalle: `cobro deuda desde Sanse`,
-            monto: -montoSaldar, // NEGATIVE to reduce their balance
+            monto: -montoSaldar, // NEGATIVO para reducir su saldo
             pagador_id: acreedorId,
             created_at: new Date().toISOString(),
         });
@@ -266,7 +263,7 @@ export default function Caja2Page() {
         fetchData();
     };
 
-    // Unify gastos and deudas
+    // Unificar gastos y deudas
     const unifiedExpenses: UnifiedExpense[] = [
         ...gastos.map((g) => ({
             id: g.id,
@@ -288,7 +285,7 @@ export default function Caja2Page() {
         })),
     ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
-    // Calculate widgets
+    // Calcular widgets
     const profileIds = Object.keys(profiles);
     const facundoId = profileIds.find((id) => profiles[id].toLowerCase().includes("facundo"));
     const lukasId = profileIds.find((id) => profiles[id].toLowerCase().includes("lukas"));
@@ -311,8 +308,22 @@ export default function Caja2Page() {
         .filter((g) => !g.pagador_id)
         .reduce((sum, g) => sum + g.monto, 0);
 
+    // Total ventas regulares (para widget Ganancias)
     const totalVentas = ventas.reduce((sum, v) => sum + v.precio_total, 0);
-    const cajaSanse = totalVentas - gastosSanse;
+
+    // Total TODAS las ventas (incluyendo ventas revendedores para cálculo Sanse)
+    const [totalAllVentas, setTotalAllVentas] = useState(0);
+
+    useEffect(() => {
+        const fetchAllVentas = async () => {
+            const { data } = await supabase.from("ventas").select("precio_total");
+            const total = (data || []).reduce((sum, v) => sum + v.precio_total, 0);
+            setTotalAllVentas(total);
+        };
+        if (!loading) fetchAllVentas();
+    }, [loading]);
+
+    const cajaSanse = totalAllVentas - gastosSanse;
 
     console.log("💰 Debug - Total Facundo:", totalFacundo);
     console.log("💰 Debug - Total Lukas:", totalLukas);
@@ -322,7 +333,7 @@ export default function Caja2Page() {
         <div className="container mx-auto py-8 px-4 max-w-7xl">
             <h1 className="text-3xl font-bold mb-8">Caja Unificada</h1>
 
-            {/* Widgets Row */}
+            {/* Fila de Widgets */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
                 <Card>
                     <CardHeader className="pb-3">
@@ -410,7 +421,7 @@ export default function Caja2Page() {
                 </Card>
             </div>
 
-            {/* Main Content Grid */}
+            {/* Grilla de Contenido Principal */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Ganancias */}
                 <Card>
@@ -471,7 +482,7 @@ export default function Caja2Page() {
                     </CardContent>
                 </Card>
 
-                {/* Gastos (Unified Table) */}
+                {/* Gastos (Tabla Unificada) */}
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between">
                         <CardTitle className="flex items-center gap-2">
@@ -561,7 +572,7 @@ export default function Caja2Page() {
                                                     ${item.pagador.toLowerCase() === 'sanse' ? 'bg-green-50 text-green-700 border-green-200' : ''}
                                                 `}
                                             >
-                                                {item.pagador}
+                                                {item.pagador.split(' ')[0]}
                                             </Badge>
                                         </TableCell>
                                         <TableCell>
@@ -588,7 +599,7 @@ export default function Caja2Page() {
                 </Card>
             </div>
 
-            {/* Settlement Dialog */}
+            {/* Diálogo de Saldo */}
             <Dialog open={saldarDialogOpen} onOpenChange={setSaldarDialogOpen}>
                 <DialogContent>
                     <DialogHeader>
@@ -627,7 +638,7 @@ export default function Caja2Page() {
                 </DialogContent>
             </Dialog>
 
-            {/* Delete Confirmation Dialog */}
+            {/* Diálogo Confirmación de Eliminación */}
             <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
                 <AlertDialogContent>
                     <AlertDialogHeader>

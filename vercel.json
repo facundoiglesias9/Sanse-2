@@ -7,6 +7,10 @@
     {
       "path": "/api/vanrossum/sync-precios",
       "schedule": "0 19 * * *"
+    },
+    {
+      "path": "/api/cron/check-stock",
+      "schedule": "0 14 * * *"
     }
   ]
 }

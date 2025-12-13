@@ -11,13 +11,18 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 
+import { cn } from "@/lib/utils";
+
 type Calendar22Props = {
   value: Date | null;
   onChange: (date: Date | null) => void;
   isEditing?: boolean;
+  className?: string;
+  disabled?: (date: Date) => boolean;
+  fromDate?: Date;
 };
 
-export function Calendar22({ value, onChange, isEditing }: Calendar22Props) {
+export function Calendar22({ value, onChange, isEditing, className, disabled, fromDate }: Calendar22Props) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -27,12 +32,12 @@ export function Calendar22({ value, onChange, isEditing }: Calendar22Props) {
           Fecha de vencimiento
         </Label>
       )}
-      <Popover open={open} onOpenChange={setOpen}>
+      <Popover open={open} onOpenChange={setOpen} modal={true}>
         <PopoverTrigger asChild>
           <Button
             variant="outline"
             id="date"
-            className="w-48 justify-between font-normal"
+            className={cn("w-48 justify-between font-normal", className)}
             type="button"
           >
             {value ? value.toLocaleDateString("es-AR") : "Seleccionar fecha"}
@@ -45,9 +50,13 @@ export function Calendar22({ value, onChange, isEditing }: Calendar22Props) {
             selected={value ?? undefined}
             captionLayout="dropdown"
             onSelect={(date) => {
-              onChange(date ?? null);
-              setOpen(false);
+              if (date) {
+                onChange(date);
+                setOpen(false);
+              }
             }}
+            disabled={disabled}
+            fromDate={fromDate}
           />
           <Button
             type="button"

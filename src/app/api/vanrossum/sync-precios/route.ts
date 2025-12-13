@@ -485,7 +485,7 @@ export async function POST(req: Request) {
         if (ng && ng.id) hit = ng;
       }
 
-      // 1.c) fallback por título principal + marca (si unívoco)
+      // 1.c) alternativa por título principal + marca (si unívoco)
       if (!hit) {
         const main = extractMain(it.nombre);
         const brand = extractBrand(it.nombre);
@@ -494,7 +494,7 @@ export async function POST(req: Request) {
         if (arr && arr.length === 1) hit = arr[0];
       }
 
-      // 2) fuzzy
+      // 2) difuso (fuzzy)
       let best: { id: string; score: number; } | null = null;
       if (!hit) best = findBestVR(it.nombre, genero);
 
@@ -506,9 +506,9 @@ export async function POST(req: Request) {
           external_code: it.externalCode,
           url: it.productUrl,
           // precio_ars_100g legado: usamos el que exista, prefiriendo 100 si hay, sino 30 (o ambos)
-          // Actually, let's just save valid fields
-          precio_ars_100g: it.precioArs100 ?? null, // legacy column usage? or new?
-          // New columns:
+          // En realidad, solo guardemos campos válidos
+          precio_ars_100g: it.precioArs100 ?? null, // ¿uso de columna heredada? ¿o nueva?
+          // Nuevas columnas:
           precio_30g: it.precioArs30 ?? null,
           precio_100g: it.precioArs100 ?? null,
 
@@ -519,10 +519,10 @@ export async function POST(req: Request) {
           id: hit.id,
           precio30: it.precioArs30 ?? null,
           precio100: it.precioArs100 ?? null,
-          // For legacy/default logic: use 30g as primary if available? Or keep existing logic?
-          // User wants dynamic toggle. Let's just update the specific cols.
-          // But `precio` and `cantidadGramos` might be used by the system as "default".
-          // Let's set default `precio` to 30g if available, else 100g.
+          // Para lógica heredada/por defecto: ¿usar 30g como primaria si está disponible? ¿O mantener lógica existente?
+          // El usuario quiere alternancia dinámica. Solo actualicemos las columnas específicas.
+          // Pero precio y cantidadGramos pueden ser usados por el sistema como "por defecto".
+          // Establezcamos el precio por defecto a 30g si está disponible, si no 100g.
           precio: it.precioArs30 ?? it.precioArs100 ?? null,
           cantidadGramos: it.precioArs30 ? 30 : (it.precioArs100 ? 100 : null),
 

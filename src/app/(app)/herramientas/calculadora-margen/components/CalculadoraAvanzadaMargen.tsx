@@ -130,7 +130,7 @@ export default function CalculadoraAvanzadaMargen() {
     };
 
     fetchProveedores();
-  }, []); // eslint-disable-line
+  }, []);
 
   useEffect(() => {
     async function fetchInsumos() {
@@ -175,7 +175,7 @@ export default function CalculadoraAvanzadaMargen() {
 
     fetchInsumos();
     fetchInsumosCategorias();
-  }, []); // eslint-disable-line
+  }, []);
 
   const form = useForm<z.infer<typeof FormSchema>>({
     resolver: zodResolver(FormSchema),

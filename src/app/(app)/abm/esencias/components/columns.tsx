@@ -17,13 +17,15 @@ export const esenciasColumns = (
     {
       accessorKey: "nombre",
       header: ({ column }) => (
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        >
-          Esencia
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
+        <div className="flex justify-center">
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          >
+            Esencia
+            <ArrowUpDown className="ml-2 h-4 w-4" />
+          </Button>
+        </div>
       ),
       cell: ({ row }) => {
         const nombre = row.getValue("nombre") as string;
@@ -37,13 +39,13 @@ export const esenciasColumns = (
           : undefined;
 
         return (
-          <div className="relative inline-block font-bold">
+          <div className="flex items-center justify-center w-full gap-2 font-bold">
             {isScraped && (
               <TooltipProvider>
                 <Tooltip delayDuration={150}>
                   <TooltipTrigger asChild>
                     <span
-                      className="absolute -left-2 -top-1 h-2 w-2 rounded-full bg-blue-500 z-10"
+                      className="h-2 w-2 rounded-full bg-blue-500 shrink-0"
                       aria-label={timeTxt ? `Actualizado con scraping: ${timeTxt}` : "Actualizado con scraping"}
                     />
                   </TooltipTrigger>
@@ -62,127 +64,131 @@ export const esenciasColumns = (
     },
     {
       accessorKey: "precio_usd",
-      header: "Precio USD",
+      header: () => <div className="text-center">Precio USD</div>,
       cell: ({ row }) => {
         const scrapeConsultar = Boolean((row.original as any)._scrape_consultar);
-        if (row.original.is_consultar || scrapeConsultar) return "Consultar";
+        if (row.original.is_consultar || scrapeConsultar) return <div className="text-center">Consultar</div>;
         const precioUsd = row.getValue("precio_usd") as number;
-        if (precioUsd === 0) return "N/A";
-        return <p>{formatCurrency(precioUsd, "USD")}</p>;
+        if (precioUsd === 0) return <div className="text-center">N/A</div>;
+        return <div className="text-center">{formatCurrency(precioUsd, "USD")}</div>;
       },
     },
     {
       accessorKey: "precio_ars",
-      header: "Precio ARS",
+      header: () => <div className="text-center">Precio ARS</div>,
       cell: ({ row }) => {
         const scrapeConsultar = Boolean((row.original as any)._scrape_consultar);
-        if (row.original.is_consultar || scrapeConsultar) return "Consultar";
+        if (row.original.is_consultar || scrapeConsultar) return <div className="text-center">Consultar</div>;
         const precioArs = row.getValue("precio_ars") as number;
-        if (precioArs === 0) return "N/A";
-        return <p>{formatCurrency(precioArs, "ARS")}</p>;
+        if (precioArs === 0) return <div className="text-center">N/A</div>;
+        return <div className="text-center">{formatCurrency(precioArs, "ARS")}</div>;
       },
     },
     {
       accessorKey: "precio_por_perfume",
-      header: "Precio por perfume",
+      header: () => <div className="text-center">Precio por perfume</div>,
       cell: ({ row }) => {
         const scrapeConsultar = Boolean((row.original as any)._scrape_consultar);
-        if (row.original.is_consultar || scrapeConsultar) return "Consultar";
+        if (row.original.is_consultar || scrapeConsultar) return <div className="text-center">Consultar</div>;
         const precio = row.getValue("precio_por_perfume") as number;
-        return <p className="font-bold">{formatCurrency(precio, "ARS")}</p>;
+        return <div className="text-center font-bold">{formatCurrency(precio, "ARS")}</div>;
       },
     },
     {
       accessorKey: "cantidad_gramos",
-      header: "Cantidad (gr)",
+      header: () => <div className="text-center">Cantidad (gr)</div>,
       cell: ({ row }) => {
         const scrapeConsultar = Boolean((row.original as any)._scrape_consultar);
-        if (row.original.is_consultar || scrapeConsultar) return "Consultar";
+        if (row.original.is_consultar || scrapeConsultar) return <div className="text-center">Consultar</div>;
         const cantidadGramos = row.getValue("cantidad_gramos") as number;
-        return <p>{cantidadGramos}</p>;
+        return <div className="text-center">{cantidadGramos}</div>;
       },
     },
     {
       accessorKey: "proveedor_id",
-      header: "Proveedor",
+      header: () => <div className="text-center">Proveedor</div>,
       filterFn: (row, id, value) => {
         if (!value) return true;
         return row.getValue(id) === value;
       },
       cell: ({ row }) => {
         const proveedor = row.original.proveedores;
-        if (!proveedor) return <Badge variant="outline">N/A</Badge>;
+        if (!proveedor) return <div className="text-center"><Badge variant="outline">N/A</Badge></div>;
         return (
-          <Badge
-            variant={
-              [
-                "default",
-                "secondary",
-                "destructive",
-                "outline",
-                "warning",
-                "success",
-                "indigo",
-                "pink",
-                "purple",
-              ].includes(proveedor.color as string)
-                ? (proveedor.color as
-                  | "default"
-                  | "secondary"
-                  | "destructive"
-                  | "outline"
-                  | "warning"
-                  | "success"
-                  | "indigo"
-                  | "pink"
-                  | "purple")
-                : "default"
-            }
-          >
-            {proveedor.nombre}
-          </Badge>
+          <div className="flex justify-center">
+            <Badge
+              variant={
+                [
+                  "default",
+                  "secondary",
+                  "destructive",
+                  "outline",
+                  "warning",
+                  "success",
+                  "indigo",
+                  "pink",
+                  "purple",
+                ].includes(proveedor.color as string)
+                  ? (proveedor.color as
+                    | "default"
+                    | "secondary"
+                    | "destructive"
+                    | "outline"
+                    | "warning"
+                    | "success"
+                    | "indigo"
+                    | "pink"
+                    | "purple")
+                  : "default"
+              }
+            >
+              {proveedor.nombre}
+            </Badge>
+          </div>
         );
       },
     },
     {
       accessorKey: "genero",
-      header: "Género",
+      header: () => <div className="text-center">Género</div>,
       cell: ({ row }) => {
         const genero = row.getValue("genero") as string;
         return (
-          <Badge
-            variant={
-              genero === "masculino"
-                ? "indigo"
-                : genero === "femenino"
-                  ? "pink"
-                  : genero === "ambiente"
-                    ? "warning"
-                    : "default"
-            }
-          >
-            {capitalizeFirstLetter(genero)}
-          </Badge>
+          <div className="flex justify-center">
+            <Badge
+              variant={
+                genero === "masculino"
+                  ? "indigo"
+                  : genero === "femenino"
+                    ? "pink"
+                    : genero === "ambiente"
+                      ? "warning"
+                      : "default"
+              }
+            >
+              {capitalizeFirstLetter(genero)}
+            </Badge>
+          </div>
         );
       },
     },
     {
       accessorKey: "updated_at",
-      header: "Última actualización",
+      header: () => <div className="text-center">Última actualización</div>,
       cell: ({ row }) => {
         const last =
           (row.original as any)._last_update ??
           (row.getValue("updated_at") as string);
-        return <p>{formatDate(new Date(last))}</p>;
+        return <div className="text-center">{formatDate(new Date(last))}</div>;
       },
     },
     {
       accessorKey: "acciones",
-      header: "Acciones",
+      header: () => <div className="text-center">Acciones</div>,
       cell: ({ row }) => {
         const esencia = row.original;
         return (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center justify-center gap-2">
             <Button
               variant="ghost"
               size="icon"

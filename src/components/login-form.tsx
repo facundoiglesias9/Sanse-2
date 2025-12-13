@@ -21,20 +21,12 @@ import {
 } from "@/components/ui/form";
 
 const loginSchema = z.object({
-  email: z
+  username: z
     .string()
-    .min(1, "El email es obligatorio")
-    .email("Debe ser un email válido"),
+    .min(1, "El usuario es obligatorio"),
   password: z
     .string()
-    .min(8, "La contraseña debe tener al menos 8 caracteres")
-    .regex(/[a-z]/, "Debe contener al menos una minúscula")
-    .regex(/[A-Z]/, "Debe contener al menos una mayúscula")
-    .regex(/[0-9]/, "Debe contener al menos un número")
-    .regex(
-      /[!@#$%^&*]/,
-      "Debe contener al menos un carácter especial (!@#$%^&*)",
-    ),
+    .min(6, "La contraseña debe tener al menos 6 caracteres"),
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
@@ -49,15 +41,22 @@ export function LoginForm({
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: "",
+      username: "",
       password: "",
     },
   });
 
   const handleSubmit = async (values: LoginFormValues) => {
     const supabase = createClient();
+
+    // Verificar si la entrada es un correo electrónico (contiene @) o un nombre de usuario
+    const isEmail = values.username.includes('@');
+    const email = isEmail
+      ? values.username
+      : `${values.username.toLowerCase().replace(/\s/g, '')}@sanseperfumes.local`;
+
     const { error } = await supabase.auth.signInWithPassword({
-      email: values.email,
+      email: email,
       password: values.password,
     });
 
@@ -88,15 +87,15 @@ export function LoginForm({
         <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
           <FormField
             control={form.control}
-            name="email"
+            name="username"
             render={({ field }) => (
               <FormItem>
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="username">Usuario</Label>
                 <FormControl>
                   <Input
-                    id="email"
-                    type="email"
-                    placeholder="m@example.com"
+                    id="username"
+                    type="text"
+                    placeholder="Tu nombre de usuario"
                     {...field}
                   />
                 </FormControl>

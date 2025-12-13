@@ -15,10 +15,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NumberInput } from "@/components/ui/number-input";
-import { Switch } from "@/components/ui/switch";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { DataTablePagination } from "@/components/ui/data-table-pagination";
-import { Download, ShoppingCart, Loader2, Trash2, FileSpreadsheet } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
+import { Loader2, Plus, Trash2, ShoppingCart, FileSpreadsheet, Download, Copy, Check } from "lucide-react";
 import {
   ColumnDef,
   ColumnFiltersState,
@@ -71,6 +71,7 @@ interface DataTableProps {
   filterColumnId?: string;
   onDataUpdate?: () => void;
   view?: "minorista" | "mayorista";
+  userRole?: string;
 }
 
 export function DataTable({
@@ -80,6 +81,7 @@ export function DataTable({
   filterColumnId = "nombre",
   onDataUpdate,
   view = "minorista",
+  userRole = "admin",
 }: DataTableProps) {
   const supabase = createClient();
   const [sorting, setSorting] = useState<SortingState>([]);
@@ -89,8 +91,10 @@ export function DataTable({
   const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({});
   const [ventaPerfumes, setVentaPerfumes] = useState<VentaPerfumeItem[]>([]);
   const [cliente, setCliente] = useState("");
+  const [metodoPago, setMetodoPago] = useState<"Efectivo" | "Transferencia">("Efectivo");
+  const [copied, setCopied] = useState(false);
 
-  // Edit / Delete State
+  // Estado de Editar/Eliminar
   const [productToDelete, setProductToDelete] = useState<Perfume | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
@@ -100,7 +104,7 @@ export function DataTable({
   const [editPrecioArs, setEditPrecioArs] = useState("");
   const [editPrecioUsd, setEditPrecioUsd] = useState("");
 
-  // New Edit State
+  // Nuevo estado de Edición
   const [editMargenMinorista, setEditMargenMinorista] = useState("");
   const [editMargenMayorista, setEditMargenMayorista] = useState("");
   const [editInsumos, setEditInsumos] = useState<InsumoLite[]>([]);
@@ -219,7 +223,7 @@ export function DataTable({
     })();
   }, []);
 
-  // Handlers
+  // Manejadores
   const handleDeleteProduct = (product: Perfume) => {
     setProductToDelete(product);
     setIsDeleteDialogOpen(true);
@@ -262,7 +266,7 @@ export function DataTable({
           // Priorizamos datos vivos para costos, pero mantenemos la cantidad de la receta
           cantidad_necesaria: ci.cantidad_necesaria || ci.cantidad || 0,
           precio_lote: live?.precio_lote || 0,
-          cantidad_lote: live?.cantidad_lote || 1, // Avoid division by zero
+          cantidad_lote: live?.cantidad_lote || 1, // Evitar división por cero
           is_general: live?.is_general ?? ci.is_general,
           insumos_categorias_id: live?.insumos_categorias_id ?? ci.insumos_categorias_id,
           nombre: live?.nombre || ci.nombre,
@@ -375,6 +379,56 @@ export function DataTable({
   const filterValue =
     (table.getColumn(filterColumnId)?.getFilterValue() as string) ?? "";
 
+  // Estado de Exportación
+  const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
+  const [exportColumns, setExportColumns] = useState<Record<string, boolean>>({
+    perfume: true,
+    precio: true,
+    genero: true,
+    proveedor: false,
+    categoria: false,
+  });
+
+  const [exportSelectedProviders, setExportSelectedProviders] = useState<string[]>([]);
+  const [exportSelectedCategories, setExportSelectedCategories] = useState<string[]>([]);
+  const [exportSelectedGenders, setExportSelectedGenders] = useState<string[]>(["masculino", "femenino"]);
+
+  // Establecer selecciones por defecto coincidiendo con la preferencia del usuario
+  useEffect(() => {
+    if (proveedores.length > 0 && exportSelectedProviders.length === 0) {
+      // Por defecto: Solo "Van Rossum"
+      const defaultProvs = proveedores
+        .filter(p => p.nombre.toLowerCase().includes("van rossum"))
+        .map(p => p.id);
+
+      // Si se encuentra, establecerlo. Si no (p.ej. nombre cambiado), podríamos alternar a todos o ninguno.
+      // Alternemos a "Ninguno" para que el usuario vea vacío (o verificar si el array está vacío).
+      if (defaultProvs.length > 0) {
+        setExportSelectedProviders(defaultProvs);
+      }
+    }
+  }, [proveedores]);
+
+  useEffect(() => {
+    if (insumosCategorias.length > 0 && exportSelectedCategories.length === 0) {
+      // Por defecto: Solo "Perfumería fina"
+      const defaultCats = insumosCategorias
+        .filter(c => c.nombre.toLowerCase().includes("perfumería fina") || c.nombre.toLowerCase().includes("perfumeria fina"))
+        .map(c => c.id);
+
+      if (defaultCats.length > 0) {
+        setExportSelectedCategories(defaultCats);
+      }
+    }
+  }, [insumosCategorias]);
+
+
+  function handleExportClick() {
+    // NO autoseleccionar todo si está vacío. Queremos respetar los defaults o la selección vacía del usuario.
+    // La inicialización sucede en useEffect.
+    setIsExportDialogOpen(true);
+  }
+
   function exportToExcel() {
     // Obtener la fecha / mes actual
     const now = new Date();
@@ -435,26 +489,65 @@ export function DataTable({
       XLSX.utils.book_append_sheet(wb, ws, name);
     };
 
-    if (view === "minorista") {
-      const minoristaData = filtrarMasCaro(data, false).map((row) => ({
-        Perfume: row.nombre,
-        Precio: formatCurrency(precioRedondeado(row, false), "ARS", 0),
-        Género: row.genero,
-      }));
-      crearHojaConTitulo(minoristaData, "Minorista");
-    } else {
-      const mayoristaData = filtrarMasCaro(data, true).map((row) => ({
-        Perfume: row.nombre,
-        "Precio Mayorista": formatCurrency(precioRedondeado(row, true), "ARS", 0),
-        Género: row.genero,
-      }));
-      crearHojaConTitulo(mayoristaData, "Mayorista");
-    }
+
+    // Nota: applyFilters ya maneja el filtrado por género, pero queremos dividir por género.
+    // Así que deberíamos:
+    // 1. Obtener datos filtrados (por proveedor/categoría).
+    // 2. Iterar a través de los géneros seleccionados.
+    // 3. Para cada género, filtrar el subconjunto y generar la hoja.
+
+    // Auxiliar: aplicar filtros NO GÉNERO primero
+    const applyCommonFilters = (rows: Perfume[]) => {
+      return rows.filter(row => {
+        // Filtro de Proveedor
+        if (!exportSelectedProviders.includes(row.proveedor_id)) return false;
+
+        // Filtro de Categoría
+        const catId = row.insumos_categorias_id;
+        // Manejar categoría nula -> normalmente no debería ocurrir, pero si es así, ¿incluir o excluir?
+        if (catId && !exportSelectedCategories.includes(catId)) return false;
+
+        return true;
+      });
+    };
+
+    const commonFiltered = applyCommonFilters(view === "minorista" ? data : data);
+
+    // Iterar a través de géneros seleccionados para crear hojas
+    exportSelectedGenders.forEach(genderKey => {
+      const genderData = commonFiltered.filter(row => {
+        const rowGen = row.genero || "otro";
+        // Asegurarse de que coincida con las claves en exportSelectedGenders
+        return rowGen === genderKey;
+      });
+
+      if (genderData.length === 0) return; // Omitir hojas vacías
+
+      const processedData = filtrarMasCaro(genderData, view === "mayorista").map((row) => {
+        const obj: any = {};
+        if (exportColumns.perfume) obj["Perfume"] = row.nombre;
+        // Usar precio apropiado según vista
+        if (view === "mayorista") {
+          if (exportColumns.precio) obj["Precio Mayorista"] = formatCurrency(precioRedondeado(row, true), "ARS", 0);
+        } else {
+          if (exportColumns.precio) obj["Precio"] = formatCurrency(precioRedondeado(row, false), "ARS", 0);
+        }
+        if (exportColumns.genero) obj["Género"] = capitalizeFirstLetter(row.genero);
+        if (exportColumns.proveedor) obj["Proveedor"] = proveedores.find(p => p.id === row.proveedor_id)?.nombre || "";
+        if (exportColumns.categoria) obj["Categoría"] = insumosCategorias.find(c => c.id === row.insumos_categorias_id)?.nombre || "";
+        return obj;
+      });
+
+      const sheetName = capitalizeFirstLetter(genderKey);
+      // Desinfectar nombre de hoja por si acaso (max 31 caracteres, etc, aunque probablemente bien aquí)
+      crearHojaConTitulo(processedData, sheetName);
+    });
 
     const id = toast.loading("Generando archivo...");
     try {
       XLSX.writeFile(wb, `lista_${view}_${mesSlug}.xlsx`, { bookType: "xlsx", type: "binary" });
-      toast("Descarga iniciada", { id, duration: 1500 });
+      toast.success("Descarga iniciada", { id, duration: 2000 });
+      setIsExportDialogOpen(false);
     } catch (e) {
       toast.error("Hubo un problema al generar el archivo", { id });
     }
@@ -498,6 +591,8 @@ export function DataTable({
         cantidad_perfumes: cantidadTotal,
         precio_total: totalPrice,
         perfumes: conjuntoDePerfumes,
+        is_reseller_sale: userRole === "revendedor",
+        metodo_pago: metodoPago,
       },
     ]);
 
@@ -506,8 +601,39 @@ export function DataTable({
       console.error("Error al agregar la venta:", error);
     } else {
       toast.success("¡Venta agregada correctamente!");
+
+      // Enviar notificación por email si es revendedor
+      if (userRole === "revendedor") {
+        const itemsForEmail = perfumesVendidos.map((item) => {
+          const { perfume, genero, cantidad, frascoLP, devuelveEnvase, priceType } = item;
+          const precioBaseUnit = computePrecioUnitario(perfume, view === "mayorista", frascoLP, priceType);
+          const descuentoEnvase = devuelveEnvase ? getEnvaseUnitCost(perfume, frascoLP) : 0;
+          const precioUnitFinal = Math.max(0, precioBaseUnit - descuentoEnvase);
+
+          return {
+            nombre: perfume.nombre,
+            genero: genero,
+            cantidad: cantidad,
+            precioUnitario: precioUnitFinal
+          };
+        });
+
+        // Disparar y olvidar (no esperar para retrasar la UI)
+        fetch("/api/emails/new-order", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            items: itemsForEmail,
+            total: totalPrice,
+            clientName: cliente,
+            metodoPago: metodoPago
+          })
+        }).catch(console.error);
+      }
+
       setVentaPerfumes([]);
       setCliente("");
+      setMetodoPago("Efectivo");
       setIsDialogOpen(false);
     }
 
@@ -516,7 +642,7 @@ export function DataTable({
     setRowSelection({});
   };
 
-  const handleAgregarVenta = () => {
+  const handleAgregarVenta = async () => {
     const selectedRows = table.getSelectedRowModel().rows;
     if (selectedRows.length === 0) {
       toast.error("Debes seleccionar al menos un perfume.");
@@ -533,6 +659,26 @@ export function DataTable({
       priceType: "precio",
     }));
     setVentaPerfumes(perfumesConCantidad);
+
+    // Autocompletar nombre de cliente para revendedores
+    if (userRole === "revendedor") {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('nombre')
+          .eq('id', session.user.id)
+          .single();
+
+        if (profile?.nombre) {
+          setCliente(profile.nombre);
+        }
+      }
+    }
+
+    // Restablecer valores por defecto
+    setMetodoPago("Efectivo");
+
     setIsDialogOpen(true);
   };
 
@@ -704,6 +850,8 @@ export function DataTable({
                 placeholder="Nombre del cliente"
                 value={cliente}
                 onChange={(e) => setCliente(e.target.value)}
+                disabled={userRole === "revendedor"}
+                className={userRole === "revendedor" ? "bg-muted cursor-not-allowed" : ""}
               />
             </div>
           </div>
@@ -750,9 +898,11 @@ export function DataTable({
                             >
                               {capitalizeFirstLetter(item.perfume.genero)}
                             </Badge>
-                            <span className="text-xs text-muted-foreground">
-                              {proveedores.find(p => p.id === item.perfume.proveedor_id)?.nombre || "Sin proveedor"}
-                            </span>
+                            {userRole === "admin" && (
+                              <span className="text-xs text-muted-foreground">
+                                {proveedores.find(p => p.id === item.perfume.proveedor_id)?.nombre || "Sin proveedor"}
+                              </span>
+                            )}
                           </div>
                         </div>
                       </TableCell>
@@ -905,124 +1055,185 @@ export function DataTable({
             </TableFooter>
           </Table>
 
-          <div className="mt-4 flex justify-end gap-x-2">
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span>
-                    <Button
-                      size="sm"
-                      disabled={isLoadingForm || cliente.trim() === ""}
-                      onClick={() => {
-                        let total = 0;
-                        const ventaConCliente = ventaPerfumes.map((item) => {
-                          const base = computePrecioUnitario(item.perfume, view === "mayorista", item.frascoLP, item.priceType);
-                          const d = item.devuelveEnvase ? getEnvaseUnitCost(item.perfume, item.frascoLP) : 0;
-                          total += Math.max(0, base - d) * item.cantidad;
-                          return { ...item, cliente: cliente.trim() };
-                        });
-                        handleSubmit(total, ventaConCliente);
-                      }}
-                    >
-                      {isLoadingForm && <Loader2 width={18} className="animate-spin" />}
-                      Agregar venta
-                    </Button>
-                  </span>
-                </TooltipTrigger>
-                {isLoadingForm ? (
-                  <TooltipContent>Procesando la venta...</TooltipContent>
-                ) : cliente.trim() === "" ? (
-                  <TooltipContent>Ingresa el nombre del cliente para continuar</TooltipContent>
-                ) : null}
-              </Tooltip>
-            </TooltipProvider>
-            <Button variant="secondary" size="sm" onClick={handleCloseModal}>
-              Cancelar
-            </Button>
+          <div className="mt-4 flex flex-col md:flex-row items-center justify-between gap-4">
+            {/* Payment Method Selection for Resellers (Left) */}
+            <div className="w-full md:w-auto flex flex-col gap-3">
+              {userRole === "revendedor" && (
+                <>
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-medium whitespace-nowrap">Método de Pago:</span>
+                    <Select value={metodoPago} onValueChange={(val: any) => setMetodoPago(val)}>
+                      <SelectTrigger className="w-[180px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Efectivo">Efectivo</SelectItem>
+                        <SelectItem value="Transferencia">Transferencia</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Payment Info Display */}
+                  <AnimatePresence mode="wait">
+                    {metodoPago === "Transferencia" && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="bg-muted/50 p-3 rounded-lg border border-border text-sm max-w-sm"
+                      >
+                        <p className="text-muted-foreground mb-1 text-xs">Alias para transferencia:</p>
+                        <div className="flex items-center gap-2 font-mono font-bold text-lg select-all">
+                          SANSE.PERFUMES
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-6 w-6 ml-auto"
+                            onClick={() => {
+                              navigator.clipboard.writeText("SANSE.PERFUMES");
+                              setCopied(true);
+                              setTimeout(() => setCopied(false), 2000);
+                            }}
+                          >
+                            {copied ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
+                          </Button>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </>
+              )}
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex justify-end gap-x-2 w-full md:w-auto">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span>
+                      <Button
+                        size="sm"
+                        disabled={isLoadingForm || cliente.trim() === ""}
+                        onClick={() => {
+                          let total = 0;
+                          const ventaConCliente = ventaPerfumes.map((item) => {
+                            const base = computePrecioUnitario(item.perfume, view === "mayorista", item.frascoLP, item.priceType);
+                            const d = item.devuelveEnvase ? getEnvaseUnitCost(item.perfume, item.frascoLP) : 0;
+                            total += Math.max(0, base - d) * item.cantidad;
+                            return { ...item, cliente: cliente.trim() };
+                          });
+                          handleSubmit(total, ventaConCliente);
+                        }}
+                      >
+                        {isLoadingForm && <Loader2 width={18} className="animate-spin" />}
+                        Agregar venta
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  {isLoadingForm ? (
+                    <TooltipContent>Procesando la venta...</TooltipContent>
+                  ) : cliente.trim() === "" ? (
+                    <TooltipContent>Ingresa el nombre del cliente para continuar</TooltipContent>
+                  ) : null}
+                </Tooltip>
+              </TooltipProvider>
+              <Button variant="secondary" size="sm" onClick={handleCloseModal}>
+                Cancelar
+              </Button>
+            </div>
           </div>
         </DialogContent>
-      </Dialog>
+      </Dialog >
 
-      <div className="flex items-center gap-x-4 mb-4">
-        <div className="relative max-w-sm">
-          <Input
-            placeholder="Buscar por nombre..."
-            value={filterValue}
-            onChange={(event) => table.getColumn("nombre")?.setFilterValue(event.target.value)}
-            className="pr-10"
-          />
+      <div className="flex flex-col xl:flex-row gap-4 items-start xl:items-center justify-between mb-6">
+        <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
+          {userRole === "admin" && (
+            <>
+              <div className="relative w-full sm:w-64">
+                <Input
+                  placeholder="Buscar por nombre..."
+                  value={filterValue}
+                  onChange={(event) => table.getColumn("nombre")?.setFilterValue(event.target.value)}
+                  className="pr-10"
+                />
+              </div>
+              <Select
+                onValueChange={(value) =>
+                  table.getColumn("genero")?.setFilterValue(value === "todos" ? undefined : value)
+                }
+              >
+                <SelectTrigger className="w-[150px]">
+                  <SelectValue placeholder="Filtrar por género" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos</SelectItem>
+                  <SelectItem value="masculino">Masculino</SelectItem>
+                  <SelectItem value="femenino">Femenino</SelectItem>
+                  <SelectItem value="ambiente">Ambiente</SelectItem>
+                  <SelectItem value="otro">Otro</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select
+                onValueChange={(value) =>
+                  table.getColumn("categoria")?.setFilterValue(value === "todos" ? undefined : value)
+                }
+              >
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Filtrar por categoría" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todas">Todas</SelectItem>
+                  {insumosCategorias.filter(c => c.nombre.toLowerCase() !== 'otro').map((c) => (
+                    <SelectItem key={c.id} value={c.nombre}>
+                      {c.nombre}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select
+                value={
+                  typeof table.getColumn("proveedor_id")?.getFilterValue() === "string"
+                    ? (table.getColumn("proveedor_id")?.getFilterValue() as string)
+                    : "todos"
+                }
+                onValueChange={(value) =>
+                  table.getColumn("proveedor_id")?.setFilterValue(value === "todos" ? undefined : value)
+                }
+              >
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Filtrar por proveedor" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos</SelectItem>
+                  {proveedores.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.nombre}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </>
+          )}
         </div>
-        <Select
-          onValueChange={(value) =>
-            table.getColumn("genero")?.setFilterValue(value === "todos" ? undefined : value)
-          }
-        >
-          <SelectTrigger className="w-[150px]">
-            <SelectValue placeholder="Filtrar por género" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="todos">Todos</SelectItem>
-            <SelectItem value="masculino">Masculino</SelectItem>
-            <SelectItem value="femenino">Femenino</SelectItem>
-            <SelectItem value="ambiente">Ambiente</SelectItem>
-            <SelectItem value="otro">Otro</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select
-          onValueChange={(value) =>
-            table.getColumn("categoria")?.setFilterValue(value === "todos" ? undefined : value)
-          }
-        >
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Filtrar por categoría" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="todos">Todas</SelectItem>
-            {insumosCategorias.filter(c => c.nombre.toLowerCase() !== 'otro').map((c) => (
-              <SelectItem key={c.id} value={c.nombre}>
-                {c.nombre}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select
-          value={
-            typeof table.getColumn("proveedor_id")?.getFilterValue() === "string"
-              ? (table.getColumn("proveedor_id")?.getFilterValue() as string)
-              : "todos"
-          }
-          onValueChange={(value) =>
-            table.getColumn("proveedor_id")?.setFilterValue(value === "todos" ? undefined : value)
-          }
-        >
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Filtrar por proveedor" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="todos">Todos</SelectItem>
-            {proveedores.map((p) => (
-              <SelectItem key={p.id} value={p.id}>
-                {p.nombre}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Button
-          size="sm"
-          onClick={exportToExcel}
-          className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm hover:shadow transition-all font-medium gap-2"
-        >
-          <FileSpreadsheet size={16} />
-          Exportar {view === "mayorista" ? "Mayorista" : "Minorista"}
-        </Button>
-        <Button
-          size="sm"
-          onClick={handleAgregarVenta}
-          className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm hover:shadow transition-all font-medium gap-2"
-        >
-          <ShoppingCart size={16} />
-          {Object.keys(rowSelection).length > 0 ? `Ver Carrito (${Object.keys(rowSelection).length})` : "Ver Carrito"}
-        </Button>
+
+        <div className="flex items-center gap-3 ml-auto xl:ml-0 flex-shrink-0">
+          <Button
+            size="sm"
+            onClick={handleExportClick}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm hover:shadow transition-all font-medium gap-2"
+          >
+            <FileSpreadsheet size={16} />
+            Exportar {view === "mayorista" ? "Mayorista" : "Minorista"}
+          </Button>
+          <Button
+            size="sm"
+            onClick={handleAgregarVenta}
+            className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm hover:shadow transition-all font-medium gap-2"
+          >
+            <ShoppingCart size={16} />
+            {Object.keys(rowSelection).length > 0 ? `Ver Carrito (${Object.keys(rowSelection).length})` : "Ver Carrito"}
+          </Button>
+        </div>
       </div>
 
       <div className="rounded-md border">
@@ -1077,6 +1288,188 @@ export function DataTable({
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>Cancelar</Button>
             <Button variant="destructive" onClick={confirmDelete}>Eliminar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Export Options Dialog */}
+      <Dialog open={isExportDialogOpen} onOpenChange={setIsExportDialogOpen}>
+        <DialogContent className="sm:max-w-xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Opciones de Exportación ({view === "mayorista" ? "Mayorista" : "Minorista"})</DialogTitle>
+            <DialogDescription>
+              Personaliza qué datos y columnas deseas exportar al Excel.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-6 py-4">
+            {/* Columnas Selection */}
+            <div className="space-y-3">
+              <h3 className="font-medium flex items-center gap-2 text-sm text-foreground/80 border-b pb-1">
+                <FileSpreadsheet className="h-4 w-4" /> Columnas a incluir
+              </h3>
+              <div className="grid grid-cols-2 gap-4">
+                {[
+                  { key: "perfume", label: "Perfume" },
+                  { key: "precio", label: view === "mayorista" ? "Precio Mayorista" : "Precio" },
+                  { key: "genero", label: "Género" },
+                  { key: "proveedor", label: "Proveedor" },
+                  { key: "categoria", label: "Categoría" },
+                ]
+                  .filter(col => userRole === "admin" || col.key !== "proveedor") // Hide proveedor for revendedores
+                  .map((col) => (
+                    <div className="flex items-center space-x-2" key={col.key}>
+                      <Checkbox
+                        id={`ex-col-${col.key}`}
+                        checked={exportColumns[col.key]}
+                        onCheckedChange={(c) => setExportColumns(prev => ({ ...prev, [col.key]: !!c }))}
+                      />
+                      <label htmlFor={`ex-col-${col.key}`} className="text-sm cursor-pointer">{col.label}</label>
+                    </div>
+                  ))}
+              </div>
+            </div>
+
+
+            {/* Proveedores Filter - Only for Admin */}
+            {userRole === "admin" && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between border-b pb-1">
+                  <h3 className="font-medium flex items-center gap-2 text-sm text-foreground/80">
+                    Proveedores
+                  </h3>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 text-xs"
+                    onClick={() => {
+                      // Toggle All
+                      if (exportSelectedProviders.length === proveedores.length) {
+                        setExportSelectedProviders([]);
+                      } else {
+                        setExportSelectedProviders(proveedores.map(p => p.id));
+                      }
+                    }}
+                  >
+                    {exportSelectedProviders.length === proveedores.length ? "Desmarcar todos" : "Marcar todos"}
+                  </Button>
+                </div>
+                <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto pr-2 custom-scrollbar">
+                  {proveedores.map((prov) => (
+                    <div className="flex items-center space-x-2" key={prov.id}>
+                      <Checkbox
+                        id={`ex-prov-${prov.id}`}
+                        checked={exportSelectedProviders.includes(prov.id)}
+                        onCheckedChange={(checked) => {
+                          setExportSelectedProviders(prev =>
+                            checked
+                              ? [...prev, prov.id]
+                              : prev.filter(id => id !== prov.id)
+                          );
+                        }}
+                      />
+                      <label htmlFor={`ex-prov-${prov.id}`} className="text-sm cursor-pointer truncate" title={prov.nombre}>{prov.nombre}</label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Categorías Filter */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between border-b pb-1">
+                <h3 className="font-medium flex items-center gap-2 text-sm text-foreground/80">
+                  Categorías
+                </h3>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 text-xs"
+                  onClick={() => {
+                    // Toggle All
+                    if (exportSelectedCategories.length === insumosCategorias.length) {
+                      setExportSelectedCategories([]);
+                    } else {
+                      setExportSelectedCategories(insumosCategorias.map(c => c.id));
+                    }
+                  }}
+                >
+                  {exportSelectedCategories.length === insumosCategorias.length ? "Desmarcar todos" : "Marcar todos"}
+                </Button>
+              </div>
+              <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto pr-2 custom-scrollbar">
+                {insumosCategorias.map((cat) => (
+                  <div className="flex items-center space-x-2" key={cat.id}>
+                    <Checkbox
+                      id={`ex-cat-${cat.id}`}
+                      checked={exportSelectedCategories.includes(cat.id)}
+                      onCheckedChange={(checked) => {
+                        setExportSelectedCategories(prev =>
+                          checked
+                            ? [...prev, cat.id]
+                            : prev.filter(id => id !== cat.id)
+                        );
+                      }}
+                    />
+                    <label htmlFor={`ex-cat-${cat.id}`} className="text-sm cursor-pointer truncate">{cat.nombre}</label>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Género Filter */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between border-b pb-1">
+                <h3 className="font-medium flex items-center gap-2 text-sm text-foreground/80">
+                  Género
+                </h3>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 text-xs"
+                  onClick={() => {
+                    // Toggle All
+                    const all = ["masculino", "femenino", "ambiente", "otro"];
+                    if (exportSelectedGenders.length === all.length) {
+                      setExportSelectedGenders([]);
+                    } else {
+                      setExportSelectedGenders(all);
+                    }
+                  }}
+                >
+                  {exportSelectedGenders.length === 4 ? "Desmarcar todos" : "Marcar todos"}
+                </Button>
+              </div>
+              <div className="flex flex-wrap gap-4">
+                {["Masculino", "Femenino", "Ambiente", "Otro"].map((label) => {
+                  const val = label.toLowerCase();
+                  return (
+                    <div className="flex items-center space-x-2" key={val}>
+                      <Checkbox
+                        id={`ex-gen-${val}`}
+                        checked={exportSelectedGenders.includes(val)}
+                        onCheckedChange={(checked) => {
+                          setExportSelectedGenders(prev =>
+                            checked
+                              ? [...prev, val]
+                              : prev.filter(v => v !== val)
+                          );
+                        }}
+                      />
+                      <label htmlFor={`ex-gen-${val}`} className="text-sm cursor-pointer">{label}</label>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsExportDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={exportToExcel} className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2">
+              <Download size={16} /> Descargar Excel
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
