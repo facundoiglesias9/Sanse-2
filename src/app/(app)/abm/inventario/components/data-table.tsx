@@ -48,7 +48,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { X, Plus, Loader2 } from "lucide-react";
+import { X, Plus, Loader2, Mail } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -98,6 +98,7 @@ export function DataTable<TData extends { tipo?: string; nombre?: string; cantid
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isLoadingForm, setIsLoadingForm] = useState(false);
   const [mostrarPerfumesCero, setMostrarPerfumesCero] = useState(true);
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
   const supabase = createClient();
 
   const orderedTipoOptions = useMemo(() => {
@@ -271,6 +272,32 @@ export function DataTable<TData extends { tipo?: string; nombre?: string; cantid
     setIsLoadingForm(false);
   }
 
+  const handleSendLowStock = async () => {
+    setIsSendingEmail(true);
+    try {
+      const response = await fetch("/api/inventory/send-low-stock-report", {
+        method: "POST",
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Error al enviar el reporte");
+      }
+
+      if (data.count === 0) {
+        toast.info("No hay items con stock bajo para reportar.");
+      } else {
+        toast.success(`Reporte enviado con éxito (${data.count} items).`);
+      }
+    } catch (error: any) {
+      toast.error("Error al enviar el reporte", {
+        description: error.message,
+      });
+    } finally {
+      setIsSendingEmail(false);
+    }
+  };
+
   return (
     <>
       <div className="flex flex-col gap-6">
@@ -379,6 +406,15 @@ export function DataTable<TData extends { tipo?: string; nombre?: string; cantid
                   Gestionar tipos
                 </Button>
               )}
+              <Button
+                variant="secondary"
+                size="icon"
+                onClick={handleSendLowStock}
+                disabled={isSendingEmail}
+                title="Enviar stock bajo"
+              >
+                {isSendingEmail ? <Loader2 className="animate-spin h-4 w-4" /> : <Mail width={18} />}
+              </Button>
               <Button
                 size="sm"
                 className="gap-x-2 bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm hover:shadow transition-all"
