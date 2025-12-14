@@ -1,6 +1,0 @@
-999b53c3-f181-4910-86fd-5c5b1f74af7b | Perfumería fina
-1849c0c4-929a-4f02-aa50-119bedfbe16f | Aromatizante
-6944056a-4b9c-4102-a368-7c2b9ff77d5a | Limpia Pisos 1L
-3138e226-c284-45c4-94a3-d08f34b6b784 | Limpia Pisos 5L
-9a5cd077-d99a-4f4c-a718-dda8ca3fce09 | Difusor
-cd32b23c-9525-419b-b2be-bb3e3d460894 | Otro

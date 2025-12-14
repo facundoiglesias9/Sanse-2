@@ -27,21 +27,7 @@ const codeFromUrl = (u?: string | null) => {
   return m ? m[1].toUpperCase() : null;
 };
 
-/* -------------------------------------------------------------
- * EXCLUSIONES
- * ----------------------------------------------------------- */
-const EXCLUDED_CODES = new Set<string>([
-  "ESEPUR0497",
-  "ESEPUR0498",
-  "ESEPUR0501",
-  // "ESEPUR0194",
-]);
 
-const EXCLUDED_NAMES = [
-  "ML SIMIL BOTTLED MASCULINO",
-  "ML SIMIL BOTTLED NIGHT MASCULINO (HUGO BOSS)",
-  "ML SIMIL BOTTLED NIGHT MASCULINO (HUGO BOSS)",
-];
 
 /* -------------------------------------------------------------
  * CANON / NORMALIZACIÓN
@@ -361,18 +347,7 @@ export async function POST(req: Request) {
       }
     }
 
-    // exclusiones
-    const excludedByName = new Set(EXCLUDED_NAMES.map((n) => norm(n)));
-    const filtered: typeof scraped = [];
-    let excluded = 0;
 
-    for (const it of scraped) {
-      const code = (it.externalCode ?? codeFromUrl(it.productUrl) ?? "").toUpperCase();
-      const nameNorm = norm(it.nombre);
-      if (EXCLUDED_CODES.has(code) || excludedByName.has(nameNorm)) { excluded++; continue; }
-      filtered.push(it);
-    }
-    scraped = filtered;
 
     // proveedor VR
     const { data: provs, error: eProv } = await supabase.from("proveedores").select("id, nombre");
@@ -392,8 +367,8 @@ export async function POST(req: Request) {
     // índices (solo VR)
     const byNameGender = new Map<string, { id: string; label: string; }>();
     const byAliasGender = new Map<string, { id: string; label: string; }>();
-    const byMainTitleBrand = new Map<string, { id: string; label: string; }[]>();
-    const byNameNoGender = new Map<string, { id: string; label: string; }>();
+    const byMainTitleBrand = new Map<string, { id: string; label: string; genero: string; }[]>();
+    const byNameNoGender = new Map<string, { id: string; label: string; genero: string; }>();
     const candidatesVR: Array<{ id: string; label: string; genero: string; }> = [];
 
     const addIndex = (id: string, label: string, genero: string) => {
@@ -401,14 +376,14 @@ export async function POST(req: Request) {
       byNameGender.set(key, { id, label });
 
       const keyNG = norm(label);
-      if (!byNameNoGender.has(keyNG)) byNameNoGender.set(keyNG, { id, label });
-      else byNameNoGender.set(keyNG, { id: "", label: "" });
+      if (!byNameNoGender.has(keyNG)) byNameNoGender.set(keyNG, { id, label, genero });
+      else byNameNoGender.set(keyNG, { id: "", label: "", genero: "" });
 
       const main = extractMain(label);
       const brand = extractBrand(label);
       const mbKey = `${main}||${brand ?? ""}`;
       const arr = byMainTitleBrand.get(mbKey) ?? [];
-      arr.push({ id, label });
+      arr.push({ id, label, genero });
       byMainTitleBrand.set(mbKey, arr);
     };
 
@@ -435,7 +410,7 @@ export async function POST(req: Request) {
     let autoAccepted = 0;
 
     const FUZZY_THRESH = 0.70;
-    const AUTO_ACCEPT_THRESH = 0.92;
+
 
     const findBestVR = (nombre: string, genero: string): { id: string; score: number; } | null => {
       const sameGender = candidatesVR.filter(c => c.genero === genero);
@@ -464,7 +439,7 @@ export async function POST(req: Request) {
         const candStrong = new Set(strongTokens(c.label));
         const missingInCand = [...srcStrong].filter(t => !candStrong.has(t));
         if (missingInCand.length > 0) {
-          score = Math.min(score, AUTO_ACCEPT_THRESH - 0.01);
+          score = Math.min(score, 0.91);
         }
 
         if (!best || score > best.score) best = { id: c.id, score };
@@ -479,10 +454,23 @@ export async function POST(req: Request) {
       // 1) exacto nombre+género o por alias
       let hit = byNameGender.get(nameKey) ?? byAliasGender.get(nameKey);
 
-      // 1.b) exacto sin género (si unívoco)
+      // 1.b) exacto sin género (si unívoco y compatible en género)
       if (!hit) {
         const ng = byNameNoGender.get(norm(it.nombre));
-        if (ng && ng.id) hit = ng;
+        if (ng && ng.id) {
+          // Verify gender compatibility if both exist
+          const g1 = (it.genero || "").toLowerCase();
+          const g2 = (ng.genero || "").toLowerCase();
+          const p1 = g1 === "masculino" || g1 === "femenino";
+          const p2 = g2 === "masculino" || g2 === "femenino";
+
+          if (p1 && p2 && g1 !== g2) {
+            // Mismatch gender (e.g. Scraped=Male vs DB=Female) -> do NOT match
+            hit = undefined;
+          } else {
+            hit = ng;
+          }
+        }
       }
 
       // 1.c) alternativa por título principal + marca (si unívoco)
@@ -491,7 +479,22 @@ export async function POST(req: Request) {
         const brand = extractBrand(it.nombre);
         const mbKey = `${main}||${brand ?? ""}`;
         const arr = byMainTitleBrand.get(mbKey);
-        if (arr && arr.length === 1) hit = arr[0];
+
+        if (arr) {
+          // Filter by gender compatibility
+          const g1 = (it.genero || "").toLowerCase();
+          const compatible = arr.filter(cand => {
+            const g2 = (cand.genero || "").toLowerCase();
+            const p1 = g1 === "masculino" || g1 === "femenino";
+            const p2 = g2 === "masculino" || g2 === "femenino";
+            if (p1 && p2 && g1 !== g2) return false;
+            return true;
+          });
+
+          if (compatible.length === 1) {
+            hit = compatible[0];
+          }
+        }
       }
 
       // 2) difuso (fuzzy)
@@ -532,30 +535,9 @@ export async function POST(req: Request) {
         continue;
       }
 
+
       if (best) {
-        if (best.score >= AUTO_ACCEPT_THRESH) {
-          inserts.push({
-            esencia_id: best.id,
-            genero: it.genero,
-            external_code: it.externalCode,
-            url: it.productUrl,
-            precio_ars_100g: it.precioArs100 ?? null,
-            precio_30g: it.precioArs30 ?? null,
-            precio_100g: it.precioArs100 ?? null,
-            fuente: "vanrossum",
-            actualizado_en: now,
-          });
-          updates.push({
-            id: best.id,
-            precio30: it.precioArs30 ?? null,
-            precio100: it.precioArs100 ?? null,
-            precio: it.precioArs30 ?? it.precioArs100 ?? null,
-            cantidadGramos: it.precioArs30 ? 30 : (it.precioArs100 ? 100 : null),
-            when: now,
-            isConsultar: it.isConsultar,
-          });
-          autoAccepted++;
-        } else if (best.score >= FUZZY_THRESH) {
+        if (best.score >= FUZZY_THRESH) {
           orphans.push({
             nombre: it.nombre,
             genero: it.genero,
@@ -631,9 +613,9 @@ export async function POST(req: Request) {
     return NextResponse.json({
       ok: true,
       dur_ms,
-      scraped_total: scraped.length + excluded,
+      scraped_total: scraped.length,
       rescued,
-      excluded,
+      excluded: 0,
       scraped: scraped.length,
       inserted: inserts.length,
       orphans: orphans.length,
