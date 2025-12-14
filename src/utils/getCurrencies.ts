@@ -16,7 +16,7 @@ export async function getCurrencies(): Promise<CurrencyRates | null> {
       }
     }
 
-    const res = await fetch("/api/exchange-rate");
+    const res = await fetch("/api/dolar");
     if (!res.ok) throw new Error("Error al obtener tasas");
     const conversionRates = (await res.json()) as CurrencyRates;
 

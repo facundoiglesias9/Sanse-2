@@ -159,7 +159,7 @@ export default function AgregarProductoPage() {
                 if (esenciasData) setEsencias(esenciasData);
 
                 // Obtener Tasa de Dólar
-                const res = await fetch("/api/exchange-rate");
+                const res = await fetch("/api/dolar");
                 const rates = await res.json();
                 if (rates && rates.ARS) setDollarRate(rates.ARS);
 
