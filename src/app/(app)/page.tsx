@@ -8,6 +8,7 @@ import { Perfume } from "@/app/types/perfume";
 import { createClient } from "@/utils/supabase/client";
 import { useCurrencies } from "@/app/contexts/CurrencyContext";
 import { LoaderTable } from "@/app/(app)/components/loader-table";
+import { FormulaInfoDialog } from "@/app/(app)/components/lista_de_precios/formula-info-dialog";
 
 export default function ListaDePreciosPage() {
   const [perfumes, setPerfumes] = useState<Perfume[]>([]);
@@ -76,24 +77,25 @@ export default function ListaDePreciosPage() {
       .map((esencia) => {
         let precioFinalArs = 0;
 
+        let baseGramos = 0; // The size corresponding to precioFinalArs
+
         // Prioridad al precio de 100g, si existe
         const precio100g = precio100gByEsencia.get(esencia.id);
         if (typeof precio100g === "number" && !Number.isNaN(precio100g)) {
           precioFinalArs = precio100g;
+          baseGramos = 100;
         } else if (esencia.precio_usd && currencies["ARS"]) {
           precioFinalArs = esencia.precio_usd * currencies["ARS"];
+          baseGramos = esencia.cantidad_gramos || 0;
         } else if (esencia.precio_ars) {
           precioFinalArs = esencia.precio_ars;
+          baseGramos = esencia.cantidad_gramos || 0;
         }
 
-        const gramosPor = esencia.proveedores?.gramos_configurados ?? 1;
-        const perfumesPorCantidad =
-          esencia.cantidad_gramos && gramosPor > 0
-            ? esencia.cantidad_gramos / gramosPor
-            : 1;
+        const precioPorGramo = baseGramos > 0 ? precioFinalArs / baseGramos : 0;
+        const gramosReceta = esencia.proveedores?.gramos_configurados ?? 0;
 
-        const costoMateriaPrima =
-          perfumesPorCantidad > 0 ? precioFinalArs / perfumesPorCantidad : 0;
+        const costoMateriaPrima = precioPorGramo * gramosReceta;
 
         // Cálculo del frasco según género
         let costoFrasco = 0;
@@ -177,9 +179,12 @@ export default function ListaDePreciosPage() {
 
   return (
     <div className="flex flex-col gap-4 p-4 max-w-6xl mx-auto">
-      <h1 className="text-3xl font-bold text-center mb-6">
-        Lista de precios {view === "mayorista" ? "mayorista" : "minorista"}
-      </h1>
+      <div className="flex items-center justify-center gap-2 mb-6">
+        <h1 className="text-3xl font-bold text-center">
+          Lista de precios {view === "mayorista" ? "mayorista" : "minorista"}
+        </h1>
+        <FormulaInfoDialog />
+      </div>
       {loadingTableListaDePrecios ? (
         <LoaderTable />
       ) : (
