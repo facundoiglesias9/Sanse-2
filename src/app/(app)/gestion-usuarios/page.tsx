@@ -62,7 +62,7 @@ export default function GestionUsuariosPage() {
     const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
     const [newUserUsername, setNewUserUsername] = useState("");
     const [newUserPassword, setNewUserPassword] = useState("");
-    const [newUserRole, setNewUserRole] = useState("revendedor");
+    const [newUserRole, setNewUserRole] = useState("comprador");
     const [isCreating, setIsCreating] = useState(false);
 
     // Obtener usuarios
@@ -135,7 +135,7 @@ export default function GestionUsuariosPage() {
             setIsCreateDialogOpen(false);
             setNewUserUsername("");
             setNewUserPassword("");
-            setNewUserRole("revendedor");
+            setNewUserRole("comprador");
             fetchProfiles();
         }
     };
@@ -229,6 +229,7 @@ export default function GestionUsuariosPage() {
                                             <SelectContent>
                                                 <SelectItem value="admin">Administrador</SelectItem>
                                                 <SelectItem value="revendedor">Revendedor</SelectItem>
+                                                <SelectItem value="comprador">Comprador</SelectItem>
                                             </SelectContent>
                                         </Select>
                                     </TableCell>
@@ -358,6 +359,7 @@ export default function GestionUsuariosPage() {
                                 <SelectContent>
                                     <SelectItem value="admin">Administrador</SelectItem>
                                     <SelectItem value="revendedor">Revendedor</SelectItem>
+                                    <SelectItem value="comprador">Comprador</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>

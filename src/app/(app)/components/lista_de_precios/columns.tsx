@@ -280,16 +280,18 @@ export const getListaPreciosColumns = (
   userRole: string = "admin"
 ): ColumnDef<Perfume>[] => {
   const columns = allColumns.filter((col) => {
-    // Ocultar columna 'acciones' para revendedores
-    if (col.id === "acciones" && userRole === "revendedor") return false;
+    const isNonAdmin = userRole === "revendedor" || userRole === "comprador";
 
-    // Ocultar columna 'proveedor' para revendedores
-    if ("accessorKey" in col && (col as any).accessorKey === "proveedor_id" && userRole === "revendedor") return false;
+    // Ocultar columna 'acciones' para no administradores
+    if (col.id === "acciones" && isNonAdmin) return false;
 
-    // Si la columna no tiene accessorKey, es probablemente 'select' o 'acciones', ¿mantenerlas siempre?
-    // 'select' tiene id='select'
-    // 'acciones' tiene id='acciones'
-    // 'insumos_categorias.nombre' tiene id='categoria'
+    // Ocultar columna 'proveedor' para no administradores
+    if ("accessorKey" in col && (col as any).accessorKey === "proveedor_id" && isNonAdmin) return false;
+
+    // Ocultar columna 'costo' explícitamente para compradores (al estar en vista minorista, se mostraría por defecto)
+    if ("accessorKey" in col && (col as any).accessorKey === "costo" && userRole === "comprador") return false;
+
+    // Si la columna no tiene accessorKey, es probablemente 'select' o 'acciones' o 'categoria'
     if (!("accessorKey" in col) && col.id !== "select" && col.id !== "acciones" && col.id !== "categoria") return true;
 
     const key = (col as any).accessorKey;

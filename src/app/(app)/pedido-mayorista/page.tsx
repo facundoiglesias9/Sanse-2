@@ -156,89 +156,58 @@ export default function PedidoMayoristaPage() {
     const handleConfirmPurchase = async () => {
         if (orderItems.length === 0) return;
 
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+            toast.error("Debes iniciar sesión para realizar un pedido");
+            return;
+        }
+
         const promise = async () => {
-            for (const item of orderItems) {
-                // 1. Actualizar Esencias (Lógica de stock)
-                if (item.tipo === 'Esencia') {
-                    const gramosConfigurados = item.proveedores?.gramos_configurados || 1;
-                    const gramosTotales = item.cantidad * gramosConfigurados;
+            // Obtener nombre del cliente
+            let clienteNombre = session.user.email;
+            const { data: profile } = await supabase
+                .from('profiles')
+                .select('nombre, rol')
+                .eq('id', session.user.id)
+                .single();
 
-                    // Incrementar en la tabla de esencias
-                    const { data: currentEsencia } = await supabase
-                        .from('esencias')
-                        .select('cantidad_gramos')
-                        .eq('id', item.id)
-                        .single();
+            if (profile?.nombre) clienteNombre = profile.nombre;
 
-                    if (currentEsencia) {
-                        await supabase
-                            .from('esencias')
-                            .update({ cantidad_gramos: (currentEsencia.cantidad_gramos || 0) + gramosTotales })
-                            .eq('id', item.id);
-                    }
+            // Preparar datos para la solicitud
+            const detalleTexto = orderItems.map(i => `${i.nombre} x${i.cantidad}`).join(", ");
+            const total = calculateTotal();
 
-                    // 2. Actualizar/Insertar en Inventario (Esencia)
-                    const { data: invItem } = await supabase
-                        .from('inventario')
-                        .select('*')
-                        .eq('tipo', 'Esencia')
-                        .ilike('nombre', item.nombre)
-                        .maybeSingle();
+            const { error } = await supabase.from('solicitudes').insert({
+                created_at: new Date(),
+                cliente: clienteNombre,
+                detalle: detalleTexto,
+                items: orderItems,
+                total: total,
+                estado: 'pendiente',
+                metodo_pago: 'A coordinar', // Se puede mejorar agregando un selector en la UI
+            });
 
-                    if (invItem) {
-                        await supabase.from('inventario').update({
-                            cantidad: (Number(invItem.cantidad) || 0) + gramosTotales,
-                            updated_at: new Date().toISOString()
-                        }).eq('id', invItem.id);
-                    } else {
-                        await supabase.from('inventario').insert({
-                            nombre: item.nombre,
-                            tipo: 'Esencia',
-                            cantidad: gramosTotales,
-                            genero: item.genero || 'unisex',
-                            updated_at: new Date().toISOString()
-                        });
-                    }
-                }
-                else if (item.tipo === 'Insumo') {
-                    // Actualizar/Insertar en Inventario (Insumo)
-                    // Lógica: 'cantidad' aquí es el número de lotes. Multiplicamos por 'cantidad_lote' para obtener el total de unidades/litros.
-                    const cantidadTotal = item.cantidad * (item.cantidad_lote || 1);
-
-                    const { data: invItem } = await supabase
-                        .from('inventario')
-                        .select('*')
-                        .eq('tipo', 'Insumo')
-                        .ilike('nombre', item.nombre)
-                        .maybeSingle();
-
-                    if (invItem) {
-                        await supabase.from('inventario').update({
-                            cantidad: (Number(invItem.cantidad) || 0) + cantidadTotal,
-                            updated_at: new Date().toISOString()
-                        }).eq('id', invItem.id);
-                    } else {
-                        await supabase.from('inventario').insert({
-                            nombre: item.nombre,
-                            tipo: 'Insumo',
-                            cantidad: cantidadTotal,
-                            genero: 'unisex',
-                            updated_at: new Date().toISOString()
-                        });
-                    }
-                }
-            }
+            if (error) throw error;
         };
 
         toast.promise(promise(), {
-            loading: 'Procesando compra...',
+            loading: 'Enviando solicitud...',
             success: () => {
                 setOrderItems([]);
-                return 'Compra registrada y stock actualizado';
+                return 'Solicitud enviada correctamente. Aguarda la aprobación.';
             },
-            error: 'Error al procesar la compra'
+            error: 'Error al enviar la solicitud'
         });
     };
+
+    // Estado para evitar errores de hidratación
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
+
+    if (!mounted) return null;
 
     return (
         <div className="container mx-auto py-8 px-4 max-w-6xl">
@@ -359,51 +328,49 @@ export default function PedidoMayoristaPage() {
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    <AnimatePresence>
-                                        {orderItems.map((item) => (
-                                            <TableRow key={item.unique_id}>
-                                                <TableCell>
-                                                    <div className="font-medium">{item.nombre}</div>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Badge variant="outline">{item.info_extra}</Badge>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <div className="flex items-center gap-2">
-                                                        <Badge variant={item.tipo === 'Esencia' ? 'secondary' : 'warning'} className="text-[10px]">
-                                                            {item.tipo}
-                                                        </Badge>
-                                                        <span className="text-xs text-muted-foreground">{item.insumos_categorias?.nombre || "-"}</span>
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell className="text-right">
-                                                    {formatCurrency(item.costo_visual, "ARS", 0)}
-                                                </TableCell>
-                                                <TableCell className="text-center">
-                                                    <Input
-                                                        type="number"
-                                                        min="1"
-                                                        value={item.cantidad}
-                                                        onChange={(e) => updateQuantity(item.unique_id, parseInt(e.target.value) || 1)}
-                                                        className="h-8 w-20 mx-auto text-center"
-                                                    />
-                                                </TableCell>
-                                                <TableCell className="text-right font-bold">
-                                                    {formatCurrency(item.costo_visual * item.cantidad, "ARS", 0)}
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                                                        onClick={() => removeFromOrder(item.unique_id)}
-                                                    >
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </Button>
-                                                </TableCell>
-                                            </TableRow>
-                                        ))}
-                                    </AnimatePresence>
+                                    {orderItems.map((item) => (
+                                        <TableRow key={item.unique_id}>
+                                            <TableCell>
+                                                <div className="font-medium">{item.nombre}</div>
+                                            </TableCell>
+                                            <TableCell>
+                                                <Badge variant="outline">{item.info_extra}</Badge>
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="flex items-center gap-2">
+                                                    <Badge variant={item.tipo === 'Esencia' ? 'secondary' : 'warning'} className="text-[10px]">
+                                                        {item.tipo}
+                                                    </Badge>
+                                                    <span className="text-xs text-muted-foreground">{item.insumos_categorias?.nombre || "-"}</span>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell className="text-right">
+                                                {formatCurrency(item.costo_visual, "ARS", 0)}
+                                            </TableCell>
+                                            <TableCell className="text-center">
+                                                <Input
+                                                    type="number"
+                                                    min="1"
+                                                    value={item.cantidad}
+                                                    onChange={(e) => updateQuantity(item.unique_id, parseInt(e.target.value) || 1)}
+                                                    className="h-8 w-20 mx-auto text-center"
+                                                />
+                                            </TableCell>
+                                            <TableCell className="text-right font-bold">
+                                                {formatCurrency(item.costo_visual * item.cantidad, "ARS", 0)}
+                                            </TableCell>
+                                            <TableCell>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                                    onClick={() => removeFromOrder(item.unique_id)}
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </Button>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
                                 </TableBody>
                             </Table>
                         </div>

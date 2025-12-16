@@ -13,8 +13,8 @@ export function FormulaInfoDialog() {
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="icon" className="h-6 w-6 ml-2 text-muted-foreground hover:text-primary">
-          <Info className="h-4 w-4" />
+        <Button variant="ghost" size="icon" className="h-8 w-8 ml-2 mt-1 text-blue-500 hover:text-blue-700 hover:bg-blue-50/50">
+          <Info className="h-6 w-6" />
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">

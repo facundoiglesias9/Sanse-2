@@ -14,7 +14,7 @@ export default function ListaDePreciosPage() {
   const [perfumes, setPerfumes] = useState<Perfume[]>([]);
   const [loadingTableListaDePrecios, setLoadingTableListaDePrecios] =
     useState(false);
-  const [userRole, setUserRole] = useState<string>("revendedor");
+  const [userRole, setUserRole] = useState<string | null>(null);
 
   const searchParams = useSearchParams();
   const supabase = createClient();
@@ -31,18 +31,22 @@ export default function ListaDePreciosPage() {
           .eq('id', session.user.id)
           .single();
 
-        const role = profile?.rol || session.user.user_metadata?.rol || "revendedor";
+        const role = profile?.rol || session.user.user_metadata?.rol || "comprador";
         setUserRole(role);
       }
     };
     getUserRole();
   }, []);
 
-  // Determinar vista: revendedores siempre ven mayorista
+  // Determinar vista: revendedores ven mayorista, compradores ven minorista
   const requestedView = searchParams.get("view") as "minorista" | "mayorista";
-  const view = userRole === "revendedor" ? "mayorista" : (requestedView || "minorista");
+
+  let view: "minorista" | "mayorista" = requestedView || "minorista";
+  if (userRole === "revendedor") view = "mayorista";
+  if (userRole === "comprador") view = "minorista"; // El comprador siempre ve minorista
 
   const fetchListaDePrecios = async () => {
+    if (userRole === null) return; // Wait for role to be determined
     setLoadingTableListaDePrecios(true);
 
     const { data: esencias } = await supabase
@@ -167,14 +171,28 @@ export default function ListaDePreciosPage() {
   };
 
   useEffect(() => {
-    if (!loadingCurrencies) {
+    if (!loadingCurrencies && userRole) {
       fetchListaDePrecios();
     }
-  }, [currencies, loadingCurrencies]);
+  }, [currencies, loadingCurrencies, userRole]);
 
-  // Filtrar solo para Van Rossum si el usuario es revendedor
-  const filteredPerfumes = userRole === "revendedor"
-    ? perfumes.filter(p => p.proveedores?.nombre?.toLowerCase() === "van rossum")
+  // Filtrar solo para Van Rossum si el usuario es revendedor o comprador
+  // Filtrar para Revendedores y Compradores:
+  // - Si la categoría es "Perfumería fina", solo mostrar productos de "Van Rossum".
+  // - Para las demás categorías, mostrar todos los productos de todos los proveedores.
+  const filteredPerfumes = (userRole === "revendedor" || userRole === "comprador")
+    ? perfumes.filter(p => {
+      const categoria = p.insumos_categorias?.nombre?.toLowerCase() || "";
+      const proveedor = p.proveedores?.nombre?.toLowerCase() || "";
+
+      // Si es perfumería fina, restringir a Van Rossum
+      if (categoria.includes("perfumería fina") || categoria === "fina") {
+        return proveedor === "van rossum";
+      }
+
+      // Si no es perfumería fina, mostrar todo
+      return true;
+    })
     : perfumes;
 
   return (
@@ -183,9 +201,10 @@ export default function ListaDePreciosPage() {
         <h1 className="text-3xl font-bold text-center">
           Lista de precios {view === "mayorista" ? "mayorista" : "minorista"}
         </h1>
-        <FormulaInfoDialog />
+        {userRole === "admin" && <FormulaInfoDialog />}
       </div>
-      {loadingTableListaDePrecios ? (
+
+      {loadingTableListaDePrecios || userRole === null ? (
         <LoaderTable />
       ) : (
         <DataTable
@@ -200,3 +219,14 @@ export default function ListaDePreciosPage() {
     </div>
   );
 }
+
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Trophy, Gift } from "lucide-react";

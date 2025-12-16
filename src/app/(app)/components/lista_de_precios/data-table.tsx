@@ -18,7 +18,7 @@ import { NumberInput } from "@/components/ui/number-input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { DataTablePagination } from "@/components/ui/data-table-pagination";
 import { AnimatePresence, motion } from "framer-motion";
-import { Loader2, Plus, Trash2, ShoppingCart, FileSpreadsheet, Download, Copy, Check } from "lucide-react";
+import { Loader2, Plus, Trash2, ShoppingCart, FileSpreadsheet, Download, Copy, Check, ClipboardList } from "lucide-react";
 import {
   ColumnDef,
   ColumnFiltersState,
@@ -116,7 +116,34 @@ export function DataTable({
   const [proveedores, setProveedores] = useState<{ id: string; nombre: string; }[]>([]);
   const [insumosCategorias, setInsumosCategorias] = useState<{ id: string; nombre: string; }[]>([]);
 
-  // ... (Keep existing ID constants and types)
+
+
+  // Fetch cliente user name if comprador/revendedor
+  useEffect(() => {
+    if (userRole === "comprador" || userRole === "revendedor") {
+      const fetchProfileName = async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          // Intentar obtener del perfil
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('nombre')
+            .eq('id', session.user.id)
+            .single();
+
+          if (profile?.nombre) {
+            setCliente(profile.nombre);
+          } else {
+            // Fallback a metadatos o email
+            const meta = session.user.user_metadata;
+            const name = meta?.nombre || meta?.full_name || meta?.name || session.user.email || "";
+            setCliente(name);
+          }
+        }
+      };
+      fetchProfileName();
+    }
+  }, [userRole]);
   const [isAddingInsumo, setIsAddingInsumo] = useState(false);
   const [selectedInsumoId, setSelectedInsumoId] = useState("");
   const [newInsumoQty, setNewInsumoQty] = useState("1");
@@ -565,6 +592,7 @@ export function DataTable({
       devuelveEnvase?: boolean;
       priceType: "precio" | "costo";
     }[],
+    forceSolicitud: boolean = false,
   ) => {
     setIsLoadingForm(true);
 
@@ -584,6 +612,37 @@ export function DataTable({
 
     const cantidadTotal = perfumesVendidos.reduce((sum, p) => sum + p.cantidad, 0);
 
+    // Lógica para COMPRADOR y REVENDEDOR -> Crear SOLICITUD
+    // O si se fuerza la solicitud (Admin)
+    if (userRole === "comprador" || userRole === "revendedor" || forceSolicitud) {
+      const { error } = await supabase.from("solicitudes").insert([
+        {
+          created_at: new Date(),
+          // intentamos obtener el ID del usuario si estuviera disponible, pero aqui no lo tenemos a mano facil
+          // en realidad supabase auth lo tiene, podriamos usar getSession pero dejemoslo asi por ahora o confiemos en RLS
+          cliente: cliente,
+          detalle: conjuntoDePerfumes,
+          items: perfumesVendidos, // Supabase maneja JSON
+          total: totalPrice,
+          estado: "pendiente",
+          metodo_pago: metodoPago,
+        }
+      ]);
+
+      if (error) {
+        toast.error("Error al enviar solicitud: " + error.message);
+      } else {
+        toast.success("Solicitud enviada correctamente. Te notificaremos cuando esté lista.");
+        handleCloseModal();
+        setRowSelection({});
+        setCliente("");
+        setMetodoPago("Efectivo");
+      }
+      setIsLoadingForm(false);
+      return;
+    }
+
+    // Lógica para OTROS (Admin, Revendedor) -> Crear VENTA directa
     const { error } = await supabase.from("ventas").insert([
       {
         created_at: new Date(),
@@ -602,8 +661,8 @@ export function DataTable({
     } else {
       toast.success("¡Venta agregada correctamente!");
 
-      // Enviar notificación por email si es revendedor
-      if (userRole === "revendedor") {
+      // Enviar notificación por email si es revendedor o comprador
+      if (userRole === "revendedor" || userRole === "comprador") {
         const itemsForEmail = perfumesVendidos.map((item) => {
           const { perfume, genero, cantidad, frascoLP, devuelveEnvase, priceType } = item;
           const precioBaseUnit = computePrecioUnitario(perfume, view === "mayorista", frascoLP, priceType);
@@ -660,8 +719,8 @@ export function DataTable({
     }));
     setVentaPerfumes(perfumesConCantidad);
 
-    // Autocompletar nombre de cliente para revendedores
-    if (userRole === "revendedor") {
+    // Autocompletar nombre de cliente para revendedores y compradores
+    if (userRole === "revendedor" || userRole === "comprador") {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
         const { data: profile } = await supabase
@@ -850,8 +909,8 @@ export function DataTable({
                 placeholder="Nombre del cliente"
                 value={cliente}
                 onChange={(e) => setCliente(e.target.value)}
-                disabled={userRole === "revendedor"}
-                className={userRole === "revendedor" ? "bg-muted cursor-not-allowed" : ""}
+                disabled={userRole === "revendedor" || userRole === "comprador"}
+                className={(userRole === "revendedor" || userRole === "comprador") ? "bg-muted cursor-not-allowed" : ""}
               />
             </div>
           </div>
@@ -1058,7 +1117,7 @@ export function DataTable({
           <div className="mt-4 flex flex-col md:flex-row items-center justify-between gap-4">
             {/* Payment Method Selection for Resellers (Left) */}
             <div className="w-full md:w-auto flex flex-col gap-3">
-              {userRole === "revendedor" && (
+              {(userRole === "revendedor" || userRole === "comprador") && (
                 <>
                   <div className="flex items-center gap-3">
                     <span className="text-sm font-medium whitespace-nowrap">Método de Pago:</span>
@@ -1107,6 +1166,30 @@ export function DataTable({
 
             {/* Action Buttons */}
             <div className="flex justify-end gap-x-2 w-full md:w-auto">
+
+              {/* Botón Admin: Agregar a Solicitud */}
+              {userRole === "admin" && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-2 border-dashed border-primary/50 hover:bg-primary/5"
+                  disabled={isLoadingForm || cliente.trim() === ""}
+                  onClick={() => {
+                    let total = 0;
+                    const ventaConCliente = ventaPerfumes.map((item) => {
+                      const base = computePrecioUnitario(item.perfume, view === "mayorista", item.frascoLP, item.priceType);
+                      const d = item.devuelveEnvase ? getEnvaseUnitCost(item.perfume, item.frascoLP) : 0;
+                      total += Math.max(0, base - d) * item.cantidad;
+                      return { ...item, cliente: cliente.trim() };
+                    });
+                    handleSubmit(total, ventaConCliente, true);
+                  }}
+                >
+                  {isLoadingForm ? <Loader2 width={18} className="animate-spin" /> : <ClipboardList width={18} />}
+                  Agregar a solicitud
+                </Button>
+              )}
+
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -1147,49 +1230,53 @@ export function DataTable({
 
       <div className="flex flex-col xl:flex-row gap-4 items-start xl:items-center justify-between mb-6">
         <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
+          {/* Filtros disponibles para todos (Admin y Revendedor) */}
+          <div className="relative w-full sm:w-64">
+            <Input
+              placeholder="Buscar por nombre..."
+              value={filterValue}
+              onChange={(event) => table.getColumn("nombre")?.setFilterValue(event.target.value)}
+              className="pr-10"
+            />
+          </div>
+          <Select
+            onValueChange={(value) =>
+              table.getColumn("genero")?.setFilterValue(value === "todos" ? undefined : value)
+            }
+          >
+            <SelectTrigger className="w-[150px]">
+              <SelectValue placeholder="Filtrar por género" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos</SelectItem>
+              <SelectItem value="masculino">Masculino</SelectItem>
+              <SelectItem value="femenino">Femenino</SelectItem>
+              <SelectItem value="ambiente">Ambiente</SelectItem>
+              <SelectItem value="otro">Otro</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select
+            onValueChange={(value) =>
+              table.getColumn("categoria")?.setFilterValue(value === "todos" ? undefined : value)
+            }
+          >
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Filtrar por categoría" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todas</SelectItem>
+              {insumosCategorias.filter(c => c.nombre.toLowerCase() !== 'otro').map((c) => (
+                <SelectItem key={c.id} value={c.nombre}>
+                  {c.nombre}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {/* Filtros exclusivos de Admin */}
           {userRole === "admin" && (
             <>
-              <div className="relative w-full sm:w-64">
-                <Input
-                  placeholder="Buscar por nombre..."
-                  value={filterValue}
-                  onChange={(event) => table.getColumn("nombre")?.setFilterValue(event.target.value)}
-                  className="pr-10"
-                />
-              </div>
-              <Select
-                onValueChange={(value) =>
-                  table.getColumn("genero")?.setFilterValue(value === "todos" ? undefined : value)
-                }
-              >
-                <SelectTrigger className="w-[150px]">
-                  <SelectValue placeholder="Filtrar por género" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todos">Todos</SelectItem>
-                  <SelectItem value="masculino">Masculino</SelectItem>
-                  <SelectItem value="femenino">Femenino</SelectItem>
-                  <SelectItem value="ambiente">Ambiente</SelectItem>
-                  <SelectItem value="otro">Otro</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select
-                onValueChange={(value) =>
-                  table.getColumn("categoria")?.setFilterValue(value === "todos" ? undefined : value)
-                }
-              >
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Filtrar por categoría" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todas">Todas</SelectItem>
-                  {insumosCategorias.filter(c => c.nombre.toLowerCase() !== 'otro').map((c) => (
-                    <SelectItem key={c.id} value={c.nombre}>
-                      {c.nombre}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
               <Select
                 value={
                   typeof table.getColumn("proveedor_id")?.getFilterValue() === "string"

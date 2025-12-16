@@ -392,16 +392,16 @@ export default function VentasRevendedoresPage() {
 
                                             {/* Alerta de Premio Pendiente */}
                                             {pendingPrize && (
-                                                <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg animate-pulse">
+                                                <div className="mb-4 p-3 bg-primary/5 border border-primary/10 rounded-lg">
                                                     <div className="flex items-center gap-2 mb-2">
-                                                        <Gift className="w-4 h-4 text-amber-600" />
-                                                        <span className="font-semibold text-sm text-amber-800">¡Premio Pendiente!</span>
+                                                        <Gift className="w-4 h-4 text-primary" />
+                                                        <span className="font-semibold text-sm text-foreground">¡Premio Pendiente!</span>
                                                     </div>
-                                                    <p className="text-sm text-amber-900 font-medium mb-3">{pendingPrize.premio}</p>
+                                                    <p className="text-sm text-muted-foreground font-medium mb-3">{pendingPrize.premio}</p>
                                                     <Button
                                                         variant="outline"
                                                         size="sm"
-                                                        className="w-full border-amber-300 text-amber-700 hover:bg-amber-100 bg-white"
+                                                        className="w-full"
                                                         onClick={() => handleDeliverPrize(pendingPrize.id)}
                                                     >
                                                         Marcar como Entregado

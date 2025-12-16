@@ -141,7 +141,7 @@ export default function Caja2Page() {
             .order("created_at", { ascending: false });
         setDeudas(deudasData || []);
 
-        // Obtener ventas (excluir ventas de revendedores del widget principal)
+        // Obtener ventas (AHORA INCLUYE revendedores)
         const { data: ventasData } = await supabase
             .from("ventas")
             .select("*")

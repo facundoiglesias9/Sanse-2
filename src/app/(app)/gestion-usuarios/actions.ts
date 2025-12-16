@@ -115,6 +115,7 @@ export async function createUser(data: { username: string; password: string; rol
             email_confirm: true,
             user_metadata: {
                 nombre: data.username,
+                rol: data.rol,
                 // Mantenemos metadatos para legado/triggers, pero la fuente principal de verdad ahora es la tabla de perfiles
             },
         });
@@ -182,7 +183,7 @@ export async function getUsers() {
                 id: u.id,
                 email: u.email,
                 nombre: profile?.nombre || u.user_metadata?.nombre || "Sin nombre",
-                rol: profile?.rol || "revendedor",
+                rol: profile?.rol || u.user_metadata?.rol || "revendedor",
                 last_sign_in_at: u.last_sign_in_at
             };
         });
@@ -211,13 +212,17 @@ export async function updateUserRole(userId: string, rol: string) {
         // Actualizar la tabla de perfiles directamente
         const { error } = await supabase
             .from('profiles')
-            .update({ rol: rol })
-            .eq('id', userId);
+            .upsert({ id: userId, rol: rol }, { onConflict: 'id' });
 
         if (error) {
             console.error("Error updating user role:", error);
             return { error: error.message };
         }
+
+        // También actualizar metadatos de Auth para redundancia/fallback
+        await supabase.auth.admin.updateUserById(userId, {
+            user_metadata: { rol: rol }
+        });
 
         return { success: true };
     } catch (error: any) {
