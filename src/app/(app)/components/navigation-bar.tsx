@@ -88,7 +88,7 @@ const linksUserbar = [
 
 // ... (previous imports)
 
-export function NavigationBar() {
+export function NavigationBar({ maintenanceMode = false }: { maintenanceMode?: boolean; }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [session, setSession] = useState<any>(null);
@@ -297,7 +297,7 @@ export function NavigationBar() {
       {/* Navegación Desktop */}
       <NavigationMenu viewport={false} className="hidden md:flex mx-auto">
         <NavigationMenuList>
-          {filteredNavbar.map((link) => {
+          {!maintenanceMode && filteredNavbar.map((link) => {
             // Admin obtiene desplegable para "Lista de precios", Revendedor obtiene enlace simple
             if (link.href === "/" && isAdmin) {
               return (
@@ -400,15 +400,15 @@ export function NavigationBar() {
           </NavigationMenuList>
         )}
         {/* Enlace "Mis Pedidos" para No-Admins (Revendedores/Compradores) */}
-        {!isAdmin && (
+        {!isAdmin && !maintenanceMode && (
           <NavigationMenuList>
             <NavigationMenuItem>
               <NavigationMenuLink asChild>
                 <Link
-                  href="/caja2/solicitudes"
+                  href="/caja/solicitudes"
                   className={clsx(
                     navigationMenuTriggerStyle(),
-                    pathname === "/caja2/solicitudes" && "bg-accent text-accent-foreground"
+                    pathname === "/caja/solicitudes" && "bg-accent text-accent-foreground"
                   )}
                 >
                   Mis Pedidos
@@ -447,16 +447,16 @@ export function NavigationBar() {
 
             {showCaja && (
               <NavigationMenuItem>
-                <NavigationMenuTrigger className={pathname.startsWith("/caja2") ? "bg-accent text-accent-foreground" : ""}>Caja</NavigationMenuTrigger>
+                <NavigationMenuTrigger className={pathname.startsWith("/caja") ? "bg-accent text-accent-foreground" : ""}>Caja</NavigationMenuTrigger>
                 <NavigationMenuContent>
                   <ul className="grid w-[300px] gap-2">
                     <li>
                       <NavigationMenuLink asChild>
                         <Link
-                          href="/caja2"
+                          href="/caja"
                           className={clsx(
                             "block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground",
-                            pathname === "/caja2" && "bg-accent text-accent-foreground"
+                            pathname === "/caja" && "bg-accent text-accent-foreground"
                           )}
                         >
                           <div className="text-sm font-medium leading-none">Caja Unificada</div>
@@ -469,10 +469,10 @@ export function NavigationBar() {
                     <li>
                       <NavigationMenuLink asChild>
                         <Link
-                          href="/caja2/solicitudes"
+                          href="/caja/solicitudes"
                           className={clsx(
                             "block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground",
-                            pathname === "/caja2/solicitudes" && "bg-accent text-accent-foreground"
+                            pathname === "/caja/solicitudes" && "bg-accent text-accent-foreground"
                           )}
                         >
                           <div className="text-sm font-medium leading-none">Solicitudes de Compra</div>
@@ -485,10 +485,10 @@ export function NavigationBar() {
                     <li>
                       <NavigationMenuLink asChild>
                         <Link
-                          href="/caja2/ventas-revendedores"
+                          href="/caja/ventas-revendedores"
                           className={clsx(
                             "block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground",
-                            pathname === "/caja2/ventas-revendedores" && "bg-accent text-accent-foreground"
+                            pathname === "/caja/ventas-revendedores" && "bg-accent text-accent-foreground"
                           )}
                         >
                           <div className="text-sm font-medium leading-none">Ventas Revendedores</div>
@@ -647,7 +647,7 @@ export function NavigationBar() {
                             </div>
                           </div>
                         </div>
-                      )
+                      );
                     })}
                   </div>
                 )}
@@ -759,7 +759,7 @@ export function NavigationBar() {
                   </>
                 )}
 
-                {!isAdmin && (
+                {!isAdmin && !maintenanceMode && (
                   <Link
                     href={userRole === "comprador" ? "/?view=minorista" : "/?view=mayorista"}
                     className={clsx(
@@ -772,7 +772,7 @@ export function NavigationBar() {
                   </Link>
                 )}
 
-                {filteredNavbar.filter(l => l.href !== "/").map((link) => {
+                {filteredNavbar.filter(l => l.href !== "/" && !maintenanceMode).map((link) => {
                   const isActive = pathname === link.href;
                   return (
                     <Link
@@ -825,10 +825,10 @@ export function NavigationBar() {
 
                 {showCaja && (
                   <Link
-                    href="/caja2"
+                    href="/caja"
                     className={clsx(
                       "text-lg font-semibold hover:text-foreground",
-                      pathname === "/caja2"
+                      pathname === "/caja"
                         ? "text-foreground"
                         : "text-muted-foreground"
                     )}

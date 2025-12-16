@@ -64,15 +64,15 @@ export async function POST(request: Request) {
             ${itemsHtml}
           </tbody>
           <tfoot>
-             <tr style="background-color: #333; color: white;">
-               <td colspan="4" style="padding: 10px; text-align: right; font-weight: bold;">TOTAL:</td>
-               <td style="padding: 10px; text-align: right; font-weight: bold;">$${total.toLocaleString('es-AR')}</td>
-             </tr>
+            <tr style="background-color: #333; color: white;">
+              <td colspan="4" style="padding: 10px; text-align: right; font-weight: bold;">TOTAL:</td>
+              <td style="padding: 10px; text-align: right; font-weight: bold;">$${total.toLocaleString('es-AR')}</td>
+            </tr>
           </tfoot>
         </table>
 
         <div style="text-align: center; margin-top: 30px;">
-          <a href="https://sanseperfumes.vercel.app/caja2/ventas-revendedores" style="background-color: #000; color: #fff; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Ver Ventas</a>
+          <a href="https://sanseperfumes.vercel.app/caja/ventas-revendedores" style="background-color: #000; color: #fff; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Ver Ventas</a>
         </div>
       </div>
     `;
@@ -90,4 +90,4 @@ export async function POST(request: Request) {
     console.error("Error sending order email:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
-}
+};

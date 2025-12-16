@@ -9,9 +9,9 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Loader2, Pencil, Trash2, Plus } from "lucide-react";
+import { Loader2, Pencil, Trash2, Plus, Users, ShieldCheck, ShieldAlert, UserCog } from "lucide-react";
 import {
     Dialog,
     DialogContent,
@@ -41,9 +41,16 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { Switch } from "@/components/ui/switch";
 import { updateUserPassword, deleteUser, createUser, getUsers, updateUserRole } from "./actions";
+import { getGlobalConfig, updateGlobalConfig } from "@/app/actions/config-actions";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
 
 export default function GestionUsuariosPage() {
+    const [isMaintenanceMode, setIsMaintenanceMode] = useState(false);
+    const [isUpdatingConfig, setIsUpdatingConfig] = useState(false);
+
     const [profiles, setProfiles] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
@@ -65,22 +72,44 @@ export default function GestionUsuariosPage() {
     const [newUserRole, setNewUserRole] = useState("comprador");
     const [isCreating, setIsCreating] = useState(false);
 
-    // Obtener usuarios
+    // Obtener usuarios y config
     const fetchProfiles = async () => {
         setIsLoading(true);
-        const result = await getUsers();
-        if (result.error) {
+        const [usersResult, maintenanceResult] = await Promise.all([
+            getUsers(),
+            getGlobalConfig('maintenance_mode')
+        ]);
+
+        if (usersResult.error) {
             toast.error("Error al cargar usuarios");
-            console.error(result.error);
+            console.error(usersResult.error);
         } else {
-            setProfiles(result.users || []);
+            setProfiles(usersResult.users || []);
         }
+
+        setIsMaintenanceMode(maintenanceResult === 'true');
         setIsLoading(false);
     };
 
     useEffect(() => {
         fetchProfiles();
     }, []);
+
+    const handleMaintenanceToggle = async (checked: boolean) => {
+        setIsUpdatingConfig(true);
+        // Actualización optimista
+        setIsMaintenanceMode(checked);
+
+        const result = await updateGlobalConfig('maintenance_mode', String(checked));
+
+        if (result.error) {
+            toast.error("Error al actualizar modo mantenimiento");
+            setIsMaintenanceMode(!checked); // Revertir
+        } else {
+            toast.success(checked ? "Modo mantenimiento ACTIVADO" : "Modo mantenimiento DESACTIVADO");
+        }
+        setIsUpdatingConfig(false);
+    };
 
     const handleEditClick = (user: any) => {
         setSelectedUser(user);
@@ -106,7 +135,7 @@ export default function GestionUsuariosPage() {
             toast.error("Error al eliminar usuario", { description: result.error });
         } else {
             toast.success(`Usuario ${userToDelete.nombre} eliminado`);
-            fetchProfiles(); // Refresh list
+            fetchProfiles(); // Actualizar lista
         }
     };
 
@@ -175,86 +204,178 @@ export default function GestionUsuariosPage() {
         }
     };
 
-    if (isLoading) {
-        return (
-            <div className="flex justify-center items-center h-screen">
-                <Loader2 className="animate-spin h-8 w-8" />
-            </div>
-        );
-    }
-
     return (
-        <div className="container mx-auto py-10">
-            <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-7">
-                    <CardTitle className="text-2xl font-bold">Gestión de Usuarios</CardTitle>
-                    <Button onClick={() => setIsCreateDialogOpen(true)}>
-                        <Plus className="mr-2 h-4 w-4" /> Nuevo Usuario
-                    </Button>
+        <div className="container mx-auto py-10 space-y-8">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                    <h1 className="text-3xl font-bold tracking-tight">Gestión de usuarios</h1>
+                    <p className="text-muted-foreground mt-1">Administra usuarios, roles y configuraciones globales.</p>
+                </div>
+                <Button onClick={() => setIsCreateDialogOpen(true)} className="shadow-sm">
+                    <Plus className="h-4 w-4" />Nuevo Usuario
+                </Button>
+            </div>
+
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                <Card className="bg-card/50 backdrop-blur-sm shadow-sm border-muted/60">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Modo Mantenimiento</CardTitle>
+                        {isMaintenanceMode ? (
+                            <ShieldAlert className="h-4 w-4 text-amber-500" />
+                        ) : (
+                            <ShieldCheck className="h-4 w-4 text-green-500" />
+                        )}
+                    </CardHeader>
+                    <CardContent>
+                        <div className="flex items-center justify-between mt-2">
+                            <div className="flex flex-col space-y-1">
+                                <span className={`text-2xl font-bold ${isMaintenanceMode ? "text-amber-500" : "text-green-600"}`}>
+                                    {isMaintenanceMode ? "Activado" : "Desactivado"}
+                                </span>
+                                <p className="text-xs text-muted-foreground">
+                                    {isMaintenanceMode
+                                        ? "Solo administradores pueden acceder"
+                                        : "El sitio es accesible para todos"}
+                                </p>
+                            </div>
+                            <Switch
+                                checked={isMaintenanceMode}
+                                onCheckedChange={handleMaintenanceToggle}
+                                disabled={isUpdatingConfig || isLoading}
+                                aria-label="Alternar modo mantenimiento"
+                            />
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <Card className="bg-card/50 backdrop-blur-sm shadow-sm border-muted/60">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Usuarios Totales</CardTitle>
+                        <Users className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold mt-2">{isLoading ? <Skeleton className="h-8 w-16" /> : profiles.length}</div>
+                        <p className="text-xs text-muted-foreground mt-1">
+                            Usuarios registrados en la plataforma
+                        </p>
+                    </CardContent>
+                </Card>
+
+                <Card className="bg-card/50 backdrop-blur-sm shadow-sm border-muted/60 hidden md:block">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Roles Activos</CardTitle>
+                        <UserCog className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="flex gap-2 mt-3">
+                            {isLoading ? (
+                                <Skeleton className="h-6 w-full" />
+                            ) : (
+                                <>
+                                    <Badge variant="secondary" className="text-xs">
+                                        {profiles.filter(p => p.rol === 'admin').length} Admin
+                                    </Badge>
+                                    <Badge variant="secondary" className="text-xs">
+                                        {profiles.filter(p => p.rol === 'revendedor').length} Revend.
+                                    </Badge>
+                                    <Badge variant="secondary" className="text-xs">
+                                        {profiles.filter(p => p.rol === 'comprador').length} Compr.
+                                    </Badge>
+                                </>
+                            )}
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
+
+            <Card className="shadow-sm border-muted/60">
+                <CardHeader>
+                    <CardTitle>Directorio de Usuarios</CardTitle>
+                    <CardDescription>
+                        Visualiza y gestiona los usuarios registrados y sus permisos.
+                    </CardDescription>
                 </CardHeader>
                 <CardContent>
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead className="w-[100px]">Avatar</TableHead>
-                                <TableHead>Nombre</TableHead>
+                                <TableHead className="w-[80px]">Avatar</TableHead>
+                                <TableHead>Información</TableHead>
                                 <TableHead>Rol</TableHead>
-                                <TableHead className="w-[100px] text-center">Acciones</TableHead>
+                                <TableHead className="text-right">Acciones</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {profiles.map((profile) => (
-                                <TableRow key={profile.id}>
-                                    <TableCell>
-                                        <Avatar>
-                                            <AvatarFallback>
-                                                {profile.nombre ? profile.nombre.charAt(0).toUpperCase() : "?"}
-                                            </AvatarFallback>
-                                        </Avatar>
-                                    </TableCell>
-                                    <TableCell className="font-medium">
-                                        <div className="flex flex-col">
-                                            <span>{profile.nombre}</span>
-                                            <span className="text-xs text-muted-foreground">{profile.email}</span>
-                                        </div>
-                                    </TableCell>
-                                    <TableCell>
-                                        <Select
-                                            value={profile.rol}
-                                            onValueChange={(val) => handleRoleChange(profile.id, val)}
-                                        >
-                                            <SelectTrigger className="w-[130px] h-8">
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="admin">Administrador</SelectItem>
-                                                <SelectItem value="revendedor">Revendedor</SelectItem>
-                                                <SelectItem value="comprador">Comprador</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </TableCell>
-                                    <TableCell>
-                                        <div className="flex justify-center gap-2">
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                className="text-blue-500 hover:text-blue-700 hover:bg-blue-100/50"
-                                                onClick={() => handleEditClick(profile)}
+                            {isLoading ? (
+                                Array.from({ length: 5 }).map((_, i) => (
+                                    <TableRow key={i}>
+                                        <TableCell><Skeleton className="h-10 w-10 rounded-full" /></TableCell>
+                                        <TableCell>
+                                            <div className="space-y-2">
+                                                <Skeleton className="h-4 w-[150px]" />
+                                                <Skeleton className="h-3 w-[100px]" />
+                                            </div>
+                                        </TableCell>
+                                        <TableCell><Skeleton className="h-8 w-[100px]" /></TableCell>
+                                        <TableCell><Skeleton className="h-8 w-[80px] ml-auto" /></TableCell>
+                                    </TableRow>
+                                ))
+                            ) : (
+                                profiles.map((profile) => (
+                                    <TableRow key={profile.id} className="group hover:bg-muted/40 transition-colors">
+                                        <TableCell>
+                                            <Avatar className="h-10 w-10 border-2 border-background shadow-sm">
+                                                <AvatarFallback className="bg-primary/10 text-primary font-medium">
+                                                    {profile.nombre ? profile.nombre.charAt(0).toUpperCase() : "?"}
+                                                </AvatarFallback>
+                                            </Avatar>
+                                        </TableCell>
+                                        <TableCell>
+                                            <div className="flex flex-col">
+                                                <span className="font-medium text-sm">{profile.nombre}</span>
+                                                <span className="text-xs text-muted-foreground">{profile.email}</span>
+                                            </div>
+                                        </TableCell>
+                                        <TableCell>
+                                            <Select
+                                                value={profile.rol}
+                                                onValueChange={(val) => handleRoleChange(profile.id, val)}
                                             >
-                                                <Pencil className="h-4 w-4" />
-                                            </Button>
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                className="text-red-500 hover:text-red-700 hover:bg-red-100/50"
-                                                onClick={() => handleDeleteClick(profile)}
-                                            >
-                                                <Trash2 className="h-4 w-4" />
-                                            </Button>
-                                        </div>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
+                                                <SelectTrigger className="w-[140px] h-8 bg-transparent border-transparent hover:border-input focus:ring-0 focus:ring-offset-0 transition-all font-medium text-xs">
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="admin">Administrador</SelectItem>
+                                                    <SelectItem value="revendedor">Revendedor</SelectItem>
+                                                    <SelectItem value="comprador">Comprador</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            <div className="flex justify-end gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-8 w-8 text-blue-500 hover:text-blue-700 hover:bg-blue-100"
+                                                    onClick={() => handleEditClick(profile)}
+                                                    title="Cambiar contraseña"
+                                                >
+                                                    <Pencil className="h-4 w-4" />
+                                                </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-100"
+                                                    onClick={() => handleDeleteClick(profile)}
+                                                    title="Eliminar usuario"
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                ))
+                            )}
                         </TableBody>
                     </Table>
                 </CardContent>
@@ -262,26 +383,23 @@ export default function GestionUsuariosPage() {
 
             {/* Diálogo Editar Contraseña */}
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                <DialogContent>
+                <DialogContent className="sm:max-w-md">
                     <DialogHeader>
                         <DialogTitle>Cambiar contraseña</DialogTitle>
                         <DialogDescription>
-                            Ingrese la nueva contraseña para <b>{selectedUser?.nombre}</b>.
+                            Ingrese la nueva contraseña para <span className="font-medium text-foreground">{selectedUser?.nombre}</span>.
                         </DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-4 py-4">
-                        <div className="grid gap-2">
+                        <div className="space-y-2">
                             <Label htmlFor="password">Nueva contraseña</Label>
                             <Input
                                 id="password"
                                 type="text"
-                                placeholder="Escribe la nueva contraseña..."
+                                placeholder="Mínimo 6 caracteres..."
                                 value={newPassword}
                                 onChange={(e) => setNewPassword(e.target.value)}
                             />
-                            <p className="text-xs text-muted-foreground">
-                                Recomendamos usar una contraseña segura.
-                            </p>
                         </div>
                     </div>
                     <DialogFooter>
@@ -289,14 +407,8 @@ export default function GestionUsuariosPage() {
                             Cancelar
                         </Button>
                         <Button onClick={handleSavePassword} disabled={isSaving}>
-                            {isSaving ? (
-                                <>
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    Guardando...
-                                </>
-                            ) : (
-                                "Guardar cambios"
-                            )}
+                            {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Guardar
                         </Button>
                     </DialogFooter>
                 </DialogContent>
@@ -306,9 +418,9 @@ export default function GestionUsuariosPage() {
             <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+                        <AlertDialogTitle>¿Eliminar usuario?</AlertDialogTitle>
                         <AlertDialogDescription>
-                            Esta acción no se puede deshacer. Se eliminará permanentemente al usuario <b>{userToDelete?.nombre}</b> y no podrá iniciar sesión nuevamente.
+                            Esta acción es irreversible. Se eliminará permanentemente al usuario <span className="font-medium text-foreground">{userToDelete?.nombre}</span> y todos sus datos asociados.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -316,16 +428,10 @@ export default function GestionUsuariosPage() {
                         <AlertDialogAction
                             onClick={confirmDelete}
                             disabled={isDeleting}
-                            className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+                            className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
                         >
-                            {isDeleting ? (
-                                <>
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    Eliminando...
-                                </>
-                            ) : (
-                                "Eliminar"
-                            )}
+                            {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Eliminar
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
@@ -333,25 +439,25 @@ export default function GestionUsuariosPage() {
 
             {/* Diálogo Crear Usuario */}
             <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-                <DialogContent>
+                <DialogContent className="sm:max-w-md">
                     <DialogHeader>
                         <DialogTitle>Crear Nuevo Usuario</DialogTitle>
                         <DialogDescription>
-                            Complete los datos para registrar un nuevo usuario en el sistema.
+                            Complete los datos para dar de alta un nuevo usuario en el sistema.
                         </DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-4 py-4">
                         <div className="grid gap-2">
-                            <Label htmlFor="newUsername">Usuario</Label>
+                            <Label htmlFor="newUsername">Nombre de Usuario</Label>
                             <Input
                                 id="newUsername"
-                                placeholder="Nombre de usuario"
+                                placeholder="Ej: juanperez"
                                 value={newUserUsername}
                                 onChange={(e) => setNewUserUsername(e.target.value)}
                             />
                         </div>
                         <div className="grid gap-2">
-                            <Label htmlFor="newRole">Rol</Label>
+                            <Label htmlFor="newRole">Rol Asignado</Label>
                             <Select value={newUserRole} onValueChange={setNewUserRole}>
                                 <SelectTrigger>
                                     <SelectValue placeholder="Seleccione un rol" />
@@ -364,11 +470,11 @@ export default function GestionUsuariosPage() {
                             </Select>
                         </div>
                         <div className="grid gap-2">
-                            <Label htmlFor="newPassword">Contraseña</Label>
+                            <Label htmlFor="newPassword">Contraseña Inicial</Label>
                             <Input
                                 id="newPassword"
                                 type="password"
-                                placeholder="Contraseña segura"
+                                placeholder="********"
                                 value={newUserPassword}
                                 onChange={(e) => setNewUserPassword(e.target.value)}
                             />
@@ -379,14 +485,8 @@ export default function GestionUsuariosPage() {
                             Cancelar
                         </Button>
                         <Button onClick={handleCreateUser} disabled={isCreating}>
-                            {isCreating ? (
-                                <>
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    Creando...
-                                </>
-                            ) : (
-                                "Crear Usuario"
-                            )}
+                            {isCreating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Crear Usuario
                         </Button>
                     </DialogFooter>
                 </DialogContent>

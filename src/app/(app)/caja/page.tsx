@@ -82,7 +82,7 @@ type UnifiedExpense = {
     source: "gasto" | "deuda";
 };
 
-export default function Caja2Page() {
+export default function CajaPage() {
     const supabase = createClient();
 
     const [gastos, setGastos] = useState<Gasto[]>([]);

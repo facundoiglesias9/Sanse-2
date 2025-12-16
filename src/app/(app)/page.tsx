@@ -10,6 +10,7 @@ import { useCurrencies } from "@/app/contexts/CurrencyContext";
 import { LoaderTable } from "@/app/(app)/components/loader-table";
 import { FormulaInfoDialog } from "@/app/(app)/components/lista_de_precios/formula-info-dialog";
 
+
 export default function ListaDePreciosPage() {
   const [perfumes, setPerfumes] = useState<Perfume[]>([]);
   const [loadingTableListaDePrecios, setLoadingTableListaDePrecios] =
@@ -20,9 +21,14 @@ export default function ListaDePreciosPage() {
   const supabase = createClient();
   const { currencies, isLoading: loadingCurrencies } = useCurrencies();
 
-  // Obtener rol del usuario
+
+
+  // Obtener rol del usuario y config de mantenimiento
   useEffect(() => {
-    const getUserRole = async () => {
+    const initPage = async () => {
+      // 1. Get User Role
+
+
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
         const { data: profile } = await supabase
@@ -33,9 +39,12 @@ export default function ListaDePreciosPage() {
 
         const role = profile?.rol || session.user.user_metadata?.rol || "comprador";
         setUserRole(role);
+      } else {
+        // Guest user
+        setUserRole("comprador"); // O "guest" si manejas
       }
     };
-    getUserRole();
+    initPage();
   }, []);
 
   // Determinar vista: revendedores ven mayorista, compradores ven minorista
@@ -44,6 +53,10 @@ export default function ListaDePreciosPage() {
   let view: "minorista" | "mayorista" = requestedView || "minorista";
   if (userRole === "revendedor") view = "mayorista";
   if (userRole === "comprador") view = "minorista"; // El comprador siempre ve minorista
+
+  // EARLY RETURN logic moved to bottom to prevent Hook Error
+
+
 
   const fetchListaDePrecios = async () => {
     if (userRole === null) return; // Esperar a que se determine el rol
@@ -197,6 +210,8 @@ export default function ListaDePreciosPage() {
       return true;
     })
     : perfumes;
+
+
 
   return (
     <div className="flex flex-col gap-4 p-4 max-w-6xl mx-auto">
