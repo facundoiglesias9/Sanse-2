@@ -18,50 +18,53 @@ export const proveedoresColumns = (
 ): ColumnDef<Proveedor>[] => [
     {
       accessorKey: "nombre",
-      header: "Nombre",
-      cell: ({ row }) => <p className="font-bold">{row.getValue("nombre")}</p>,
+      header: () => <div className="text-center">Nombre</div>,
+      cell: ({ row }) => <div className="text-center font-bold">{row.getValue("nombre")}</div>,
     },
     {
       accessorKey: "gramos_configurados",
-      header: "Gramos configurados",
-      cell: ({ row }) => <p>{row.getValue("gramos_configurados")}</p>,
+      header: () => <div className="text-center">Gramos configurados</div>,
+      cell: ({ row }) => <div className="text-center">{row.getValue("gramos_configurados")}</div>,
     },
     {
       accessorKey: "margen_venta",
-      header: "Margen de venta",
-      cell: ({ row }) => <p>{row.getValue("margen_venta")} %</p>,
+      header: () => <div className="text-center">Margen de venta</div>,
+      cell: ({ row }) => <div className="text-center">{row.getValue("margen_venta")} %</div>,
     },
     {
       accessorKey: "color",
-      header: "Color",
+      header: () => <div className="text-center">Color</div>,
       cell: ({ row }) => (
-        <Tooltip>
-          <TooltipTrigger>
-            <Badge
-              className="h-5 min-w-5 rounded-full px-1 tabular-nums"
-              variant={row.getValue("color")}
-            /></TooltipTrigger>
-          <TooltipContent>
-            <p>{row.getValue("color") ?? "default"}</p>
-          </TooltipContent>
-        </Tooltip>
+        <div className="flex items-center justify-center">
+          <Tooltip>
+            <TooltipTrigger>
+              <Badge
+                className="h-5 min-w-5 rounded-full px-1 tabular-nums"
+                variant={row.getValue("color")}
+              />
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>{row.getValue("color") ?? "default"}</p>
+            </TooltipContent>
+          </Tooltip>
+        </div>
       ),
     },
     {
       accessorKey: "updated_at",
-      header: "Última actualización",
+      header: () => <div className="text-center">Última actualización</div>,
       cell: ({ row }) => {
         const updatedAt = row.getValue("updated_at") as string;
-        return <p>{formatDate(new Date(updatedAt))}</p>;
+        return <div className="text-center">{formatDate(new Date(updatedAt))}</div>;
       },
     },
     {
       accessorKey: "acciones",
-      header: "Acciones",
+      header: () => <div className="text-center">Acciones</div>,
       cell: ({ row }) => {
         const proveedor = row.original;
         return (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center justify-center gap-2">
             <Button
               variant="ghost"
               size="icon"

@@ -3,26 +3,26 @@
 import { useState, useEffect } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { useCurrencies } from "@/app/contexts/CurrencyContext";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Plus, Trash2, ShoppingCart, Loader2 } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency } from "@/app/helpers/formatCurrency";
-import { motion, AnimatePresence } from "framer-motion";
+import { AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import {
     Dialog,
     DialogContent,
     DialogDescription,
-    DialogFooter,
     DialogHeader,
     DialogTitle,
     DialogTrigger,
 } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
+
 
 export default function PedidoMayoristaPage() {
     const supabase = createClient();
@@ -36,15 +36,20 @@ export default function PedidoMayoristaPage() {
     // Estado del modal de agregar producto
     const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
+    const [showZeroPrice, setShowZeroPrice] = useState(true);
 
     // Cargar productos al inicio
     useEffect(() => {
+        // ... (existing useEffect code remains the same, I will not include it in replacement if I can help it, but replace_file_content needs contiguous block. 
+        // Wait, I can use multi_replace to avoid replacing the big useEffect chunk.
+        // I will switch to multi_replace for cleaner edits.)
+
         const fetchProducts = async () => {
             if (loadingCurrencies) return;
 
             setLoadingProducts(true);
 
-            // 1. Fetch Esencias
+            // 1. Obtener Esencias
             const { data: esenciasData, error: esenciasError } = await supabase
                 .from("esencias")
                 .select(`*, insumos_categorias(nombre), proveedores(id, nombre, gramos_configurados, color)`)
@@ -55,7 +60,7 @@ export default function PedidoMayoristaPage() {
                 toast.error("Error al cargar esencias");
             }
 
-            // 2. Fetch Insumos
+            // 2. Obtener Insumos
             const { data: insumosData, error: insumosError } = await supabase
                 .from("insumos")
                 .select(`*`)
@@ -66,10 +71,10 @@ export default function PedidoMayoristaPage() {
                 toast.error("Error al cargar insumos");
             }
 
-            // 3. Process and Merge
+            // 3. Procesar y Unificar
             const processedEsencias = (esenciasData || []).map((e: any) => {
-                const gramosPor = e.proveedores?.gramos_configurados ?? 1;
-                const perfumesPorCantidad = e.cantidad_gramos && gramosPor > 0 ? e.cantidad_gramos / gramosPor : 1;
+                // const gramosPor = e.proveedores?.gramos_configurados ?? 1;
+                // const perfumesPorCantidad = e.cantidad_gramos && gramosPor > 0 ? e.cantidad_gramos / gramosPor : 1;
 
                 let precioFinal = 0;
                 if (e.precio_usd && currencies["ARS"]) {
@@ -97,7 +102,7 @@ export default function PedidoMayoristaPage() {
                     tipo: 'Insumo',
                     costo_visual: costo,
                     info_extra: `${i.cantidad_lote || 0} ${i.unidad || 'u'}`,
-                    cantidad_lote: i.cantidad_lote, // Ensure we keep this for calculations
+                    cantidad_lote: i.cantidad_lote, // Nos aseguramos de mantener esto para los cálculos
                     unique_id: `insumo-${i.id}`,
                     proveedores: { nombre: '-' },
                     insumos_categorias: { nombre: 'Insumo' }
@@ -142,117 +147,73 @@ export default function PedidoMayoristaPage() {
     };
 
     // Filtrar productos para el buscador
-    const filteredProducts = allProducts.filter(p =>
-        p.nombre.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredProducts = allProducts.filter(p => {
+        const matchesSearch = p.nombre.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesPrice = showZeroPrice ? true : (p.costo_visual > 0);
+        return matchesSearch && matchesPrice;
+    });
 
     const handleConfirmPurchase = async () => {
         if (orderItems.length === 0) return;
 
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+            toast.error("Debes iniciar sesión para realizar un pedido");
+            return;
+        }
+
         const promise = async () => {
-            for (const item of orderItems) {
-                // 1. Update Esencias (Stock logic)
-                if (item.tipo === 'Esencia') {
-                    const gramosConfigurados = item.proveedores?.gramos_configurados || 1;
-                    const gramosTotales = item.cantidad * gramosConfigurados;
+            // Obtener nombre del cliente
+            let clienteNombre = session.user.email;
+            const { data: profile } = await supabase
+                .from('profiles')
+                .select('nombre, rol')
+                .eq('id', session.user.id)
+                .single();
 
-                    // Increment in esencias table
-                    const { data: currentEsencia } = await supabase
-                        .from('esencias')
-                        .select('cantidad_gramos')
-                        .eq('id', item.id)
-                        .single();
+            if (profile?.nombre) clienteNombre = profile.nombre;
 
-                    if (currentEsencia) {
-                        await supabase
-                            .from('esencias')
-                            .update({ cantidad_gramos: (currentEsencia.cantidad_gramos || 0) + gramosTotales })
-                            .eq('id', item.id);
-                    }
+            // Preparar datos para la solicitud
+            const detalleTexto = orderItems.map(i => `${i.nombre} x${i.cantidad}`).join(", ");
+            const total = calculateTotal();
 
-                    // 2. Update/Insert in Inventario (Esencia)
-                    const { data: invItem } = await supabase
-                        .from('inventario')
-                        .select('*')
-                        .eq('tipo', 'Esencia')
-                        .ilike('nombre', item.nombre)
-                        .maybeSingle();
+            const { error } = await supabase.from('solicitudes').insert({
+                created_at: new Date(),
+                cliente: clienteNombre,
+                detalle: detalleTexto,
+                items: orderItems,
+                total: total,
+                estado: 'pendiente',
+                metodo_pago: 'A coordinar', // Se puede mejorar agregando un selector en la UI
+            });
 
-                    if (invItem) {
-                        await supabase.from('inventario').update({
-                            cantidad: (Number(invItem.cantidad) || 0) + gramosTotales,
-                            updated_at: new Date().toISOString()
-                        }).eq('id', invItem.id);
-                    } else {
-                        await supabase.from('inventario').insert({
-                            nombre: item.nombre,
-                            tipo: 'Esencia',
-                            cantidad: gramosTotales,
-                            genero: item.genero || 'unisex',
-                            updated_at: new Date().toISOString()
-                        });
-                    }
-                }
-                else if (item.tipo === 'Insumo') {
-                    // Update/Insert in Inventario (Insumo)
-                    // Logic: 'cantidad' here is number of lots. We multiply by 'cantidad_lote' to get total units/liters.
-                    const cantidadTotal = item.cantidad * (item.cantidad_lote || 1);
-
-                    const { data: invItem } = await supabase
-                        .from('inventario')
-                        .select('*')
-                        .eq('tipo', 'Insumo')
-                        .ilike('nombre', item.nombre)
-                        .maybeSingle();
-
-                    if (invItem) {
-                        await supabase.from('inventario').update({
-                            cantidad: (Number(invItem.cantidad) || 0) + cantidadTotal,
-                            updated_at: new Date().toISOString()
-                        }).eq('id', invItem.id);
-                    } else {
-                        await supabase.from('inventario').insert({
-                            nombre: item.nombre,
-                            tipo: 'Insumo',
-                            cantidad: cantidadTotal,
-                            genero: 'unisex',
-                            updated_at: new Date().toISOString()
-                        });
-                    }
-                }
-            }
+            if (error) throw error;
         };
 
         toast.promise(promise(), {
-            loading: 'Procesando compra...',
+            loading: 'Enviando solicitud...',
             success: () => {
                 setOrderItems([]);
-                return 'Compra registrada y stock actualizado';
+                return 'Solicitud enviada correctamente. Aguarda la aprobación.';
             },
-            error: 'Error al procesar la compra'
+            error: 'Error al enviar la solicitud'
         });
     };
 
+    // Estado para evitar errores de hidratación
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
+
+    if (!mounted) return null;
+
     return (
         <div className="container mx-auto py-8 px-4 max-w-6xl">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-primary">Pedido Mayorista</h1>
-                    <p className="text-muted-foreground mt-1">Arma tu pedido seleccionando productos de la lista.</p>
-                </div>
-                <div className="flex items-center gap-4">
-                    <Card className="p-3 bg-muted/50 border-dashed flex items-center gap-4">
-                        <div>
-                            <div className="text-sm font-medium text-muted-foreground">Total Estimado</div>
-                            <div className="text-2xl font-bold text-primary">
-                                {formatCurrency(calculateTotal(), "ARS", 0)}
-                            </div>
-                        </div>
-                        <Button onClick={handleConfirmPurchase} disabled={orderItems.length === 0}>
-                            Confirmar Compra
-                        </Button>
-                    </Card>
-                </div>
+            <div className="mb-8 text-center">
+                <h1 className="text-3xl font-bold tracking-tight text-primary">Pedido Mayorista</h1>
+                <p className="text-muted-foreground mt-1">Arma tu pedido seleccionando productos de la lista.</p>
             </div>
 
             <Card className="border-none shadow-md bg-card">
@@ -264,19 +225,30 @@ export default function PedidoMayoristaPage() {
                                 <Plus className="w-4 h-4" /> Agregar Producto
                             </Button>
                         </DialogTrigger>
-                        <DialogContent className="max-w-5xl max-h-[80vh] flex flex-col">
+                        <DialogContent className="w-full max-w-3xl sm:max-w-3xl max-h-[90vh] flex flex-col">
                             <DialogHeader>
                                 <DialogTitle>Seleccionar Productos</DialogTitle>
                                 <DialogDescription>Busca y selecciona los productos para agregar al pedido.</DialogDescription>
                             </DialogHeader>
 
                             <div className="py-4 space-y-4 flex-1 overflow-hidden flex flex-col">
-                                <Input
-                                    placeholder="Buscar por nombre..."
-                                    value={searchTerm}
-                                    onChange={(e) => setSearchTerm(e.target.value)}
-                                    autoFocus
-                                />
+                                <div className="flex flex-col sm:flex-row gap-4 justify-between items-center">
+                                    <Input
+                                        placeholder="Buscar por nombre..."
+                                        value={searchTerm}
+                                        onChange={(e) => setSearchTerm(e.target.value)}
+                                        className="flex-1"
+                                        autoFocus
+                                    />
+                                    <div className="flex items-center gap-2">
+                                        <Switch
+                                            id="show-zero"
+                                            checked={showZeroPrice}
+                                            onCheckedChange={setShowZeroPrice}
+                                        />
+                                        <Label htmlFor="show-zero" className="cursor-pointer">Mostrar precios en $0</Label>
+                                    </div>
+                                </div>
 
                                 <div className="flex-1 overflow-y-auto border rounded-md">
                                     {loadingProducts ? (
@@ -356,57 +328,79 @@ export default function PedidoMayoristaPage() {
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    <AnimatePresence>
-                                        {orderItems.map((item) => (
-                                            <TableRow key={item.unique_id}>
-                                                <TableCell>
-                                                    <div className="font-medium">{item.nombre}</div>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Badge variant="outline">{item.info_extra}</Badge>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <div className="flex items-center gap-2">
-                                                        <Badge variant={item.tipo === 'Esencia' ? 'secondary' : 'warning'} className="text-[10px]">
-                                                            {item.tipo}
-                                                        </Badge>
-                                                        <span className="text-xs text-muted-foreground">{item.insumos_categorias?.nombre || "-"}</span>
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell className="text-right">
-                                                    {formatCurrency(item.costo_visual, "ARS", 0)}
-                                                </TableCell>
-                                                <TableCell className="text-center">
-                                                    <Input
-                                                        type="number"
-                                                        min="1"
-                                                        value={item.cantidad}
-                                                        onChange={(e) => updateQuantity(item.unique_id, parseInt(e.target.value) || 1)}
-                                                        className="h-8 w-20 mx-auto text-center"
-                                                    />
-                                                </TableCell>
-                                                <TableCell className="text-right font-bold">
-                                                    {formatCurrency(item.costo_visual * item.cantidad, "ARS", 0)}
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                                                        onClick={() => removeFromOrder(item.unique_id)}
-                                                    >
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </Button>
-                                                </TableCell>
-                                            </TableRow>
-                                        ))}
-                                    </AnimatePresence>
+                                    {orderItems.map((item) => (
+                                        <TableRow key={item.unique_id}>
+                                            <TableCell>
+                                                <div className="font-medium">{item.nombre}</div>
+                                            </TableCell>
+                                            <TableCell>
+                                                <Badge variant="outline">{item.info_extra}</Badge>
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="flex items-center gap-2">
+                                                    <Badge variant={item.tipo === 'Esencia' ? 'secondary' : 'warning'} className="text-[10px]">
+                                                        {item.tipo}
+                                                    </Badge>
+                                                    <span className="text-xs text-muted-foreground">{item.insumos_categorias?.nombre || "-"}</span>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell className="text-right">
+                                                {formatCurrency(item.costo_visual, "ARS", 0)}
+                                            </TableCell>
+                                            <TableCell className="text-center">
+                                                <Input
+                                                    type="number"
+                                                    min="1"
+                                                    value={item.cantidad}
+                                                    onChange={(e) => updateQuantity(item.unique_id, parseInt(e.target.value) || 1)}
+                                                    className="h-8 w-20 mx-auto text-center"
+                                                />
+                                            </TableCell>
+                                            <TableCell className="text-right font-bold">
+                                                {formatCurrency(item.costo_visual * item.cantidad, "ARS", 0)}
+                                            </TableCell>
+                                            <TableCell>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                                    onClick={() => removeFromOrder(item.unique_id)}
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </Button>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
                                 </TableBody>
                             </Table>
                         </div>
                     )}
                 </CardContent>
             </Card>
+
+            {/* Padding extra para que el contenido no quede tapado por la barra fija */}
+            <div className="h-24"></div>
+
+            {/* Barra fija inferior moderna */}
+            <div className="fixed bottom-0 left-0 right-0 border-t bg-background/80 backdrop-blur-md p-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] z-40 transition-all duration-300">
+                <div className="container mx-auto max-w-6xl flex justify-between items-center">
+                    <div className="flex flex-col sm:flex-row sm:items-baseline gap-2">
+                        <span className="text-sm font-medium text-muted-foreground">Total Estimado</span>
+                        <span className="text-3xl font-bold text-primary tabular-nums">
+                            {formatCurrency(calculateTotal(), "ARS", 0)}
+                        </span>
+                    </div>
+
+                    <Button
+                        size="lg"
+                        onClick={handleConfirmPurchase}
+                        disabled={orderItems.length === 0}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-lg px-8 shadow-lg hover:shadow-emerald-500/20 transition-all rounded-full"
+                    >
+                        Confirmar Compra
+                    </Button>
+                </div>
+            </div>
         </div >
     );
 }

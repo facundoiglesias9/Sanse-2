@@ -133,13 +133,13 @@ export default function OrphansPage() {
   const [suggestedMap, setSuggestedMap] = useState<Map<string, EsenciaLite>>(new Map());
   const [loading, setLoading] = useState(false);
 
-  // Filters
+  // Filtros
   const [onlyWithSuggestion, setOnlyWithSuggestion] = useState(false);
   const [genderFilter, setGenderFilter] = useState<"all" | "masculino" | "femenino" | "unisex">("all");
 
   const [acceptingId, setAcceptingId] = useState<string | null>(null);
 
-  // Manual Create Dialog
+  // Diálogo de creación manual
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [orphanToCreate, setOrphanToCreate] = useState<Orphan | null>(null);
 
@@ -166,7 +166,7 @@ export default function OrphansPage() {
     }
     progressTimer.current = window.setInterval(() => {
       setProgress((p) => {
-        const next = p + 8; // Fixed increment instead of random
+        const next = p + 8; // Incremento fijo en lugar de aleatorio
         return next < 90 ? next : 90;
       });
     }, 300);
@@ -220,14 +220,14 @@ export default function OrphansPage() {
 
   useEffect(() => {
     fetchData();
-  }, []); // eslint-disable-line
+  }, []);
 
   const filtered = useMemo(
     () => orphans.filter((o) => {
       if (onlyWithSuggestion && !o.sugerido_esencia_id) return false;
       if (genderFilter !== "all") {
         const g = (o.genero || "").toLowerCase();
-        // simple match
+        // coincidencia simple
         if (g !== genderFilter) return false;
       }
       return true;
@@ -257,11 +257,11 @@ export default function OrphansPage() {
   };
 
   const createFromOrphan = async (orphan: Orphan) => {
-    // Query Van Rossum provider ID
+    // Consultar ID del proveedor Van Rossum
     const { data: provs } = await supabase.from("proveedores").select("id, nombre");
     const vanRossum = (provs ?? []).find((p) => (p.nombre || "").trim().toLowerCase() === "van rossum");
 
-    // Query Perfumería Fina category ID  
+    // Consultar ID de categoría Perfumería Fina  
     const { data: cats } = await supabase.from("insumos_categorias").select("id, nombre");
     const perfumeriaFina = (cats ?? []).find((c) => (c.nombre || "").trim().toLowerCase() === "perfumería fina");
 
@@ -276,13 +276,13 @@ export default function OrphansPage() {
   const handleCreateSuccess = async (newEsencia: any) => {
     if (!orphanToCreate) return;
     try {
-      // Use existing acceptOrphan logic but with the new essence ID to link them
+      // Usar la lógica existente de acceptOrphan pero con el nuevo ID de esencia para vincularlos
       await acceptOrphan(orphanToCreate.id, newEsencia.id);
       setCreateDialogOpen(false);
       setOrphanToCreate(null);
-      // Refresh list is handled by acceptOrphan via local state update normally,
-      // but acceptOrphan updates `orphans` state directly.
-    } catch (e) {
+      // Refrescar lista es manejado por acceptOrphan vía actualización de estado local normalmente,
+      // pero acceptOrphan actualiza el estado de `orphans` directamente.
+    } catch (_e) {
       toast.error("Error al vincular el huérfano con la nueva esencia");
     }
   };
@@ -321,7 +321,7 @@ export default function OrphansPage() {
   };
 
   const clearSuggestion = async (id: string, e: React.MouseEvent) => {
-    e.stopPropagation(); // prevent row click
+    e.stopPropagation(); // evitar click en fila
     try {
       const { error } = await supabase
         .from("precios_vanrossum_orphans")
@@ -558,7 +558,7 @@ export default function OrphansPage() {
             ? {
               nombre: orphanToCreate.nombre,
               precio_ars: orphanToCreate.precio_ars_100g || 0,
-              cantidad_gramos: 100, // Default to 100g
+              cantidad_gramos: 100, // Por defecto 100g
               genero:
                 orphanToCreate.genero === "masculino" ||
                   orphanToCreate.genero === "femenino" ||
@@ -568,7 +568,7 @@ export default function OrphansPage() {
                   : "otro",
               proveedor_id: (orphanToCreate as any).vanRossumId || "",
               insumos_categorias_id: (orphanToCreate as any).perfumeriaFinaId || "",
-              is_consultar: !orphanToCreate.precio_ars_100g, // true if no price
+              is_consultar: !orphanToCreate.precio_ars_100g, // true si no hay precio
             }
             : {}
         }

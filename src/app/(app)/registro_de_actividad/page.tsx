@@ -137,10 +137,6 @@ export default function ActividadPage() {
     return porUsuario;
   }, [actividad, fechaFiltro, usuarioFiltro]);
 
-  const resetView = () => {
-    setActividad([]);
-  };
-
   return (
     <div className="flex flex-col gap-4 p-4 max-w-5xl mx-auto">
       <h1 className="text-3xl font-bold text-center mb-6">Registro de actividad</h1>

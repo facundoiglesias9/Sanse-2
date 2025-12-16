@@ -29,7 +29,7 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { Loader2, Plus, Sparkles, Car, Droplets, Trash2, Calculator, Package, Check, ChevronsUpDown, Search, FlaskConical, Filter, User, TrendingUp, Wallet, ArrowRight, DollarSign } from "lucide-react";
+import { Loader2, Plus, Sparkles, Car, Droplets, Trash2, Calculator, Package, Check, ChevronsUpDown, FlaskConical, Filter, User, Wallet } from "lucide-react";
 import {
     Table,
     TableBody,
@@ -75,23 +75,23 @@ type FormValues = z.infer<typeof formSchema>;
 
 export default function AgregarProductoPage() {
     const [activeTab, setActiveTab] = useState("perfumeria");
-    const [proveedores, setProveedores] = useState<{ id: string; nombre: string }[]>([]);
+    const [proveedores, setProveedores] = useState<{ id: string; nombre: string; }[]>([]);
     const [insumos, setInsumos] = useState<any[]>([]);
     const [esencias, setEsencias] = useState<any[]>([]);
-    const [categories, setCategories] = useState<{ id: string; nombre: string }[]>([]);
+    const [categories, setCategories] = useState<{ id: string; nombre: string; }[]>([]);
 
-    // Add Category State
+    // Estado de agregar categoría
     const [isAddCategoryOpen, setIsAddCategoryOpen] = useState(false);
     const [newCategoryName, setNewCategoryName] = useState("");
     const [creatingCategory, setCreatingCategory] = useState(false);
 
     const [dollarRate, setDollarRate] = useState<number>(0);
 
-    // Calculator State
+    // Estado de calculadora
     const [itemType, setItemType] = useState<"insumo" | "esencia">("insumo");
     const [openCombobox, setOpenCombobox] = useState(false);
 
-    // Filters for Esencias
+    // Filtros para Esencias
     const [filterGenero, setFilterGenero] = useState<string>("todos");
     const [filterProveedor, setFilterProveedor] = useState<string>("todos");
 
@@ -111,7 +111,7 @@ export default function AgregarProductoPage() {
     }[]>([]);
     const [currentInsumoId, setCurrentInsumoId] = useState("");
     const [currentCantidad, setCurrentCantidad] = useState("");
-    const [currentUnidad, setCurrentUnidad] = useState("un"); // Default unit
+    const [currentUnidad, setCurrentUnidad] = useState("un"); // Unidad por defecto
 
     const form = useForm<FormValues>({
         resolver: zodResolver(formSchema),
@@ -126,19 +126,19 @@ export default function AgregarProductoPage() {
     useEffect(() => {
         async function fetchData() {
             try {
-                // Fetch Categories
+                // Obtener categorías
                 const { data: cats } = await supabase.from("insumos_categorias").select("id, nombre").order("nombre");
                 if (cats) setCategories(cats);
 
-                // Fetch Suppliers
+                // Obtener proveedores
                 const { data: provs } = await supabase.from("proveedores").select("id, nombre").order("nombre");
                 if (provs) setProveedores(provs);
 
-                // Fetch Insumos
+                // Obtener insumos
                 const { data: insData } = await supabase.from("insumos").select("*").order("nombre");
                 if (insData) setInsumos(insData);
 
-                // Fetch Esencias
+                // Obtener Esencias
                 const { data: esenciasData } = await supabase
                     .from("esencias")
                     .select(`
@@ -158,8 +158,8 @@ export default function AgregarProductoPage() {
                     .order("nombre");
                 if (esenciasData) setEsencias(esenciasData);
 
-                // Fetch Dollar Rate
-                const res = await fetch("/api/exchange-rate");
+                // Obtener Tasa de Dólar
+                const res = await fetch("/api/dolar");
                 const rates = await res.json();
                 if (rates && rates.ARS) setDollarRate(rates.ARS);
 
@@ -183,13 +183,13 @@ export default function AgregarProductoPage() {
 
     useEffect(() => {
         if (categories.length > 0 && !activeTab) {
-            // Default to first category if none selected
+            // Por defecto la primera categoría si no hay ninguna seleccionada
             setActiveTab(categories[0].id);
         }
     }, [categories, activeTab]);
 
     useEffect(() => {
-        // Logic to set gender based on selected category
+        // Lógica para establecer género basado en la categoría seleccionada
         const currentCat = categories.find(c => c.id === activeTab);
         if (currentCat) {
             const name = currentCat.nombre.toLowerCase();
@@ -289,12 +289,12 @@ export default function AgregarProductoPage() {
         const newInsumos = [...selectedInsumos];
         newInsumos.splice(index, 1);
         setSelectedInsumos(newInsumos);
-    }
+    };
 
     async function onSubmit(data: FormValues) {
         setLoading(true);
         try {
-            // activeTab now holds the ID directly
+            // activeTab ahora contiene el ID directamente
             const categoryId = activeTab;
 
             const custom_insumos = selectedInsumos.map(item => ({
@@ -330,7 +330,7 @@ export default function AgregarProductoPage() {
                 insumos_categorias_id: null,
             });
             setSelectedInsumos([]);
-            // Keep on current tab
+            // Mantener en la pestaña actual
             router.push("/");
         } catch (error: any) {
             console.error(error);
@@ -354,7 +354,7 @@ export default function AgregarProductoPage() {
             setCategories([...categories, data]);
             setIsAddCategoryOpen(false);
             setNewCategoryName("");
-            setActiveTab(data.id); // Switch to new category
+            setActiveTab(data.id); // Cambiar a la nueva categoría
             toast.success("Categoría creada exitosamente");
         } catch (error: any) {
             toast.error("Error al crear categoría: " + error.message);
@@ -369,7 +369,7 @@ export default function AgregarProductoPage() {
             animate={{ opacity: 1, y: 0 }}
             className="container mx-auto py-10 px-4 max-w-4xl"
         >
-            <div className="flex flex-col space-y-2 mb-8 text-center md:text-left">
+            <div className="flex flex-col space-y-2 mb-8 text-center">
                 <h1 className="text-4xl font-extrabold tracking-tight text-primary">Agregar nuevo producto</h1>
                 <p className="text-muted-foreground text-lg">
                     Selecciona la categoría y completa los detalles para añadir un nuevo ítem a la lista de precios.
@@ -642,7 +642,7 @@ export default function AgregarProductoPage() {
                                                                         }).map((esencia) => (
                                                                             <CommandItem
                                                                                 key={esencia.id}
-                                                                                value={`${esencia.nombre}-${esencia.id}`} // Unique value for cmdk
+                                                                                value={`${esencia.nombre}-${esencia.id}`} // Valor único para cmdk
                                                                                 onSelect={() => {
                                                                                     setCurrentInsumoId(esencia.id);
                                                                                     setOpenCombobox(false);

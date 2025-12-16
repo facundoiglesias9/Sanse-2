@@ -1,4 +1,4 @@
-# 🌸 Sanse Perfumes - [master-refix]
+# 🌸 Sanse Perfumes
 
 Aplicación web para administrar integralmente el negocio de Sanse Perfumes: controla esencias, insumos, costos, ventas, caja, deudas y sincroniza precios con proveedores externos. Está construida sobre el ecosistema de Next.js y Supabase para ofrecer una experiencia rápida, responsiva y lista para producción.
 

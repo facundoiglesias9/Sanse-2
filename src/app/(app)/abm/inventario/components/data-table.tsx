@@ -48,7 +48,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { X, Plus, Loader2 } from "lucide-react";
+import { X, Plus, Loader2, Mail } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -98,6 +98,7 @@ export function DataTable<TData extends { tipo?: string; nombre?: string; cantid
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isLoadingForm, setIsLoadingForm] = useState(false);
   const [mostrarPerfumesCero, setMostrarPerfumesCero] = useState(true);
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
   const supabase = createClient();
 
   const orderedTipoOptions = useMemo(() => {
@@ -271,110 +272,160 @@ export function DataTable<TData extends { tipo?: string; nombre?: string; cantid
     setIsLoadingForm(false);
   }
 
+  const handleSendLowStock = async () => {
+    setIsSendingEmail(true);
+    try {
+      const response = await fetch("/api/inventory/send-low-stock-report", {
+        method: "POST",
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Error al enviar el reporte");
+      }
+
+      if (data.count === 0) {
+        toast.info("No hay items con stock bajo para reportar.");
+      } else {
+        toast.success(`Reporte enviado con éxito (${data.count} items).`);
+      }
+    } catch (error: any) {
+      toast.error("Error al enviar el reporte", {
+        description: error.message,
+      });
+    } finally {
+      setIsSendingEmail(false);
+    }
+  };
+
   return (
     <>
-      {/* Filtros + toggle */}
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-x-4">
-          <div className="relative max-w-sm">
-            <Input
-              placeholder="Buscar por nombre..."
-              value={filterValue}
-              onChange={(event) =>
-                table
-                  .getColumn(filterColumnId)
-                  ?.setFilterValue(event.target.value)
-              }
-              className="pr-10"
-            />
-            {filterValue !== "" && (
-              <Button
-                size="icon"
-                variant="ghost"
-                className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6"
-                onClick={() =>
-                  table.getColumn(filterColumnId)?.setFilterValue("")
+      <div className="flex flex-col gap-6">
+        <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-end justify-between">
+
+          {/* Sección de Filtros */}
+          <div className="flex flex-wrap lg:flex-nowrap items-center gap-3 w-full lg:w-auto">
+            <div className="relative w-full sm:w-64">
+              <Input
+                placeholder="Buscar por nombre..."
+                value={filterValue}
+                onChange={(event) =>
+                  table
+                    .getColumn(filterColumnId)
+                    ?.setFilterValue(event.target.value)
                 }
-              >
-                <X className="w-4 h-4" />
-              </Button>
-            )}
+                className="pr-10"
+              />
+              {filterValue !== "" && (
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6"
+                  onClick={() =>
+                    table.getColumn(filterColumnId)?.setFilterValue("")
+                  }
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              )}
+            </div>
+
+            <Select
+              value={
+                typeof table.getColumn("genero")?.getFilterValue() === "string"
+                  ? (table.getColumn("genero")?.getFilterValue() as string)
+                  : "todos"
+              }
+              onValueChange={(value) =>
+                table
+                  .getColumn("genero")
+                  ?.setFilterValue(value === "todos" ? undefined : value)
+              }
+            >
+              <SelectTrigger className="w-[150px]">
+                <SelectValue placeholder="Filtrar por género" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos</SelectItem>
+                <SelectItem value="masculino">Masculino</SelectItem>
+                <SelectItem value="femenino">Femenino</SelectItem>
+                <SelectItem value="ambiente">Ambiente</SelectItem>
+                <SelectItem value="otro">Otro</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select
+              value={
+                typeof table.getColumn("tipo")?.getFilterValue() === "string"
+                  ? (table.getColumn("tipo")?.getFilterValue() as string)
+                  : "todos"
+              }
+              onValueChange={(value) =>
+                table
+                  .getColumn("tipo")
+                  ?.setFilterValue(value === "todos" ? undefined : value)
+              }
+              disabled={orderedTipoOptions.length === 0}
+            >
+              <SelectTrigger className="w-[150px]">
+                <SelectValue placeholder="Filtrar por tipo" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos</SelectItem>
+                {orderedTipoOptions.map((tipo) => (
+                  <SelectItem key={tipo} value={tipo}>
+                    {tipo}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
-          <Select
-            value={
-              typeof table.getColumn("genero")?.getFilterValue() === "string"
-                ? (table.getColumn("genero")?.getFilterValue() as string)
-                : "todos"
-            }
-            onValueChange={(value) =>
-              table
-                .getColumn("genero")
-                ?.setFilterValue(value === "todos" ? undefined : value)
-            }
-          >
-            <SelectTrigger className="w-[150px]">
-              <SelectValue placeholder="Filtrar por género" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todos</SelectItem>
-              <SelectItem value="masculino">Masculino</SelectItem>
-              <SelectItem value="femenino">Femenino</SelectItem>
-              <SelectItem value="ambiente">Ambiente</SelectItem>
-              <SelectItem value="otro">Otro</SelectItem>
-            </SelectContent>
-          </Select>
+          {/* Acciones y Conmutadores */}
+          <div className="flex flex-col gap-3 items-end w-full lg:w-auto">
+            {/* Alternar shadcn/ui */}
+            <div className="flex items-center gap-2 mb-1">
+              <Label htmlFor="toggle-cero" className="text-sm font-medium text-muted-foreground cursor-pointer hover:text-foreground transition-colors">
+                Mostrar perfumes sin stock
+              </Label>
+              <Switch
+                id="toggle-cero"
+                checked={mostrarPerfumesCero}
+                onCheckedChange={(v) => setMostrarPerfumesCero(Boolean(v))}
+              />
+            </div>
 
-          <Select
-            value={
-              typeof table.getColumn("tipo")?.getFilterValue() === "string"
-                ? (table.getColumn("tipo")?.getFilterValue() as string)
-                : "todos"
-            }
-            onValueChange={(value) =>
-              table
-                .getColumn("tipo")
-                ?.setFilterValue(value === "todos" ? undefined : value)
-            }
-            disabled={orderedTipoOptions.length === 0}
-          >
-            <SelectTrigger className="w-[150px]">
-              <SelectValue placeholder="Filtrar por tipo" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todos</SelectItem>
-              {orderedTipoOptions.map((tipo) => (
-                <SelectItem key={tipo} value={tipo}>
-                  {tipo}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            <div className="flex items-center gap-3">
+              {onManageTipos && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onManageTipos}
+                  className="border-primary/20 hover:border-primary/50 text-foreground"
+                >
+                  Gestionar tipos
+                </Button>
+              )}
+              <Button
+                variant="secondary"
+                size="icon"
+                onClick={handleSendLowStock}
+                disabled={isSendingEmail}
+                title="Enviar stock bajo"
+              >
+                {isSendingEmail ? <Loader2 className="animate-spin h-4 w-4" /> : <Mail width={18} />}
+              </Button>
+              <Button
+                size="sm"
+                className="gap-x-2 bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm hover:shadow transition-all"
+                onClick={handleNew}
+              >
+                <Plus width={18} />
+                Agregar item
+              </Button>
+            </div>
+          </div>
         </div>
-
-        {/* Toggle shadcn/ui */}
-        <div className="flex items-center gap-2">
-          <Label htmlFor="toggle-cero" className="text-sm">
-            Mostrar perfumes sin stock
-          </Label>
-          <Switch
-            id="toggle-cero"
-            checked={mostrarPerfumesCero}
-            onCheckedChange={(v) => setMostrarPerfumesCero(Boolean(v))}
-          />
-        </div>
-      </div>
-
-      <div className="flex items-center gap-2">
-        {onManageTipos && (
-          <Button variant="outline" size="sm" onClick={onManageTipos}>
-            Gestionar tipos
-          </Button>
-        )}
-        <Button size="sm" className="gap-x-2" onClick={handleNew}>
-          <Plus width={18} />
-          Agregar item
-        </Button>
       </div>
 
       <Dialog

@@ -1,6 +1,0 @@
-{
-  "code": "23502",
-  "details": "Failing row contains (259fb7c4-904d-47e2-8907-bcbb281a93f4, Otro, 63b939ab-d077-400a-acd2-89791a9fb8df, null, 2025-12-11 01:45:37.999+00).",
-  "hint": null,
-  "message": "null value in column \"updated_by\" of relation \"insumos_categorias\" violates not-null constraint"
-}

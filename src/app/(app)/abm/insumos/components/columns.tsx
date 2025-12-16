@@ -4,7 +4,7 @@ import { ColumnDef } from "@tanstack/react-table";
 import { formatCurrency } from "@/app/helpers/formatCurrency";
 import { formatDate } from "@/app/helpers/formatDate";
 import { Insumo } from "@/app/types/insumo";
-import { Badge } from "@/components/ui/badge";
+
 import { Button } from "@/components/ui/button";
 import { Pencil, Trash2 } from "lucide-react";
 
@@ -14,57 +14,56 @@ export const insumosColumns = (
 ): ColumnDef<Insumo>[] => [
     {
       accessorKey: "nombre",
-      header: "Nombre",
-      cell: ({ row }) => <p className="font-bold">{row.getValue("nombre")}</p>,
+      header: () => <div className="text-center">Nombre</div>,
+      cell: ({ row }) => <div className="text-center font-bold">{row.getValue("nombre")}</div>,
     },
     {
       accessorKey: "costo_unitario",
-      header: "Costo unitario",
+      header: () => <div className="text-center">Costo unitario</div>,
       cell: ({ row }) => {
         const costoUnitario = row.getValue("costo_unitario") as number;
-        return <p>{formatCurrency(costoUnitario, "ARS", 0)}</p>;
+        return <div className="text-center">{formatCurrency(costoUnitario, "ARS", 0)}</div>;
       },
     },
     {
       accessorKey: "cantidad_necesaria",
-      header: "Cantidad necesaria",
+      header: () => <div className="text-center">Cantidad necesaria</div>,
       cell: ({ row }) => {
         const cantidadNecesaria = row.getValue("cantidad_necesaria") as number;
-        return <p>{cantidadNecesaria}</p>;
+        return <div className="text-center">{cantidadNecesaria}</div>;
       },
     },
     {
       accessorKey: "precio_lote",
-      header: "Precio por lote",
+      header: () => <div className="text-center">Precio por lote</div>,
       cell: ({ row }) => {
         const precioLote = row.getValue("precio_lote") as number;
-        return <p>{formatCurrency(precioLote, "ARS", 0)}</p>;
+        return <div className="text-center">{formatCurrency(precioLote, "ARS", 0)}</div>;
       },
     },
     {
       accessorKey: "cantidad_lote",
-      header: "Cantidad por lote",
+      header: () => <div className="text-center">Cantidad por lote</div>,
       cell: ({ row }) => {
         const cantidadLote = row.getValue("cantidad_lote") as number;
-        return <p>{cantidadLote}</p>;
+        return <div className="text-center">{cantidadLote}</div>;
       },
     },
-    // Categoría column removed
     {
       accessorKey: "updated_at",
-      header: "Última actualización",
+      header: () => <div className="text-center">Última actualización</div>,
       cell: ({ row }) => {
         const updatedAt = row.getValue("updated_at") as string;
-        return <p>{formatDate(new Date(updatedAt))}</p>;
+        return <div className="text-center">{formatDate(new Date(updatedAt))}</div>;
       },
     },
     {
       accessorKey: "acciones",
-      header: "Acciones",
+      header: () => <div className="text-center">Acciones</div>,
       cell: ({ row }) => {
         const insumo = row.original;
         return (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center justify-center gap-2">
             <Button
               variant="ghost"
               size="icon"

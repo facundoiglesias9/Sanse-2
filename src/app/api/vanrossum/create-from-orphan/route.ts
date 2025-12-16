@@ -19,7 +19,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: "Falta orphan_id" }, { status: 400 });
     }
 
-    // 1) Get Orphan
+    // 1) Obtener huérfano
     const { data: orphan, error: eOrphan } = await supabase
       .from("precios_vanrossum_orphans")
       .select("*")
@@ -29,20 +29,20 @@ export async function POST(req: Request) {
     if (eOrphan) throw eOrphan;
     if (!orphan) return NextResponse.json({ ok: false, error: "Huérfano no encontrado" }, { status: 404 });
 
-    // 2) Get Provider VR
+    // 2) Obtener proveedor VR
     const { data: provs, error: eProv } = await supabase.from("proveedores").select("id, nombre");
     if (eProv) throw eProv;
     const vr = (provs ?? []).find((p) => (p.nombre || "").trim().toLowerCase() === "van rossum");
     if (!vr) return NextResponse.json({ ok: false, error: 'No existe el proveedor "Van Rossum"' }, { status: 400 });
 
-    // 3) Create Essence
+    // 3) Crear esencia
     const { data: newEssence, error: eCreate } = await supabase
       .from("esencias")
       .insert({
         nombre: orphan.nombre,
         genero: orphan.genero || null,
         proveedor_id: vr.id,
-        // Initial values from orphan
+        // Valores iniciales del huérfano
         precio_ars: orphan.precio_ars_100g ?? null,
         precio_ars_100g: orphan.precio_ars_100g ?? null,
         cantidad_gramos: 100,
@@ -55,9 +55,9 @@ export async function POST(req: Request) {
 
     if (eCreate) throw eCreate;
 
-    // 4) Create Alias (Self-reference for future matches)
-    // Sometimes the orphan name might be slightly different from what we want as canonical, but here we just used it as name.
-    // Let's add it as alias anyway to be safe for re-scraping logic.
+    // 4) Crear alias (Autorreferencia para futuras coincidencias)
+    // A veces el nombre del huérfano puede ser ligeramente diferente de lo que queremos como canónico, pero aquí solo lo usamos como nombre.
+    // Vamos a añadirlo como alias de todos modos para estar seguros en la lógica de rescrapeo.
     {
       const { error: aliasErr } = await supabase
         .from("esencias_alias")
@@ -68,7 +68,7 @@ export async function POST(req: Request) {
       }
     }
 
-    // 5) Insert Price History
+    // 5) Insertar historial de precios
     {
       const insertRow = {
         esencia_id: newEssence.id,
@@ -83,7 +83,7 @@ export async function POST(req: Request) {
       if (ePrecio) throw ePrecio;
     }
 
-    // 6) Resolve Orphan
+    // 6) Resolver huérfano
     {
       const hasResolvedColumns = "resolved_at" in orphan || "resolved_by" in orphan;
       if (hasResolvedColumns) {

@@ -9,22 +9,7 @@ import { capitalizeFirstLetter } from "@/app/helpers/capitalizeFirstLetter";
 import { formatDate } from "@/app/helpers/formatDate";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
-function getLowStockMeta(it: { tipo: string; nombre: string; cantidad: number; }) {
-  const tipo = (it.tipo || "").trim();
-  const name = (it.nombre || "").trim().toLowerCase();
-
-  if (tipo === "Perfume") return { low: false, threshold: null };
-  if (tipo === "Frasco") return { low: it.cantidad <= 4, threshold: 4 };
-  if (tipo === "Etiqueta") return { low: it.cantidad <= 4, threshold: 4 };
-  if (tipo === "Esencia") return { low: it.cantidad <= 15, threshold: 15 };
-
-  if (tipo === "Insumo") {
-    if (name.includes("alcohol")) return { low: it.cantidad <= 500, threshold: 500 };
-    if (name.includes("bolsas de madera")) return { low: it.cantidad <= 10, threshold: 10 };
-  }
-
-  return { low: false, threshold: null };
-}
+import { getLowStockMeta } from "@/app/helpers/stock-logic";
 
 export const inventarioColumns = (
   onConfirmDelete: (id: string) => void,
@@ -74,69 +59,73 @@ export const inventarioColumns = (
     },
     {
       accessorKey: "tipo",
-      header: "Tipo",
+      header: () => <div className="text-center">Tipo</div>,
       cell: ({ row }) => {
         const tipo = row.getValue("tipo") as string;
         return (
-          <Badge
-            variant={
-              tipo === "Frasco"
-                ? "outline"
-                : tipo === "Insumo"
-                  ? "warning"
-                  : tipo === "Esencia"
-                    ? "purple"
-                    : tipo === "Perfume"
-                      ? "success"
-                      : "default"
-            }
-          >
-            {tipo}
-          </Badge>
+          <div className="flex justify-center">
+            <Badge
+              variant={
+                tipo === "Frasco"
+                  ? "outline"
+                  : tipo === "Insumo"
+                    ? "warning"
+                    : tipo === "Esencia"
+                      ? "purple"
+                      : tipo === "Perfume"
+                        ? "success"
+                        : "default"
+              }
+            >
+              {tipo}
+            </Badge>
+          </div>
         );
       },
     },
     {
       accessorKey: "genero",
-      header: "Género",
+      header: () => <div className="text-center">Género</div>,
       cell: ({ row }) => {
         const genero = row.getValue("genero") as string;
         return (
-          <Badge
-            variant={genero === "masculino"
-              ? "indigo"
-              : genero === "femenino"
-                ? "pink"
-                : genero === "ambiente"
-                  ? "warning"
-                  : "default"
-            }
-          >
-            {capitalizeFirstLetter(genero)}
-          </Badge>
+          <div className="flex justify-center">
+            <Badge
+              variant={genero === "masculino"
+                ? "indigo"
+                : genero === "femenino"
+                  ? "pink"
+                  : genero === "ambiente"
+                    ? "warning"
+                    : "default"
+              }
+            >
+              {capitalizeFirstLetter(genero)}
+            </Badge>
+          </div>
         );
       },
     },
     {
       accessorKey: "cantidad",
-      header: "Cantidad",
-      cell: ({ row }) => <p>{row.getValue("cantidad") as number}</p>,
+      header: () => <div className="text-center">Cantidad</div>,
+      cell: ({ row }) => <div className="text-center font-medium">{row.getValue("cantidad") as number}</div>,
     },
     {
       accessorKey: "updated_at",
-      header: "Última actualización",
+      header: () => <div className="text-center">Última actualización</div>,
       cell: ({ row }) => {
         const updatedAt = row.getValue("updated_at") as string;
-        return <p>{formatDate(new Date(updatedAt))}</p>;
+        return <div className="text-center text-muted-foreground text-sm">{formatDate(new Date(updatedAt))}</div>;
       },
     },
     {
       accessorKey: "acciones",
-      header: "Acciones",
+      header: () => <div className="text-center">Acciones</div>,
       cell: ({ row }) => {
         const it = row.original;
         return (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center justify-center gap-2">
             <Button
               variant="ghost"
               size="icon"

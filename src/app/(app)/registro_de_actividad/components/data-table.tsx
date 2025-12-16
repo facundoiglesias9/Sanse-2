@@ -77,15 +77,6 @@ export function DataTable<TData>({
     return parts.length > 1 ? parts[1].trim() : "";
   };
 
-  const hasRealChanges = (row: any): boolean => {
-    const extra = getExtra(row);
-    if (!extra?.antes || !extra?.despues) return false;
-    for (const k of Object.keys(extra.antes)) {
-      if (extra.antes[k] !== extra.despues[k]) return true;
-    }
-    return false;
-  };
-
   // Armamos opciones de "tabla" a partir de los datos actuales
   const tablaOptions: string[] = useMemo(() => {
     const set = new Set<string>();
