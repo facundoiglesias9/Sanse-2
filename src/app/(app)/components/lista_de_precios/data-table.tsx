@@ -18,7 +18,7 @@ import { NumberInput } from "@/components/ui/number-input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { DataTablePagination } from "@/components/ui/data-table-pagination";
 import { AnimatePresence, motion } from "framer-motion";
-import { Loader2, Plus, Trash2, ShoppingCart, FileSpreadsheet, Download, Copy, Check, ClipboardList } from "lucide-react";
+import { Loader2, Trash2, ShoppingCart, FileSpreadsheet, Download, Copy, Check, ClipboardList } from "lucide-react";
 import {
   ColumnDef,
   ColumnFiltersState,
@@ -326,6 +326,52 @@ export function DataTable({
 
     setIsEditDialogOpen(true);
   };
+
+  // Cálculo en vivo para el diálogo de edición
+  const computedTotalCost = React.useMemo(() => {
+    // 2. Costo de Insumos
+    // Recalcular costo de otros insumos (excluyendo la esencia virtual)
+    const othersCost = editInsumos
+      .filter(i => i.id !== "virtual-esencia")
+      .reduce((acc, i) => acc + unitCost(i), 0);
+
+    // Costo base desde el input (asumiendo que es el costo de la esencia en sí)
+    // Necesitamos 'gramos' y 'baseGramos'.
+    // En el diálogo de edición no tenemos acceso fácil a 'gramos_configurados' vivo a menos que busquemos el proveedor...
+    // pero 'editInsumos' tiene la 'virtual-esencia' que tiene 'cantidad_necesaria' (uso gramos) y 'cantidad_lote' (tamaño base).
+
+    const virtual = editInsumos.find(i => i.id === "virtual-esencia");
+    let baseCost = 0;
+    if (virtual) {
+      // Si tenemos la esencia virtual, usar sus cantidades pero el precio VIVO del input
+      const price = parseFloat(editPrecioArs) || 0; // El precio del lote (ej: 100g)
+      const size = virtual.cantidad_lote || 100;
+      const usage = virtual.cantidad_necesaria || 0;
+      baseCost = (price / size) * usage;
+    } else {
+      // Respaldo si no se encuentra esencia virtual (no debería pasar para perfumes)
+      baseCost = parseFloat(editPrecioArs) || 0;
+    }
+
+    return baseCost + othersCost;
+  }, [editPrecioArs, editInsumos]);
+
+  const computedSuggMinorista = React.useMemo(() => {
+    const margin = parseFloat(editMargenMinorista) || 0;
+    return computedTotalCost * (1 + margin / 100);
+  }, [computedTotalCost, editMargenMinorista]);
+
+  const computedSuggMayorista = React.useMemo(() => {
+    // Lógica desde page.tsx:
+    // si existe margen mayorista, usarlo. Si no, aplicar descuento por defecto.
+
+    const margin = parseFloat(editMargenMayorista);
+    if (!isNaN(margin)) {
+      return computedTotalCost * (1 + margin / 100);
+    }
+    // Descuento por defecto 15% del minorista si es nulo
+    return computedSuggMinorista * 0.85;
+  }, [computedTotalCost, computedSuggMinorista, editMargenMayorista]);
 
   const confirmDelete = async () => {
     if (!productToDelete) return;
@@ -1730,6 +1776,33 @@ export function DataTable({
               <p className="text-[10px] text-muted-foreground pl-1">
                 * El costo final se calcula sumando el costo base + costos de insumos.
               </p>
+            </div>
+
+            {/* Previsualización de Costos en Vivo de Costos */}
+            <div className="rounded-lg border p-4 bg-muted/20 space-y-3">
+              <h4 className="font-semibold text-sm flex items-center gap-2">
+                <Check className="w-4 h-4 text-green-600" /> Resumen Estimado
+              </h4>
+              <div className="grid grid-cols-3 gap-4 text-sm">
+                <div className="space-y-1">
+                  <span className="text-muted-foreground text-xs">Costo Total</span>
+                  <div className="font-medium text-lg text-slate-700">
+                    {formatCurrency(computedTotalCost, "ARS")}
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <span className="text-muted-foreground text-xs">Sug. Minorista</span>
+                  <div className="font-bold text-lg text-primary">
+                    {formatCurrency(computedSuggMinorista, "ARS")}
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <span className="text-muted-foreground text-xs">Sug. Mayorista</span>
+                  <div className="font-bold text-lg text-blue-600">
+                    {formatCurrency(computedSuggMayorista, "ARS")}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
           <DialogFooter>

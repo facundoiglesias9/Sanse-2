@@ -46,7 +46,7 @@ export default function ListaDePreciosPage() {
   if (userRole === "comprador") view = "minorista"; // El comprador siempre ve minorista
 
   const fetchListaDePrecios = async () => {
-    if (userRole === null) return; // Wait for role to be determined
+    if (userRole === null) return; // Esperar a que se determine el rol
     setLoadingTableListaDePrecios(true);
 
     const { data: esencias } = await supabase
@@ -81,7 +81,7 @@ export default function ListaDePreciosPage() {
       .map((esencia) => {
         let precioFinalArs = 0;
 
-        let baseGramos = 0; // The size corresponding to precioFinalArs
+        let baseGramos = 0; // El tamaño correspondiente a precioFinalArs
 
         // Prioridad al precio de 100g, si existe
         const precio100g = precio100gByEsencia.get(esencia.id);
@@ -114,10 +114,13 @@ export default function ListaDePreciosPage() {
 
             if (insumoReal) {
               const costoU = insumoReal.cantidad_lote > 0
-                ? (insumoReal.precio_lote / insumoReal.cantidad_lote)
+                ? (Number(insumoReal.precio_lote) / Number(insumoReal.cantidad_lote))
                 : 0;
-              // Usamos la cantidad guardada en la receta
-              return acc + (costoU * (customIns.cantidad || 0));
+
+              const qty = Number(customIns.cantidad_necesaria || customIns.cantidad || 0);
+              const totalInsumo = Number(costoU) * qty;
+
+              return Number(acc) + totalInsumo;
             }
             return acc;
           }, 0);
@@ -129,7 +132,7 @@ export default function ListaDePreciosPage() {
         }
 
         const costoTotal =
-          costoMateriaPrima + costoFrasco + costoOtrosInsumos;
+          Number(costoMateriaPrima) + Number(costoFrasco) + Number(costoOtrosInsumos);
 
         // Margen Minorista
         const margenPorcentaje = esencia.margen_minorista ?? (esencia.proveedores?.margen_venta ?? 100);
@@ -220,13 +223,4 @@ export default function ListaDePreciosPage() {
   );
 }
 
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Trophy, Gift } from "lucide-react";
+
