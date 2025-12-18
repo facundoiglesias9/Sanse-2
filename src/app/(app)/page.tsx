@@ -182,6 +182,26 @@ export default function ListaDePreciosPage() {
         };
       });
 
+    // Ordenar por Categoría (Fina primero) -> Nombre
+    perfumesCalculados.sort((a, b) => {
+      const catA = (a.insumos_categorias?.nombre || "").toLowerCase();
+      const catB = (b.insumos_categorias?.nombre || "").toLowerCase();
+
+      const isFinaA = catA.includes("perfumería fina");
+      const isFinaB = catB.includes("perfumería fina");
+
+      // 1. Prioridad: Perfumería Fina primero
+      if (isFinaA && !isFinaB) return -1;
+      if (!isFinaA && isFinaB) return 1;
+
+      // 2. Alfabetico por Categoría
+      if (catA < catB) return -1;
+      if (catA > catB) return 1;
+
+      // 3. Alfabetico por Nombre
+      return a.nombre.localeCompare(b.nombre);
+    });
+
     setPerfumes(perfumesCalculados);
     setLoadingTableListaDePrecios(false);
   };
