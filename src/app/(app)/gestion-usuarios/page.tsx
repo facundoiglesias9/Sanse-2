@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Loader2, Pencil, Trash2, Plus, Users, ShieldCheck, ShieldAlert, UserCog } from "lucide-react";
+import { Loader2, Pencil, Trash2, Plus, Users, ShieldCheck, ShieldAlert, UserCog, Eye, EyeOff } from "lucide-react";
 import {
     Dialog,
     DialogContent,
@@ -46,6 +46,37 @@ import { updateUserPassword, deleteUser, createUser, getUsers, updateUserRole } 
 import { getGlobalConfig, updateGlobalConfig } from "@/app/actions/config-actions";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { getPasswordStrength, getStrengthLabel, passwordSchema } from "@/lib/password-utils";
+import { PasswordRequirements } from "@/components/password-requirements";
+import { cn } from "@/lib/utils";
+import { motion } from "framer-motion";
+
+function PasswordStrengthMeter({ password }: { password: string; }) {
+    const score = getPasswordStrength(password);
+    const strength = getStrengthLabel(score);
+
+    return (
+        <div className="mt-2">
+            <div className="flex justify-between items-center mb-1">
+                <span className="text-xs text-muted-foreground">Fortaleza</span>
+                <span className={cn("text-xs font-medium",
+                    score >= 4 ? "text-green-600" :
+                        score === 3 ? "text-yellow-600" : "text-red-600"
+                )}>
+                    {strength.text}
+                </span>
+            </div>
+            <div className="h-1.5 w-full bg-secondary rounded-full overflow-hidden">
+                <motion.div
+                    className={cn("h-full", strength.color)}
+                    initial={{ width: 0 }}
+                    animate={{ width: `${(score / 5) * 100}%` }}
+                    transition={{ duration: 0.3 }}
+                />
+            </div>
+        </div>
+    );
+}
 
 export default function GestionUsuariosPage() {
     const [isMaintenanceMode, setIsMaintenanceMode] = useState(false);
@@ -71,6 +102,14 @@ export default function GestionUsuariosPage() {
     const [newUserPassword, setNewUserPassword] = useState("");
     const [newUserRole, setNewUserRole] = useState("comprador");
     const [isCreating, setIsCreating] = useState(false);
+
+    // Estado visibilidad contraseñas
+    const [showNewPassword, setShowNewPassword] = useState(false);
+    const [showCreateUserPassword, setShowCreateUserPassword] = useState(false);
+
+    // Estado foco inputs contraseña
+    const [isNewPasswordFocused, setIsNewPasswordFocused] = useState(false);
+    const [isCreateUserPasswordFocused, setIsCreateUserPasswordFocused] = useState(false);
 
     // Obtener usuarios y config
     const fetchProfiles = async () => {
@@ -144,8 +183,11 @@ export default function GestionUsuariosPage() {
             toast.error("Por favor complete todos los campos");
             return;
         }
-        if (newUserPassword.length < 6) {
-            toast.error("La contraseña debe tener al menos 6 caracteres");
+
+        if (!passwordSchema.safeParse(newUserPassword).success) {
+            toast.error("Contraseña insegura", {
+                description: "Debe tener 8+ caracteres, mayúscula, minúscula, número y símbolo."
+            });
             return;
         }
 
@@ -171,8 +213,11 @@ export default function GestionUsuariosPage() {
 
     const handleSavePassword = async () => {
         if (!selectedUser) return;
-        if (newPassword.length < 6) {
-            toast.error("La contraseña debe tener al menos 6 caracteres");
+
+        if (!passwordSchema.safeParse(newPassword).success) {
+            toast.error("Contraseña insegura", {
+                description: "Debe tener 8+ caracteres, mayúscula, minúscula, número y símbolo."
+            });
             return;
         }
 
@@ -393,13 +438,36 @@ export default function GestionUsuariosPage() {
                     <div className="grid gap-4 py-4">
                         <div className="space-y-2">
                             <Label htmlFor="password">Nueva contraseña</Label>
-                            <Input
-                                id="password"
-                                type="text"
-                                placeholder="Mínimo 6 caracteres..."
-                                value={newPassword}
-                                onChange={(e) => setNewPassword(e.target.value)}
-                            />
+                            <div className="relative">
+                                <Input
+                                    id="password"
+                                    type={showNewPassword ? "text" : "password"}
+                                    placeholder="Mínimo 8 caracteres..."
+                                    value={newPassword}
+                                    onChange={(e) => setNewPassword(e.target.value)}
+                                    onFocus={() => setIsNewPasswordFocused(true)}
+                                    onBlur={() => setIsNewPasswordFocused(false)}
+                                />
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                                    onClick={() => setShowNewPassword(!showNewPassword)}
+                                >
+                                    {showNewPassword ? (
+                                        <EyeOff className="h-4 w-4 text-muted-foreground" />
+                                    ) : (
+                                        <Eye className="h-4 w-4 text-muted-foreground" />
+                                    )}
+                                </Button>
+                            </div>
+                            {isNewPasswordFocused && (
+                                <div className="absolute top-full left-0 w-full mt-1 z-50">
+                                    <PasswordRequirements password={newPassword} />
+                                </div>
+                            )}
+                            <PasswordStrengthMeter password={newPassword} />
                         </div>
                     </div>
                     <DialogFooter>
@@ -471,13 +539,36 @@ export default function GestionUsuariosPage() {
                         </div>
                         <div className="grid gap-2">
                             <Label htmlFor="newPassword">Contraseña Inicial</Label>
-                            <Input
-                                id="newPassword"
-                                type="password"
-                                placeholder="********"
-                                value={newUserPassword}
-                                onChange={(e) => setNewUserPassword(e.target.value)}
-                            />
+                            <div className="relative">
+                                <Input
+                                    id="newPassword"
+                                    type={showCreateUserPassword ? "text" : "password"}
+                                    placeholder="********"
+                                    value={newUserPassword}
+                                    onChange={(e) => setNewUserPassword(e.target.value)}
+                                    onFocus={() => setIsCreateUserPasswordFocused(true)}
+                                    onBlur={() => setIsCreateUserPasswordFocused(false)}
+                                />
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                                    onClick={() => setShowCreateUserPassword(!showCreateUserPassword)}
+                                >
+                                    {showCreateUserPassword ? (
+                                        <EyeOff className="h-4 w-4 text-muted-foreground" />
+                                    ) : (
+                                        <Eye className="h-4 w-4 text-muted-foreground" />
+                                    )}
+                                </Button>
+                            </div>
+                            {isCreateUserPasswordFocused && (
+                                <div className="absolute top-full left-0 w-full mt-1 z-50">
+                                    <PasswordRequirements password={newUserPassword} />
+                                </div>
+                            )}
+                            <PasswordStrengthMeter password={newUserPassword} />
                         </div>
                     </div>
                     <DialogFooter>

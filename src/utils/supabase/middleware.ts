@@ -67,6 +67,7 @@ export async function updateSession(request: NextRequest) {
         currentPath === "/" ||
         currentPath.startsWith("/login") ||
         currentPath.startsWith("/auth") ||
+        currentPath.startsWith("/caja/solicitudes") ||
         currentPath.startsWith("/api"); // Permitir API requests si es necesario, o restringir también
 
       // Si intenta acceder a cualquier otra cosa, redirigir a "/"
