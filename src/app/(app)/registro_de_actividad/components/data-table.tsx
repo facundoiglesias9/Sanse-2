@@ -139,7 +139,7 @@ export function DataTable<TData>({
       const payload = (filteredData as any[]).map(shapeForExport);
       const text = JSON.stringify(payload, null, 2);
       await navigator.clipboard.writeText(text);
-      toast(`Copiado en formato JSON (${payload.length} registros)`);
+      toast.success(`Copiado en formato JSON (${payload.length} registros)`);
     } catch {
       toast.error("No se pudo copiar al portapapeles");
     }
