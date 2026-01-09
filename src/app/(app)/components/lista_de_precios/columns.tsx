@@ -82,7 +82,7 @@ const allColumns: ColumnDef<Perfume>[] = [
         </Button>
       );
     },
-    cell: ({ row }) => <p className="font-bold">{row.getValue("nombre")}</p>,
+    cell: ({ row }) => <p className="font-bold break-words">{row.getValue("nombre")}</p>,
   },
   {
     accessorKey: "insumos_categorias.nombre", // Accessor para ordenamiento potencial

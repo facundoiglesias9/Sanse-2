@@ -24,18 +24,18 @@ export function DataTablePagination<TData>({
   enableRowSelection = false,
 }: DataTablePaginationProps<TData>) {
   return (
-    <div className="flex items-center justify-between px-2 mb-6">
+    <div className="flex flex-col gap-4 items-center justify-between px-2 mb-6 md:flex-row">
       {enableRowSelection ? (
-        <div className="text-muted-foreground flex-1 text-sm">
+        <div className="text-muted-foreground flex-1 text-sm text-center md:text-left">
           {table.getFilteredSelectedRowModel().rows.length} de{" "}
           {table.getFilteredRowModel().rows.length} fila(s) seleccionada(s).
         </div>
       ) : (
-        <div className="text-muted-foreground flex-1 text-sm">
+        <div className="text-muted-foreground flex-1 text-sm text-center md:text-left">
           Total de {table.getFilteredRowModel().rows.length} fila(s).
         </div>
       )}
-      <div className="flex items-center space-x-6 lg:space-x-8">
+      <div className="flex flex-col items-center gap-4 sm:flex-row sm:gap-6 lg:gap-8">
         <div className="flex items-center space-x-2">
           <p className="text-sm font-medium">Filas por página</p>
           <Select
