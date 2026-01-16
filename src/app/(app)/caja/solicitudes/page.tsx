@@ -43,7 +43,7 @@ export default function SolicitudesPage() {
 
     // Dialog state
     const [isDialogOpen, setIsDialogOpen] = useState(false);
-    const [selectedSolicitud, setSelectedSolicitud] = useState<{ id: string, status: 'rechazado' | 'cancelado' } | null>(null);
+    const [selectedSolicitud, setSelectedSolicitud] = useState<{ id: string, status: 'rechazado' | 'cancelado'; } | null>(null);
     const [rejectionReason, setRejectionReason] = useState("");
 
     useEffect(() => {
@@ -229,7 +229,7 @@ export default function SolicitudesPage() {
     const rechazados = solicitudes.filter(s => s.estado === "rechazado");
     const cancelados = solicitudes.filter(s => s.estado === "cancelado");
 
-    const RenderCard = ({ solicitud }: { solicitud: Solicitud }) => (
+    const RenderCard = ({ solicitud }: { solicitud: Solicitud; }) => (
         <motion.div
             layout
             layoutId={solicitud.id}
@@ -265,13 +265,15 @@ export default function SolicitudesPage() {
                                     <div key={idx} className="text-sm border-l-2 pl-2 border-muted flex flex-col">
                                         <span className="font-medium text-foreground">{item.perfume?.nombre}</span>
                                         <span className="text-xs text-muted-foreground flex items-center gap-1">
-                                            <Badge variant="outline" className="text-[10px] py-0 h-4 px-1">{provName}</Badge>
+                                            {userRole === 'admin' && (
+                                                <Badge variant="outline" className="text-[10px] py-0 h-4 px-1">{provName}</Badge>
+                                            )}
                                             <span>x {item.cantidad}</span>
                                             <span>• {item.genero}</span>
                                             {item.frascoLP && <span>• {item.frascoLP}</span>}
                                         </span>
                                     </div>
-                                )
+                                );
                             })
                         ) : (
                             <p className="text-sm italic text-muted-foreground">{solicitud.detalle}</p>
