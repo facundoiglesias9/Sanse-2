@@ -4,23 +4,13 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { formatCurrency } from "@/app/helpers/formatCurrency";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from "@/components/ui/table";
+
 import { Badge } from "@/components/ui/badge";
 import {
-    TrendingUp,
     User,
     Trophy,
     Calendar,
     DollarSign,
-    Users,
-    ArrowRight,
     ShoppingBag,
     Gift
 } from "lucide-react";
@@ -40,7 +30,7 @@ import {
     DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { startOfMonth, subMonths, isAfter, startOfDay, endOfDay } from "date-fns";
+import { startOfMonth, subMonths, isAfter, startOfDay } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
@@ -438,7 +428,7 @@ export default function VentasRevendedoresPage() {
                                             </div>
                                         </CardContent>
                                     </Card>
-                                )
+                                );
                             })}
                         </div>
                     </div>

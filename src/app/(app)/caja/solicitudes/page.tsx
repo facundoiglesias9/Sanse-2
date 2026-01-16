@@ -37,7 +37,7 @@ export default function SolicitudesPage() {
     const supabase = createClient();
     const [solicitudes, setSolicitudes] = useState<Solicitud[]>([]);
     const [proveedores, setProveedores] = useState<any[]>([]); // Lista de proveedores
-    const [loading, setLoading] = useState(true);
+    const [_loading, setLoading] = useState(true);
     const [userRole, setUserRole] = useState<string | null>(null);
     const [userName, setUserName] = useState<string | null>(null);
 

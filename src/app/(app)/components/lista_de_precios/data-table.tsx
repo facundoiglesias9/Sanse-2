@@ -414,7 +414,7 @@ export function DataTable({
         margen_minorista: parseFloat(editMargenMinorista) || null,
         margen_mayorista: parseFloat(editMargenMayorista) || null,
         custom_insumos: customInsumosToSave.length > 0 ? customInsumosToSave : null,
-        custom_insumos: customInsumosToSave.length > 0 ? customInsumosToSave : null,
+
         familia_olfativa: (productToEdit.insumos_categorias_id === "999b53c3-f181-4910-86fd-5c5b1f74af7b" ||
           insumosCategorias.find(c => c.id === productToEdit.insumos_categorias_id)?.nombre.toLowerCase().includes("aromatizante"))
           ? productToEdit.familia_olfativa : null
@@ -626,7 +626,7 @@ export function DataTable({
       XLSX.writeFile(wb, `lista_${view}_${mesSlug}.xlsx`, { bookType: "xlsx", type: "binary" });
       toast.success("Descarga iniciada", { id, duration: 2000 });
       setIsExportDialogOpen(false);
-    } catch (e) {
+    } catch (_e) {
       toast.error("Hubo un problema al generar el archivo", { id });
     }
   }

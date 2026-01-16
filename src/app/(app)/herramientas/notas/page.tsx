@@ -13,7 +13,7 @@ import { z } from "zod";
 import ModernCardNote from "@/app/(app)/herramientas/notas/components/modern-card-note";
 import { AnimatePresence, motion } from "framer-motion";
 import { Calendar22 } from "@/components/calendar-22";
-import { Loader2, Plus, User, Flag, Calendar, Filter } from "lucide-react";
+import { Loader2, Plus, User, Flag, Calendar } from "lucide-react";
 import {
     Dialog,
     DialogContent,
