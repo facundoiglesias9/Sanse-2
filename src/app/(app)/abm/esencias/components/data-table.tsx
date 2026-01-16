@@ -7,7 +7,7 @@ import { Esencia } from "@/app/types/esencia";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DataTablePagination } from "@/components/ui/data-table-pagination";
-import { X, Plus } from "lucide-react";
+import { X, Plus, Filter, Search } from "lucide-react";
 import {
   ColumnDef,
   ColumnFiltersState,
@@ -144,13 +144,14 @@ export function DataTable<TData>({
       <div className="flex flex-col xl:flex-row items-center justify-between gap-4 mb-4">
         <div className="flex flex-wrap items-center gap-4 w-full xl:w-auto">
           <div className="relative max-w-sm w-full sm:w-auto">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Buscar por nombre..."
               value={filterValue}
               onChange={(event) =>
                 table.getColumn("nombre")?.setFilterValue(event.target.value)
               }
-              className="pr-10"
+              className="pl-9 pr-10 bg-background"
             />
             {filterValue !== "" && (
               <Button
@@ -164,22 +165,20 @@ export function DataTable<TData>({
             )}
           </div>
           <Select
-            value={
-              typeof table.getColumn("genero")?.getFilterValue() === "string"
-                ? (table.getColumn("genero")?.getFilterValue() as string)
-                : "todos"
-            }
             onValueChange={(value) =>
               table
                 .getColumn("genero")
                 ?.setFilterValue(value === "todos" ? undefined : value)
             }
           >
-            <SelectTrigger className="w-[150px]">
-              <SelectValue placeholder="Filtrar por género" />
+            <SelectTrigger className="w-[150px] bg-background">
+              <div className="flex items-center gap-2 truncate">
+                <Filter className="w-3.5 h-3.5 text-muted-foreground" />
+                <SelectValue placeholder="Género" />
+              </div>
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="todos">Todos</SelectItem>
+              <SelectItem value="todos">Todos los proveedores</SelectItem>
               <SelectItem value="masculino">Masculino</SelectItem>
               <SelectItem value="femenino">Femenino</SelectItem>
               <SelectItem value="ambiente">Ambiente</SelectItem>
@@ -187,28 +186,53 @@ export function DataTable<TData>({
             </SelectContent>
           </Select>
           <Select
-            value={
-              typeof table.getColumn("proveedor_id")?.getFilterValue() ===
-                "string"
-                ? (table.getColumn("proveedor_id")?.getFilterValue() as string)
-                : "todos"
-            }
             onValueChange={(value) =>
               table
                 .getColumn("proveedor_id")
                 ?.setFilterValue(value === "todos" ? undefined : value)
             }
           >
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Filtrar por proveedor" />
+            <SelectTrigger className="w-[180px] bg-background">
+              <div className="flex items-center gap-2 truncate">
+                <Filter className="w-3.5 h-3.5 text-muted-foreground" />
+                <SelectValue placeholder="Proveedor" />
+              </div>
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="todos">Todos</SelectItem>
+              <SelectItem value="todos">Todos los géneros</SelectItem>
               {proveedores.map((p) => (
                 <SelectItem key={p.id} value={p.id}>
                   {p.nombre}
                 </SelectItem>
               ))}
+            </SelectContent>
+          </Select>
+          <Select
+            onValueChange={(value) =>
+              table
+                .getColumn("familia_olfativa")
+                ?.setFilterValue(value === "todos" ? undefined : value)
+            }
+          >
+            <SelectTrigger className="w-[180px] bg-background">
+              <div className="flex items-center gap-2 truncate">
+                <Filter className="w-3.5 h-3.5 text-muted-foreground" />
+                <SelectValue placeholder="Familia Olfativa" />
+              </div>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todas las familias</SelectItem>
+              <SelectItem value="Cítrico">Cítrico</SelectItem>
+              <SelectItem value="Floral">Floral</SelectItem>
+              <SelectItem value="Amaderado">Amaderado</SelectItem>
+              <SelectItem value="Frutal">Frutal</SelectItem>
+              <SelectItem value="Dulce">Dulce</SelectItem>
+              <SelectItem value="Especiado">Especiado</SelectItem>
+              <SelectItem value="Fresco">Fresco</SelectItem>
+              <SelectItem value="Oriental">Oriental</SelectItem>
+              <SelectItem value="Gourmand">Gourmand</SelectItem>
+              <SelectItem value="Herbal">Herbal</SelectItem>
+              <SelectItem value="Almizclada">Almizclada</SelectItem>
             </SelectContent>
           </Select>
         </div>

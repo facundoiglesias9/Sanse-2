@@ -22,6 +22,7 @@ export type Esencia = {
   } | null;
   is_consultar?: boolean;
   genero: "masculino" | "femenino" | "ambiente" | "otro";
+  familia_olfativa?: string | null;
   created_by: string;
   created_at: Date;
   updated_at: Date;

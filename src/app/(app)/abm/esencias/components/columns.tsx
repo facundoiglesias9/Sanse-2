@@ -173,6 +173,27 @@ export const esenciasColumns = (
       },
     },
     {
+      accessorKey: "familia_olfativa",
+      header: () => <div className="text-center">Familia Olfativa</div>,
+      filterFn: (row, id, value) => {
+        if (!value) return true;
+        const rowValue = row.getValue(id) as string | null;
+        if (!rowValue) return false;
+        return rowValue.includes(value);
+      },
+      cell: ({ row }) => {
+        const val = row.getValue("familia_olfativa") as string | null;
+        if (!val) return <div className="text-center">-</div>;
+        return (
+          <div className="flex justify-center">
+            <Badge variant="outline" className="max-w-[150px] truncate block" title={val}>
+              {val}
+            </Badge>
+          </div>
+        );
+      },
+    },
+    {
       accessorKey: "updated_at",
       header: () => <div className="text-center">Última actualización</div>,
       cell: ({ row }) => {

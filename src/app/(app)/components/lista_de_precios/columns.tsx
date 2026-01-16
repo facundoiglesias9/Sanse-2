@@ -312,6 +312,27 @@ const allColumns: ColumnDef<Perfume>[] = [
     },
   },
   {
+    accessorKey: "familia_olfativa",
+    header: () => <div className="text-center">Familia Olfativa</div>,
+    filterFn: (row, id, value) => {
+      if (!value) return true;
+      const rowValue = row.getValue(id) as string | null;
+      if (!rowValue) return false;
+      return rowValue.includes(value);
+    },
+    cell: ({ row }) => {
+      const val = row.getValue("familia_olfativa") as string | null;
+      if (!val) return <div className="text-center">-</div>;
+      return (
+        <div className="flex justify-center">
+          <Badge variant="outline" className="max-w-[150px] truncate block" title={val}>
+            {val}
+          </Badge>
+        </div>
+      );
+    },
+  },
+  {
     id: "acciones",
     header: () => <div className="text-center">Acciones</div>,
     cell: ({ row, table }) => {
@@ -369,6 +390,8 @@ export const getListaPreciosColumns = (
       if (key === "costo") return false;
       if (key === "precio") return false;
     }
+
+    // Ocultar familia olfativa si es comprador? (Opcional, pero el usuario pidió filtrar, así que dejarlo)
 
     return true;
   });

@@ -20,6 +20,7 @@ export type Perfume = {
   id: string;
   nombre: string;
   genero: Genero;
+  familia_olfativa?: string | null;
   costo: number;
   precio: number;
   precio_mayorista: number;

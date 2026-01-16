@@ -46,6 +46,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { MultiSelect } from "@/components/ui/multi-select";
 import {
   Dialog,
   DialogContent,
@@ -412,7 +413,11 @@ export function DataTable({
         nombre: editName,
         margen_minorista: parseFloat(editMargenMinorista) || null,
         margen_mayorista: parseFloat(editMargenMayorista) || null,
-        custom_insumos: customInsumosToSave.length > 0 ? customInsumosToSave : null
+        custom_insumos: customInsumosToSave.length > 0 ? customInsumosToSave : null,
+        custom_insumos: customInsumosToSave.length > 0 ? customInsumosToSave : null,
+        familia_olfativa: (productToEdit.insumos_categorias_id === "999b53c3-f181-4910-86fd-5c5b1f74af7b" ||
+          insumosCategorias.find(c => c.id === productToEdit.insumos_categorias_id)?.nombre.toLowerCase().includes("aromatizante"))
+          ? productToEdit.familia_olfativa : null
       };
 
       if (editPrecioArs !== "") updates.precio_ars = parseFloat(editPrecioArs) || null;
@@ -1488,6 +1493,34 @@ export function DataTable({
             </SelectContent>
           </Select>
 
+          {/* Filtro Familia Olfativa */}
+          <Select
+            onValueChange={(value) =>
+              table.getColumn("familia_olfativa")?.setFilterValue(value === "todos" ? undefined : value)
+            }
+          >
+            <SelectTrigger className="w-full min-[960px]:w-[180px] bg-background">
+              <div className="flex items-center gap-2 truncate">
+                <Filter className="w-3.5 h-3.5 text-muted-foreground" />
+                <SelectValue placeholder="Familia Olfativa" />
+              </div>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todas las familias</SelectItem>
+              <SelectItem value="Cítrico">Cítrico</SelectItem>
+              <SelectItem value="Floral">Floral</SelectItem>
+              <SelectItem value="Amaderado">Amaderado</SelectItem>
+              <SelectItem value="Frutal">Frutal</SelectItem>
+              <SelectItem value="Dulce">Dulce</SelectItem>
+              <SelectItem value="Especiado">Especiado</SelectItem>
+              <SelectItem value="Fresco">Fresco</SelectItem>
+              <SelectItem value="Oriental">Oriental</SelectItem>
+              <SelectItem value="Gourmand">Gourmand</SelectItem>
+              <SelectItem value="Herbal">Herbal</SelectItem>
+              <SelectItem value="Almizclada">Almizclada</SelectItem>
+            </SelectContent>
+          </Select>
+
           {/* Filtro Proveedor (Admin) */}
           {userRole === "admin" && (
             <Select
@@ -1815,6 +1848,40 @@ export function DataTable({
                 onChange={(e) => setEditName(e.target.value)}
               />
             </div>
+            {/* Familia Olfativa (Solo Aromatizantes) */}
+            {(() => {
+              const catId = productToEdit?.insumos_categorias_id;
+              const cat = insumosCategorias.find(c => c.id === catId);
+              const isAromatizante = cat?.nombre?.toLowerCase().includes("aromatizante") || catId === "999b53c3-f181-4910-86fd-5c5b1f74af7b";
+              const hasValue = !!productToEdit?.familia_olfativa;
+              return isAromatizante || hasValue;
+            })() && (
+                <div className="space-y-2">
+                  <Label htmlFor="familia_olfativa">Familia Olfativa</Label>
+                  <MultiSelect
+                    options={[
+                      { label: "Cítrico", value: "Cítrico" },
+                      { label: "Floral", value: "Floral" },
+                      { label: "Amaderado", value: "Amaderado" },
+                      { label: "Frutal", value: "Frutal" },
+                      { label: "Dulce", value: "Dulce" },
+                      { label: "Especiado", value: "Especiado" },
+                      { label: "Fresco", value: "Fresco" },
+                      { label: "Oriental", value: "Oriental" },
+                      { label: "Gourmand", value: "Gourmand" },
+                      { label: "Herbal", value: "Herbal" },
+                      { label: "Almizclada", value: "Almizclada" },
+                    ]}
+                    selected={productToEdit?.familia_olfativa ? productToEdit.familia_olfativa.split(",").map(s => s.trim()).filter(Boolean) : []}
+                    onChange={(selected) => {
+                      const val = selected.length > 0 ? selected.join(", ") : null;
+                      setProductToEdit(prev => prev ? ({ ...prev, familia_olfativa: val }) : null);
+                    }}
+                    placeholder="Seleccionar familias"
+                    className="w-full"
+                  />
+                </div>
+              )}
 
             {/* Costos Base */}
             <div className="grid grid-cols-2 gap-4">

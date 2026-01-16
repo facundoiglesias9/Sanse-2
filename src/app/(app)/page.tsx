@@ -164,6 +164,7 @@ export default function ListaDePreciosPage() {
           id: esencia.id,
           nombre: esencia.nombre,
           genero: esencia.genero,
+          familia_olfativa: esencia.familia_olfativa,
           proveedor: esencia.proveedor,
           costo: costoTotal,
           precio,
