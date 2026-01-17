@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { createClient } from "@/utils/supabase/client";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
+import { deductStockForSale } from "@/app/actions/inventory-actions";
 import { formatCurrency } from "@/app/helpers/formatCurrency";
 import {
   redondearAlCienMasCercano,
@@ -748,7 +749,40 @@ export function DataTable({
     }
 
     setIsLoadingForm(false);
-    await actualizarInventarioDespuesVenta(perfumesVendidos);
+    setIsLoadingForm(false);
+
+    // Nueva lógica unificada de descuento de stock basada en Reglas
+    try {
+      const saleItems = perfumesVendidos.map(p => {
+        const catName = insumosCategorias.find(c => c.id === p.perfume.insumos_categorias_id)?.nombre || "";
+        const provName = proveedores.find(pv => pv.id === p.perfume.proveedor_id)?.nombre || "";
+
+        return {
+          perfumeName: p.perfume.nombre,
+          gender: p.genero,
+          quantity: p.cantidad,
+          category: catName,
+          provider: provName
+        };
+      });
+
+      toast.promise(deductStockForSale(saleItems), {
+        loading: 'Actualizando inventario...',
+        success: (res) => {
+          if (res.success) {
+            if (res.logs && res.logs.length > 0) return `Inventario actualizado (${res.logs.length} reglas aplicadas)`;
+            return 'Venta registrada (Sin consumo de stock)';
+          } else {
+            throw new Error(res.message || "Error desconocido");
+          }
+        },
+        error: (err) => `Error inventario: ${err.message || err}`
+      });
+
+    } catch (err) {
+      console.error("Error invoking inventory action", err);
+    }
+
     setRowSelection({});
   };
 

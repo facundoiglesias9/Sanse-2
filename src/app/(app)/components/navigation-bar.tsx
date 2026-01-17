@@ -74,6 +74,11 @@ const herramientasLinks = [
     label: "Notas",
     description: "Gestionar notas.",
   },
+  {
+    href: "/herramientas/combos",
+    label: "Configuración de Combos",
+    description: "Definir combos de insumos que se descuentan al vender.",
+  },
 ];
 
 const linksUserbar = [

@@ -21,6 +21,8 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 
+import { deductStockForSale, getPerfumesDetails } from "@/app/actions/inventory-actions";
+
 type Solicitud = {
     id: string;
     created_at: string;
@@ -181,10 +183,83 @@ export default function SolicitudesPage() {
     };
 
     const handleEntregar = async (id: string) => {
-        const solicitud = solicitudes.find(s => s.id === id);
-        if (!solicitud) return;
+        // Fetch solicitud (items is stored in a JSON column)
+        const { data: solicitudBasic, error: fetchError } = await supabase
+            .from("solicitudes")
+            .select("*")
+            .eq("id", id)
+            .single();
 
-        // Optimistic Update ya hecho en handleUpdateStatus, pero si se llama directo:
+        if (fetchError || !solicitudBasic) {
+            console.error("Error fetching delivery details:", fetchError);
+            toast.error("Error al procesar entrega: " + (fetchError?.message || ""));
+            return;
+        }
+
+        // Items are stored in JSON column
+        const rawItems = Array.isArray(solicitudBasic.items) ? solicitudBasic.items : [];
+
+        // Manual Enrich (Fetch related real-time data using IDs from the JSON)
+        // Check for ID at root or nested object (defensive programming)
+        const perfumeIds = rawItems.map((i: any) => i.perfume_id || i.perfume?.id).filter(Boolean);
+        const catIds = rawItems.map((i: any) => i.insumos_categorias_id || i.insumos_categorias?.id).filter(Boolean);
+
+        let perfumesMap: Record<string, any> = {};
+        let providersMap: Record<string, string> = {};
+        let categoriesMap: Record<string, string> = {};
+
+        // Fetch Perfumes & Providers
+        if (perfumeIds.length > 0) {
+            // Use Server Action to fetch details (bypassing client-side 404/RLS issues)
+            const perfumesData = await getPerfumesDetails(perfumeIds);
+
+            if (perfumesData && perfumesData.length > 0) {
+                perfumesMap = perfumesData.reduce((acc: any, p: any) => ({ ...acc, [p.id]: p }), {});
+                const providerIds = perfumesData.map((p: any) => p.proveedor_id).filter(Boolean);
+                if (providerIds.length > 0) {
+                    const { data: provData } = await supabase.from("proveedores").select("id, nombre").in("id", providerIds);
+                    if (provData) {
+                        providersMap = provData.reduce((acc: any, p: any) => ({ ...acc, [p.id]: p.nombre }), {});
+                    }
+                }
+            }
+        }
+
+        // Fetch Categories
+        if (catIds.length > 0) {
+            const { data: catData } = await supabase.from("insumos_categorias").select("id, nombre").in("id", catIds);
+            if (catData) {
+                categoriesMap = catData.reduce((acc, c) => ({ ...acc, [c.id]: c.nombre }), {});
+            }
+        }
+
+        // Enrich Items merging fresh DB data with JSON data
+        const enrichedItems = rawItems.map((item: any) => {
+            const pId = item.perfume_id || item.perfume?.id;
+            const cId = item.insumos_categorias_id || item.insumos_categorias?.id;
+
+            const perf = pId ? perfumesMap[pId] : (item.perfume || {});
+            // Fallback to what's in JSON if DB fetch fails or null, 
+            // but prioritize fresh DB data structure which has 'proveedor_id'
+
+            const pProvId = perf?.proveedor_id;
+            const provName = pProvId ? providersMap[pProvId] : (item.proveedores?.nombre || "Sin proveedor");
+            const catName = cId ? categoriesMap[cId] : (item.insumos_categorias?.nombre || item.categoria || null);
+
+            return {
+                ...item,
+                perfume: perf,
+                proveedores: { nombre: provName },
+                insumos_categorias: catName ? { nombre: catName } : null,
+                // Ensure helper fields exist for rule engine
+                genero: perf?.genero || item.genero || "",
+                nombre: perf?.nombre || item.nombre || ""
+            };
+        });
+
+        const solicitud = { ...solicitudBasic, items: enrichedItems };
+
+        // Optimistic Update
         setSolicitudes(prev => prev.map(s => s.id === id ? { ...s, estado: "entregado" } : s));
 
         // Calcular cantidad total
@@ -195,8 +270,8 @@ export default function SolicitudesPage() {
         const { error: saleError } = await supabase.from("ventas").insert({
             created_at: new Date(),
             cliente: solicitud.cliente,
-            cantidad_perfumes: cantidadTotal,
-            precio_total: solicitud.total,
+            cantidad_perfumes: Math.round(cantidadTotal),
+            precio_total: Math.round(solicitud.total),
             perfumes: solicitud.detalle,
             is_reseller_sale: true,
             metodo_pago: solicitud.metodo_pago
@@ -207,6 +282,59 @@ export default function SolicitudesPage() {
             fetchSolicitudes(); // Revertir
             return;
         }
+
+        // Deduct Stock
+        if (Array.isArray(solicitud.items)) {
+            toast.loading("Actualizando inventario...", { id: "stock-update" });
+            const saleItems = solicitud.items.map((i: any) => {
+                // Resolve Provider Name
+                let provName = "Sin proveedor";
+                if (i.proveedores?.nombre && i.proveedores.nombre !== '-') {
+                    provName = i.proveedores.nombre;
+                } else if (i.perfume?.proveedor_id) {
+                    provName = proveedores.find(p => p.id === i.perfume.proveedor_id)?.nombre || "Sin proveedor";
+                }
+
+                // Resolve Category
+                let category = "";
+                if (i.insumos_categorias?.nombre) category = i.insumos_categorias.nombre;
+                else if (i.perfume?.categoria) category = i.perfume.categoria;
+                else if (i.categoria) category = i.categoria;
+
+                // Detect Bottle Return
+                let bType = i.envase || i.frascoLP || "";
+                let isReturned = i.devolvio_envase === true;
+
+                if (typeof bType === 'string' && bType.toLowerCase().includes('devolvi')) {
+                    isReturned = true;
+                    // Clean the string so rule matches "Botella (1L)" instead of "Botella (1L) (devolvió...)"
+                    bType = bType.replace(/\s*\(devolvi.*?\)/i, '').replace(' - ', '').trim();
+                }
+
+                return {
+                    perfumeName: i.perfume?.nombre || i.nombre || "Desconocido",
+                    gender: i.genero || "",
+                    quantity: i.cantidad || 1,
+                    category: category,
+                    provider: provName,
+                    bottleType: bType,
+                    returnedBottle: isReturned
+                };
+            });
+
+            const { success, logs, message } = await deductStockForSale(saleItems);
+
+            if (success) {
+                if (logs && logs.length > 0) {
+                    toast.success("Inventario actualizado", { id: "stock-update" });
+                } else {
+                    toast.success("Venta registrada (Sin descuentos de stock)", { id: "stock-update" });
+                }
+            } else {
+                console.error("Inventario error:", message);
+                toast.error("Venta OK, pero falló inventario: " + message, { id: "stock-update" });
+            }
+        };
 
         const { error: updateError } = await supabase
             .from("solicitudes")
