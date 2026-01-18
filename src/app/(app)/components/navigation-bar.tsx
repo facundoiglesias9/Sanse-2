@@ -79,14 +79,11 @@ const herramientasLinks = [
     label: "Configuración de Combos",
     description: "Definir combos de insumos que se descuentan al vender.",
   },
-<<<<<<< HEAD
   {
     href: "/herramientas/insumos-por-stock",
     label: "Insumos por Stock",
     description: "Información sobre qué insumos utiliza cada producto base.",
   },
-=======
->>>>>>> 691132e2d938874488506d3085094b5708e80dd0
 ];
 
 const linksUserbar = [

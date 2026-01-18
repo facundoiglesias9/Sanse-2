@@ -11,7 +11,6 @@ const NextThemeProvider = dynamic(
 );
 
 export function Providers({ children, ...props }: any) {
-<<<<<<< HEAD
   React.useEffect(() => {
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", function () {
@@ -27,7 +26,5 @@ export function Providers({ children, ...props }: any) {
     }
   }, []);
 
-=======
->>>>>>> 691132e2d938874488506d3085094b5708e80dd0
   return <NextThemeProvider {...props}>{children}</NextThemeProvider>;
 }
