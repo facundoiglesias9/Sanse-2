@@ -48,6 +48,37 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  // Lógica de protección de rutas basada en rol
+  if (user) {
+    // Buscar el rol del usuario en la tabla profiles
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("rol")
+      .eq("id", user.id)
+      .single();
+
+    const userRole = profile?.rol ?? user.user_metadata?.rol ?? "comprador";
+    const currentPath = request.nextUrl.pathname;
+
+    // Si NO es admin...
+    if (userRole !== "admin") {
+      // Y NO está en la home ("/") ni en rutas permitidas explícitamente (como /login, /start, etc.)
+      const isAllowedPath =
+        currentPath === "/" ||
+        currentPath.startsWith("/login") ||
+        currentPath.startsWith("/auth") ||
+        currentPath.startsWith("/caja/solicitudes") ||
+        currentPath.startsWith("/api"); // Permitir API requests si es necesario, o restringir también
+
+      // Si intenta acceder a cualquier otra cosa, redirigir a "/"
+      if (!isAllowedPath) {
+        const url = request.nextUrl.clone();
+        url.pathname = "/";
+        return NextResponse.redirect(url);
+      }
+    }
+  }
+
   // IMPORTANTE: Debe devolver el objeto supabaseResponse tal como está.
   // Si está creando un nuevo objeto de respuesta con NextResponse.next(), asegúrese de:
   // 1. Pasar la solicitud en él, así:

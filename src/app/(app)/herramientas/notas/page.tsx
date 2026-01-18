@@ -13,7 +13,7 @@ import { z } from "zod";
 import ModernCardNote from "@/app/(app)/herramientas/notas/components/modern-card-note";
 import { AnimatePresence, motion } from "framer-motion";
 import { Calendar22 } from "@/components/calendar-22";
-import { Loader2, Plus, User, Flag, Calendar, Filter } from "lucide-react";
+import { Loader2, Plus, User, Flag, Calendar } from "lucide-react";
 import {
     Dialog,
     DialogContent,
@@ -50,7 +50,7 @@ const FormSchema = z.object({
 export default function Notas2Page() {
     console.log("Renderizando Notas2Page"); // Debug log
     const [notas, setNotas] = useState<Nota[]>([]);
-    const [profiles, setProfiles] = useState<{ id: string; nombre: string | null; }[]>([]);
+    const [profiles, setProfiles] = useState<{ id: string; nombre: string | null; rol: string | null; }[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [deleteId, setDeleteId] = useState<string | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
@@ -108,7 +108,7 @@ export default function Notas2Page() {
     });
 
     async function fetchProfiles() {
-        const { data } = await supabase.from("profiles").select("id, nombre");
+        const { data } = await supabase.from("profiles").select("id, nombre, rol");
         if (data) {
             setProfiles(data);
         }
@@ -123,6 +123,10 @@ export default function Notas2Page() {
 
         if (data) {
             const sorted = data.sort((a, b) => {
+                // 0. Ordenar por Pin (Ancladas primero)
+                if (a.is_pinned && !b.is_pinned) return -1;
+                if (!a.is_pinned && b.is_pinned) return 1;
+
                 // 1. Ordenar por Fecha de Vencimiento
                 if (a.fecha_vencimiento && !b.fecha_vencimiento) return -1;
                 if (!a.fecha_vencimiento && b.fecha_vencimiento) return 1;
@@ -281,6 +285,37 @@ export default function Notas2Page() {
         setIsLoading(false);
     };
 
+    const togglePin = async (nota: Nota) => {
+        const { error } = await supabase
+            .from("notas")
+            .update({ is_pinned: !nota.is_pinned })
+            .eq("id", nota.id);
+
+        if (!error) {
+            setNotas(current =>
+                current.map(n => n.id === nota.id ? { ...n, is_pinned: !n.is_pinned } : n)
+                    .sort((a, b) => {
+                        if (a.is_pinned && !b.is_pinned) return -1;
+                        if (!a.is_pinned && b.is_pinned) return 1;
+                        if (a.fecha_vencimiento && !b.fecha_vencimiento) return -1;
+                        if (!a.fecha_vencimiento && b.fecha_vencimiento) return 1;
+                        if (a.fecha_vencimiento && b.fecha_vencimiento) {
+                            const dateA = new Date(a.fecha_vencimiento);
+                            const dateB = new Date(b.fecha_vencimiento);
+                            dateA.setHours(0, 0, 0, 0);
+                            dateB.setHours(0, 0, 0, 0);
+                            if (dateA.getTime() !== dateB.getTime()) return dateA.getTime() - dateB.getTime();
+                        }
+                        const priorityOrder: Record<string, number> = { "alta": 1, "normal": 2, "baja": 3 };
+                        return (priorityOrder[a.prioridad] || 99) - (priorityOrder[b.prioridad] || 99);
+                    })
+            );
+            toast.success(nota.is_pinned ? "Nota desfijada" : "Nota fijada");
+        } else {
+            toast.error("Error al cambiar el estado del pin");
+        }
+    };
+
     return (
         <div className="flex flex-col min-h-screen bg-background text-foreground p-6 md:p-12 transition-colors duration-500">
             <div className="max-w-7xl mx-auto w-full">
@@ -391,9 +426,9 @@ export default function Notas2Page() {
                                                             </SelectTrigger>
                                                         </FormControl>
                                                         <SelectContent>
-                                                            {profiles.map((profile) => (
+                                                            {profiles.filter(p => p.rol === 'admin').map((profile) => (
                                                                 <SelectItem key={profile.id} value={profile.id}>
-                                                                    {profile.nombre || "Usuario sin nombre"}
+                                                                    {profile.nombre || "Admin sin nombre"}
                                                                 </SelectItem>
                                                             ))}
                                                         </SelectContent>
@@ -521,6 +556,8 @@ export default function Notas2Page() {
                                     setEditingAssignedTo={setEditingAssignedTo}
                                     onSaveEdit={guardarEdit}
                                     onCancelEdit={cancelarEdit}
+                                    onTogglePin={() => togglePin(nota)}
+                                    isPinned={nota.is_pinned}
                                     profiles={profiles}
                                     editingAssignedTo={editingAssignedTo}
                                 />

@@ -6,7 +6,7 @@ import { Perfume } from "@/app/types/perfume";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ArrowUpDown, Pencil, Trash2, ShoppingCart } from "lucide-react";
+import { ArrowUpDown, Pencil, Trash2, ShoppingCart, ArrowUp, ArrowDown } from "lucide-react";
 import { capitalizeFirstLetter } from "@/app/helpers/capitalizeFirstLetter";
 import {
   redondearAlCienMasCercano,
@@ -64,6 +64,7 @@ const allColumns: ColumnDef<Perfume>[] = [
 
     accessorKey: "nombre",
     header: ({ column }) => {
+      const isSorted = column.getIsSorted();
       return (
         <Button
           variant="ghost"
@@ -71,16 +72,40 @@ const allColumns: ColumnDef<Perfume>[] = [
           className="pl-0 hover:bg-transparent"
         >
           Perfume
-          <ArrowUpDown className="ml-2 h-4 w-4" />
+          {isSorted === "asc" ? (
+            <ArrowUp className="ml-2 h-4 w-4" />
+          ) : isSorted === "desc" ? (
+            <ArrowDown className="ml-2 h-4 w-4" />
+          ) : (
+            <ArrowUpDown className="ml-2 h-4 w-4" />
+          )}
         </Button>
       );
     },
-    cell: ({ row }) => <p className="font-bold">{row.getValue("nombre")}</p>,
+    cell: ({ row }) => <p className="font-bold break-words">{row.getValue("nombre")}</p>,
   },
   {
     accessorKey: "insumos_categorias.nombre", // Accessor para ordenamiento potencial
     id: "categoria",
-    header: ({ column }) => <div className="text-center">Categoría</div>,
+    header: ({ column }) => {
+      const isSorted = column.getIsSorted();
+      return (
+        <Button
+          variant="ghost"
+          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          className="pl-0 hover:bg-transparent"
+        >
+          Categoría
+          {isSorted === "asc" ? (
+            <ArrowUp className="ml-2 h-4 w-4" />
+          ) : isSorted === "desc" ? (
+            <ArrowDown className="ml-2 h-4 w-4" />
+          ) : (
+            <ArrowUpDown className="ml-2 h-4 w-4" />
+          )}
+        </Button>
+      );
+    },
     cell: ({ row }) => {
       const categoria = row.original.insumos_categorias?.nombre;
 
@@ -143,7 +168,27 @@ const allColumns: ColumnDef<Perfume>[] = [
   },
   {
     accessorKey: "precio",
-    header: () => <div className="text-center">Precio</div>,
+    header: ({ column }) => {
+      const isSorted = column.getIsSorted();
+      return (
+        <div className="text-center flex justify-center">
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+            className="hover:bg-transparent"
+          >
+            Precio
+            {isSorted === "asc" ? (
+              <ArrowUp className="ml-2 h-4 w-4" />
+            ) : isSorted === "desc" ? (
+              <ArrowDown className="ml-2 h-4 w-4" />
+            ) : (
+              <ArrowUpDown className="ml-2 h-4 w-4" />
+            )}
+          </Button>
+        </div>
+      );
+    },
     cell: ({ row }) => {
       const precio = row.getValue("precio") as number;
       const precioRedondeadoCien = redondearAlCienMasCercano(precio);
@@ -161,7 +206,27 @@ const allColumns: ColumnDef<Perfume>[] = [
   },
   {
     accessorKey: "precio_mayorista",
-    header: () => <div className="text-center">Precio mayorista</div>,
+    header: ({ column }) => {
+      const isSorted = column.getIsSorted();
+      return (
+        <div className="text-center flex justify-center">
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+            className="hover:bg-transparent"
+          >
+            Precio mayorista
+            {isSorted === "asc" ? (
+              <ArrowUp className="ml-2 h-4 w-4" />
+            ) : isSorted === "desc" ? (
+              <ArrowDown className="ml-2 h-4 w-4" />
+            ) : (
+              <ArrowUpDown className="ml-2 h-4 w-4" />
+            )}
+          </Button>
+        </div>
+      );
+    },
     cell: ({ row }) => {
       const precioMayorista = row.getValue("precio_mayorista") as number;
       const precioMayoristaRedondeadoCien =
@@ -247,6 +312,27 @@ const allColumns: ColumnDef<Perfume>[] = [
     },
   },
   {
+    accessorKey: "familia_olfativa",
+    header: () => <div className="text-center">Familia Olfativa</div>,
+    filterFn: (row, id, value) => {
+      if (!value) return true;
+      const rowValue = row.getValue(id) as string | null;
+      if (!rowValue) return false;
+      return rowValue.includes(value);
+    },
+    cell: ({ row }) => {
+      const val = row.getValue("familia_olfativa") as string | null;
+      if (!val) return <div className="text-center">-</div>;
+      return (
+        <div className="flex justify-center">
+          <Badge variant="outline" className="max-w-[150px] truncate block" title={val}>
+            {val}
+          </Badge>
+        </div>
+      );
+    },
+  },
+  {
     id: "acciones",
     header: () => <div className="text-center">Acciones</div>,
     cell: ({ row, table }) => {
@@ -304,6 +390,8 @@ export const getListaPreciosColumns = (
       if (key === "costo") return false;
       if (key === "precio") return false;
     }
+
+    // Ocultar familia olfativa si es comprador? (Opcional, pero el usuario pidió filtrar, así que dejarlo)
 
     return true;
   });

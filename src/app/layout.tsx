@@ -2,15 +2,35 @@ import "./globals.css";
 import { Inter } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import type { Metadata } from "next";
-import { ThemeProvider } from "@/components/theme-provider";
+import { Providers } from "./providers";
 
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "Sanse Perfumes",
   description: "Aplicación privada de perfumes",
+  manifest: "/manifest.json",
+  themeColor: "#000000",
+  viewport: "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Sanse Perfumes",
+  },
   icons: {
     icon: "/logo.ico",
+    apple: "/icon.png",
+  },
+  openGraph: {
+    title: "Sanse Perfumes",
+    description: "Gestión de boutique de fragancias finas.",
+    images: ["/icon.png"],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Sanse Perfumes",
+    description: "Gestión de boutique de fragancias finas.",
+    images: ["/icon.png"],
   },
 };
 
@@ -23,17 +43,21 @@ export default function RootLayout({
     <html lang="es" suppressHydrationWarning>
       <body
         className={`${inter.className} antialiased`}
+        suppressHydrationWarning
       >
-        <ThemeProvider
+        <Providers
           attribute="class"
           defaultTheme="system"
           enableSystem
           disableTransitionOnChange
         >
-          {children}
-        </ThemeProvider>
-        <Toaster richColors position="top-right" />
+          <div suppressHydrationWarning id="app-root">
+            {children}
+          </div>
+        </Providers>
+        <Toaster richColors position="top-right" duration={3000} />
       </body>
     </html>
   );
 }
+

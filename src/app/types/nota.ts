@@ -6,6 +6,7 @@ export type Nota = {
   nota: string;
   fecha_vencimiento?: Date | null;
   prioridad: Prioridad;
+  is_pinned: boolean;
   created_by: string;
   created_at: Date;
   updated_by: string;

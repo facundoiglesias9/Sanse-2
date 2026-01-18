@@ -321,7 +321,9 @@ export default function SolicitudesPage() {
 
     return (
         <div className="container mx-auto py-8 px-4 max-w-7xl">
-            <h1 className="text-3xl font-bold mb-8">Gestión de Solicitudes</h1>
+            <div className="mb-8 text-center flex justify-center">
+                <h1 className="text-3xl font-bold">Gestión de Solicitudes</h1>
+            </div>
 
             {userRole === 'admin' ? (
                 // Diseño Admin: 3 arriba, 2 abajo

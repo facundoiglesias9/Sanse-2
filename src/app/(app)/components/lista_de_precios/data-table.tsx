@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { createClient } from "@/utils/supabase/client";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
+import { deductStockForSale } from "@/app/actions/inventory-actions";
 import { formatCurrency } from "@/app/helpers/formatCurrency";
 import {
   redondearAlCienMasCercano,
@@ -18,7 +19,7 @@ import { NumberInput } from "@/components/ui/number-input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { DataTablePagination } from "@/components/ui/data-table-pagination";
 import { AnimatePresence, motion } from "framer-motion";
-import { Loader2, Plus, Trash2, ShoppingCart, FileSpreadsheet, Download, Copy, Check, ClipboardList } from "lucide-react";
+import { Loader2, Trash2, ShoppingCart, FileSpreadsheet, Download, Copy, Check, ClipboardList, Search, Filter } from "lucide-react";
 import {
   ColumnDef,
   ColumnFiltersState,
@@ -46,6 +47,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { MultiSelect } from "@/components/ui/multi-select";
 import {
   Dialog,
   DialogContent,
@@ -327,6 +329,52 @@ export function DataTable({
     setIsEditDialogOpen(true);
   };
 
+  // Cálculo en vivo para el diálogo de edición
+  const computedTotalCost = React.useMemo(() => {
+    // 2. Costo de Insumos
+    // Recalcular costo de otros insumos (excluyendo la esencia virtual)
+    const othersCost = editInsumos
+      .filter(i => i.id !== "virtual-esencia")
+      .reduce((acc, i) => acc + unitCost(i), 0);
+
+    // Costo base desde el input (asumiendo que es el costo de la esencia en sí)
+    // Necesitamos 'gramos' y 'baseGramos'.
+    // En el diálogo de edición no tenemos acceso fácil a 'gramos_configurados' vivo a menos que busquemos el proveedor...
+    // pero 'editInsumos' tiene la 'virtual-esencia' que tiene 'cantidad_necesaria' (uso gramos) y 'cantidad_lote' (tamaño base).
+
+    const virtual = editInsumos.find(i => i.id === "virtual-esencia");
+    let baseCost = 0;
+    if (virtual) {
+      // Si tenemos la esencia virtual, usar sus cantidades pero el precio VIVO del input
+      const price = parseFloat(editPrecioArs) || 0; // El precio del lote (ej: 100g)
+      const size = virtual.cantidad_lote || 100;
+      const usage = virtual.cantidad_necesaria || 0;
+      baseCost = (price / size) * usage;
+    } else {
+      // Respaldo si no se encuentra esencia virtual (no debería pasar para perfumes)
+      baseCost = parseFloat(editPrecioArs) || 0;
+    }
+
+    return baseCost + othersCost;
+  }, [editPrecioArs, editInsumos]);
+
+  const computedSuggMinorista = React.useMemo(() => {
+    const margin = parseFloat(editMargenMinorista) || 0;
+    return computedTotalCost * (1 + margin / 100);
+  }, [computedTotalCost, editMargenMinorista]);
+
+  const computedSuggMayorista = React.useMemo(() => {
+    // Lógica desde page.tsx:
+    // si existe margen mayorista, usarlo. Si no, aplicar descuento por defecto.
+
+    const margin = parseFloat(editMargenMayorista);
+    if (!isNaN(margin)) {
+      return computedTotalCost * (1 + margin / 100);
+    }
+    // Descuento por defecto 15% del minorista si es nulo
+    return computedSuggMinorista * 0.85;
+  }, [computedTotalCost, computedSuggMinorista, editMargenMayorista]);
+
   const confirmDelete = async () => {
     if (!productToDelete) return;
 
@@ -366,7 +414,11 @@ export function DataTable({
         nombre: editName,
         margen_minorista: parseFloat(editMargenMinorista) || null,
         margen_mayorista: parseFloat(editMargenMayorista) || null,
-        custom_insumos: customInsumosToSave.length > 0 ? customInsumosToSave : null
+        custom_insumos: customInsumosToSave.length > 0 ? customInsumosToSave : null,
+
+        familia_olfativa: (productToEdit.insumos_categorias_id === "999b53c3-f181-4910-86fd-5c5b1f74af7b" ||
+          insumosCategorias.find(c => c.id === productToEdit.insumos_categorias_id)?.nombre.toLowerCase().includes("aromatizante"))
+          ? productToEdit.familia_olfativa : null
       };
 
       if (editPrecioArs !== "") updates.precio_ars = parseFloat(editPrecioArs) || null;
@@ -575,7 +627,7 @@ export function DataTable({
       XLSX.writeFile(wb, `lista_${view}_${mesSlug}.xlsx`, { bookType: "xlsx", type: "binary" });
       toast.success("Descarga iniciada", { id, duration: 2000 });
       setIsExportDialogOpen(false);
-    } catch (e) {
+    } catch (_e) {
       toast.error("Hubo un problema al generar el archivo", { id });
     }
   }
@@ -697,7 +749,40 @@ export function DataTable({
     }
 
     setIsLoadingForm(false);
-    await actualizarInventarioDespuesVenta(perfumesVendidos);
+    setIsLoadingForm(false);
+
+    // Nueva lógica unificada de descuento de stock basada en Reglas
+    try {
+      const saleItems = perfumesVendidos.map(p => {
+        const catName = insumosCategorias.find(c => c.id === p.perfume.insumos_categorias_id)?.nombre || "";
+        const provName = proveedores.find(pv => pv.id === p.perfume.proveedor_id)?.nombre || "";
+
+        return {
+          perfumeName: p.perfume.nombre,
+          gender: p.genero,
+          quantity: p.cantidad,
+          category: catName,
+          provider: provName
+        };
+      });
+
+      toast.promise(deductStockForSale(saleItems), {
+        loading: 'Actualizando inventario...',
+        success: (res) => {
+          if (res.success) {
+            if (res.logs && res.logs.length > 0) return `Inventario actualizado (${res.logs.length} reglas aplicadas)`;
+            return 'Venta registrada (Sin consumo de stock)';
+          } else {
+            throw new Error(res.message || "Error desconocido");
+          }
+        },
+        error: (err) => `Error inventario: ${err.message || err}`
+      });
+
+    } catch (err) {
+      console.error("Error invoking inventory action", err);
+    }
+
     setRowSelection({});
   };
 
@@ -896,7 +981,7 @@ export function DataTable({
   return (
     <>
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen} aria-describedby={undefined}>
-        <DialogContent className="sm:max-w-5xl" aria-describedby={undefined}>
+        <DialogContent className="w-[96%] max-h-[90vh] overflow-y-auto p-3 sm:p-6 sm:max-w-5xl gap-3" aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle>Detalle de la venta</DialogTitle>
           </DialogHeader>
@@ -915,71 +1000,240 @@ export function DataTable({
             </div>
           </div>
 
-          <Table className="table-fixed">
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[30%]">Producto</TableHead>
-                <TableHead className="w-[15%]">Precio</TableHead>
-                <TableHead className="w-[20%]">Envase</TableHead>
-                <TableHead className="w-[15%] text-center">Cantidad</TableHead>
-                <TableHead className="w-[15%] text-right">Subtotal</TableHead>
-                <TableHead className="w-[5%]"></TableHead>
-              </TableRow>
-            </TableHeader>
-          </Table>
+          <div className="hidden lg:block">
+            <Table className="table-fixed">
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[30%]">Producto</TableHead>
+                  <TableHead className="w-[15%]">Precio</TableHead>
+                  <TableHead className="w-[20%]">Envase</TableHead>
+                  <TableHead className="w-[15%] text-center">Cantidad</TableHead>
+                  <TableHead className="w-[15%] text-right">Subtotal</TableHead>
+                  <TableHead className="w-[5%]"></TableHead>
+                </TableRow>
+              </TableHeader>
+            </Table>
+          </div>
 
           <ScrollArea className="max-h-[300px]">
-            <Table className="table-fixed">
-              <TableBody>
-                {ventaPerfumes.map((item) => {
-                  const unitBase = computePrecioUnitario(item.perfume, view === "mayorista", item.frascoLP, item.priceType);
-                  const descEnv = item.devuelveEnvase ? getEnvaseUnitCost(item.perfume, item.frascoLP) : 0;
-                  const unitFinal = Math.max(0, unitBase - descEnv);
+            {/* Desktop Table View */}
+            <div className="hidden lg:block">
+              <Table className="table-fixed">
+                <TableBody>
+                  {ventaPerfumes.map((item) => {
+                    const unitBase = computePrecioUnitario(item.perfume, view === "mayorista", item.frascoLP, item.priceType);
+                    const descEnv = item.devuelveEnvase ? getEnvaseUnitCost(item.perfume, item.frascoLP) : 0;
+                    const unitFinal = Math.max(0, unitBase - descEnv);
 
-                  const esLP = item.perfume.insumos_categorias_id === LIMPIA_PISOS_CAT_ID;
+                    const esLP = item.perfume.insumos_categorias_id === LIMPIA_PISOS_CAT_ID;
 
-                  return (
-                    <TableRow key={item.perfume.id} className="hover:bg-muted/50">
-                      {/* Producto (Nombre + Género) */}
-                      <TableCell className="w-[30%] align-top py-4">
-                        <div className="flex flex-col gap-1">
-                          <span className="font-semibold text-base">{item.perfume.nombre}</span>
-                          <div className="flex items-center gap-2">
-                            <Badge
-                              variant={
-                                item.perfume.genero === "masculino"
-                                  ? "indigo"
-                                  : item.perfume.genero === "femenino"
-                                    ? "pink"
-                                    : "default"
-                              }
-                              className="w-fit"
+                    return (
+                      <TableRow key={item.perfume.id} className="hover:bg-muted/50">
+                        {/* Producto (Nombre + Género) */}
+                        <TableCell className="w-[30%] align-top py-4">
+                          <div className="flex flex-col gap-1">
+                            <span className="font-semibold text-base">{item.perfume.nombre}</span>
+                            <div className="flex items-center gap-2">
+                              <Badge
+                                variant={
+                                  item.perfume.genero === "masculino"
+                                    ? "indigo"
+                                    : item.perfume.genero === "femenino"
+                                      ? "pink"
+                                      : "default"
+                                }
+                                className="w-fit"
+                              >
+                                {capitalizeFirstLetter(item.perfume.genero)}
+                              </Badge>
+                              {userRole === "admin" && (
+                                <span className="text-xs text-muted-foreground">
+                                  {proveedores.find(p => p.id === item.perfume.proveedor_id)?.nombre || "Sin proveedor"}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </TableCell>
+
+                        {/* Configuración (Precio) */}
+                        <TableCell className="w-[15%] align-top py-4">
+                          {view === "mayorista" ? (
+                            <div className="flex h-9 items-center px-3 text-sm font-medium text-muted-foreground bg-muted/50 rounded-md border border-transparent">
+                              Mayorista
+                            </div>
+                          ) : (
+                            <Select
+                              value={item.priceType}
+                              onValueChange={(val: "precio" | "costo") => {
+                                setVentaPerfumes(prev => prev.map(p => p.perfume.id === item.perfume.id ? { ...p, priceType: val } : p));
+                              }}
                             >
-                              {capitalizeFirstLetter(item.perfume.genero)}
-                            </Badge>
-                            {userRole === "admin" && (
-                              <span className="text-xs text-muted-foreground">
-                                {proveedores.find(p => p.id === item.perfume.proveedor_id)?.nombre || "Sin proveedor"}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </TableCell>
+                              <SelectTrigger className="h-9 w-[140px] bg-background">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="precio">Precio Lista</SelectItem>
+                                <SelectItem value="costo">Al Costo</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          )}
+                        </TableCell>
 
-                      {/* Configuración (Precio) */}
-                      <TableCell className="w-[15%] align-top py-4">
-                        {view === "mayorista" ? (
-                          <div className="flex h-9 items-center px-3 text-sm font-medium text-muted-foreground bg-muted/50 rounded-md border border-transparent">
-                            Mayorista
+                        {/* Envase (solo LP) */}
+                        <TableCell className="w-[20%] align-top py-4">
+                          {esLP ? (
+                            <div className="flex flex-col gap-2">
+                              <Select
+                                value={item.frascoLP ?? "botella"}
+                                onValueChange={(v: "botella" | "bidon") => {
+                                  setVentaPerfumes((prev) =>
+                                    prev.map((p) =>
+                                      p.perfume.id === item.perfume.id ? { ...p, frascoLP: v } : p
+                                    ),
+                                  );
+                                }}
+                              >
+                                <SelectTrigger className="h-9 w-full bg-background">
+                                  <SelectValue placeholder="Envase" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="botella">Botella (1L)</SelectItem>
+                                  <SelectItem value="bidon">Bidón (5L)</SelectItem>
+                                </SelectContent>
+                              </Select>
+
+                              <div className="flex items-center space-x-2 pt-1">
+                                <Checkbox
+                                  id={`envase-${item.perfume.id}`}
+                                  checked={!!item.devuelveEnvase}
+                                  onCheckedChange={(checked) =>
+                                    setVentaPerfumes((prev) =>
+                                      prev.map((p) =>
+                                        p.perfume.id === item.perfume.id
+                                          ? { ...p, devuelveEnvase: checked === true }
+                                          : p
+                                      ),
+                                    )
+                                  }
+                                />
+                                <label
+                                  htmlFor={`envase-${item.perfume.id}`}
+                                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                >
+                                  Devolvió envase
+                                </label>
+                              </div>
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground text-sm italic">No aplica</span>
+                          )}
+                        </TableCell>
+
+                        {/* Cantidad */}
+                        <TableCell className="w-[15%] align-top py-4 text-center">
+                          <div className="flex justify-center w-full">
+                            <NumberInput
+                              min={0}
+                              decimalScale={0}
+                              thousandSeparator="."
+                              decimalSeparator=","
+                              value={item.cantidad}
+                              className="h-9 text-center w-20"
+                              onValueChange={(n) => {
+                                const value = n ?? 0;
+                                setVentaPerfumes((prev) =>
+                                  prev.map((p) =>
+                                    p.perfume.id === item.perfume.id ? { ...p, cantidad: value } : p,
+                                  ),
+                                );
+                              }}
+                            />
                           </div>
-                        ) : (
+                        </TableCell>
+
+                        {/* Subtotal */}
+                        <TableCell className="w-[15%] align-top py-4 text-right font-medium text-lg">
+                          {formatCurrency(unitFinal * item.cantidad, "ARS", 0)}
+                        </TableCell>
+
+                        {/* Remove Button */}
+                        <TableCell className="w-[5%] align-top py-4 text-center">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-9 w-9 text-muted-foreground hover:text-destructive"
+                            onClick={() => {
+                              setVentaPerfumes(prev => prev.filter(p => p.perfume.id !== item.perfume.id));
+                              setRowSelection(prev => {
+                                const newState = { ...prev };
+                                delete newState[item.perfume.id];
+                                return newState;
+                              });
+                            }}
+                          >
+                            <Trash2 size={18} />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+
+            {/* Mobile Card View */}
+            <div className="lg:hidden space-y-3 pr-1 pb-2">
+              {ventaPerfumes.map((item) => {
+                const unitBase = computePrecioUnitario(item.perfume, view === "mayorista", item.frascoLP, item.priceType);
+                const descEnv = item.devuelveEnvase ? getEnvaseUnitCost(item.perfume, item.frascoLP) : 0;
+                const unitFinal = Math.max(0, unitBase - descEnv);
+                const esLP = item.perfume.insumos_categorias_id === LIMPIA_PISOS_CAT_ID;
+
+                return (
+                  <div key={item.perfume.id} className="bg-background border rounded-lg p-3 shadow-sm relative space-y-3">
+                    {/* Header: Name & Badges */}
+                    <div className="pr-8">
+                      <div className="font-semibold text-sm leading-tight mb-1">{item.perfume.nombre}</div>
+                      <div className="flex flex-wrap gap-1.5">
+                        <Badge variant={item.perfume.genero === "masculino" ? "indigo" : item.perfume.genero === "femenino" ? "pink" : "default"} className="text-[10px] px-1.5 py-0 h-5">
+                          {capitalizeFirstLetter(item.perfume.genero)}
+                        </Badge>
+                        {userRole === "admin" && (
+                          <span className="text-[10px] text-muted-foreground flex items-center border px-1 rounded h-5">
+                            {proveedores.find(p => p.id === item.perfume.proveedor_id)?.nombre || "N/A"}
+                          </span>
+                        )}
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="absolute top-1 right-1 h-8 w-8 text-muted-foreground hover:text-destructive"
+                        onClick={() => {
+                          setVentaPerfumes(prev => prev.filter(p => p.perfume.id !== item.perfume.id));
+                          setRowSelection(prev => {
+                            const newState = { ...prev };
+                            delete newState[item.perfume.id];
+                            return newState;
+                          });
+                        }}
+                      >
+                        <Trash2 size={16} />
+                      </Button>
+                    </div>
+
+                    {/* Controls Grid */}
+                    <div className="grid grid-cols-2 gap-3">
+                      {/* Price Type */}
+                      {view !== "mayorista" && (
+                        <div className="space-y-1">
+                          <Label className="text-[10px] text-muted-foreground uppercase tracking-wider">Tipo</Label>
                           <Select
                             value={item.priceType}
                             onValueChange={(val: "precio" | "costo") => {
                               setVentaPerfumes(prev => prev.map(p => p.perfume.id === item.perfume.id ? { ...p, priceType: val } : p));
                             }}
                           >
-                            <SelectTrigger className="h-9 w-[140px] bg-background">
+                            <SelectTrigger className="h-8 text-xs w-full">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -987,132 +1241,119 @@ export function DataTable({
                               <SelectItem value="costo">Al Costo</SelectItem>
                             </SelectContent>
                           </Select>
-                        )}
-                      </TableCell>
-
-                      {/* Envase (solo LP) */}
-                      <TableCell className="w-[20%] align-top py-4">
-                        {esLP ? (
-                          <div className="flex flex-col gap-2">
-                            <Select
-                              value={item.frascoLP ?? "botella"}
-                              onValueChange={(v: "botella" | "bidon") => {
-                                setVentaPerfumes((prev) =>
-                                  prev.map((p) =>
-                                    p.perfume.id === item.perfume.id ? { ...p, frascoLP: v } : p
-                                  ),
-                                );
-                              }}
-                            >
-                              <SelectTrigger className="h-9 w-full bg-background">
-                                <SelectValue placeholder="Envase" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="botella">Botella (1L)</SelectItem>
-                                <SelectItem value="bidon">Bidón (5L)</SelectItem>
-                              </SelectContent>
-                            </Select>
-
-                            <div className="flex items-center space-x-2 pt-1">
-                              <Checkbox
-                                id={`envase-${item.perfume.id}`}
-                                checked={!!item.devuelveEnvase}
-                                onCheckedChange={(checked) =>
-                                  setVentaPerfumes((prev) =>
-                                    prev.map((p) =>
-                                      p.perfume.id === item.perfume.id
-                                        ? { ...p, devuelveEnvase: checked === true }
-                                        : p
-                                    ),
-                                  )
-                                }
-                              />
-                              <label
-                                htmlFor={`envase-${item.perfume.id}`}
-                                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                              >
-                                Devolvió envase
-                              </label>
-                            </div>
-                          </div>
-                        ) : (
-                          <span className="text-muted-foreground text-sm italic">No aplica</span>
-                        )}
-                      </TableCell>
-
-                      {/* Cantidad */}
-                      <TableCell className="w-[15%] align-top py-4 text-center">
-                        <div className="flex justify-center w-full">
-                          <NumberInput
-                            min={0}
-                            decimalScale={0}
-                            thousandSeparator="."
-                            decimalSeparator=","
-                            value={item.cantidad}
-                            className="h-9 text-center w-20"
-                            onValueChange={(n) => {
-                              const value = n ?? 0;
-                              setVentaPerfumes((prev) =>
-                                prev.map((p) =>
-                                  p.perfume.id === item.perfume.id ? { ...p, cantidad: value } : p,
-                                ),
-                              );
-                            }}
-                          />
                         </div>
-                      </TableCell>
+                      )}
 
-                      {/* Subtotal */}
-                      <TableCell className="w-[15%] align-top py-4 text-right font-medium text-lg">
-                        {formatCurrency(unitFinal * item.cantidad, "ARS", 0)}
-                      </TableCell>
+                      {/* Envase for LP */}
+                      {esLP && (
+                        <div className={`space-y-1 ${view === "mayorista" ? "col-span-2" : ""}`}>
+                          <Label className="text-[10px] text-muted-foreground uppercase tracking-wider">Envase</Label>
+                          <Select
+                            value={item.frascoLP ?? "botella"}
+                            onValueChange={(v: "botella" | "bidon") => {
+                              setVentaPerfumes((prev) => prev.map((p) => p.perfume.id === item.perfume.id ? { ...p, frascoLP: v } : p));
+                            }}
+                          >
+                            <SelectTrigger className="h-8 text-xs w-full">
+                              <SelectValue placeholder="Envase" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="botella">Botella (1L)</SelectItem>
+                              <SelectItem value="bidon">Bidón (5L)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+                    </div>
 
-                      {/* Remove Button */}
-                      <TableCell className="w-[5%] align-top py-4 text-center">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-9 w-9 text-muted-foreground hover:text-destructive"
-                          onClick={() => {
-                            setVentaPerfumes(prev => prev.filter(p => p.perfume.id !== item.perfume.id));
-                            setRowSelection(prev => {
-                              const newState = { ...prev };
-                              delete newState[item.perfume.id];
-                              return newState;
-                            });
+                    {/* Envase Return Checkbox for LP - Full Width */}
+                    {esLP && (
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`envase-m-${item.perfume.id}`}
+                          checked={!!item.devuelveEnvase}
+                          onCheckedChange={(checked) =>
+                            setVentaPerfumes((prev) => prev.map((p) => p.perfume.id === item.perfume.id ? { ...p, devuelveEnvase: checked === true } : p))
+                          }
+                        />
+                        <label htmlFor={`envase-m-${item.perfume.id}`} className="text-xs font-medium cursor-pointer">
+                          Devolvió envase
+                        </label>
+                      </div>
+                    )}
+
+                    {/* Quantity & Total */}
+                    <div className="flex items-center justify-between pt-2 border-t mt-2">
+                      <div className="flex items-center gap-2 bg-muted/30 rounded-md p-1">
+                        <span className="text-xs font-medium px-1">Cant:</span>
+                        <NumberInput
+                          min={0}
+                          decimalScale={0}
+                          value={item.cantidad}
+                          className="h-7 w-16 text-center bg-background border-none focus-visible:ring-0"
+                          onValueChange={(n) => {
+                            const value = n ?? 0;
+                            setVentaPerfumes((prev) => prev.map((p) => p.perfume.id === item.perfume.id ? { ...p, cantidad: value } : p));
                           }}
-                        >
-                          <Trash2 size={18} />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+                        />
+                      </div>
+                      <div className="text-right">
+                        <div className="font-bold text-lg text-emerald-600">
+                          {formatCurrency(unitFinal * item.cantidad, "ARS", 0)}
+                        </div>
+                        <div className="text-[10px] text-muted-foreground">
+                          {formatCurrency(unitFinal, "ARS", 0)} c/u
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </ScrollArea>
 
-          <Table className="table-fixed">
-            <TableFooter>
-              <TableRow>
-                <TableCell colSpan={4} className="font-bold text-lg text-right pr-4">
-                  Total Final
-                </TableCell>
-                <TableCell className="w-[15%] text-right font-bold text-xl text-emerald-600">
-                  {formatCurrency(
-                    ventaPerfumes.reduce((acc, it) => {
-                      const base = computePrecioUnitario(it.perfume, view === "mayorista", it.frascoLP, it.priceType);
-                      const d = it.devuelveEnvase ? getEnvaseUnitCost(it.perfume, it.frascoLP) : 0;
-                      return acc + Math.max(0, base - d) * it.cantidad;
-                    }, 0),
-                    "ARS",
-                    0,
-                  )}
-                </TableCell>
-                <TableCell></TableCell>
-              </TableRow>
-            </TableFooter>
-          </Table>
+          {/* Desktop Footer */}
+          <div className="hidden lg:block">
+            <Table className="table-fixed">
+              <TableFooter>
+                <TableRow>
+                  <TableCell colSpan={4} className="font-bold text-lg text-right pr-4">
+                    Total Final
+                  </TableCell>
+                  <TableCell className="w-[15%] text-right font-bold text-xl text-emerald-600">
+                    {formatCurrency(
+                      ventaPerfumes.reduce((acc, it) => {
+                        const base = computePrecioUnitario(it.perfume, view === "mayorista", it.frascoLP, it.priceType);
+                        const d = it.devuelveEnvase ? getEnvaseUnitCost(it.perfume, it.frascoLP) : 0;
+                        return acc + Math.max(0, base - d) * it.cantidad;
+                      }, 0),
+                      "ARS",
+                      0,
+                    )}
+                  </TableCell>
+                  <TableCell></TableCell>
+                </TableRow>
+              </TableFooter>
+            </Table>
+          </div>
+
+          {/* Mobile Footer */}
+          <div className="lg:hidden border-t pt-4 mt-2">
+            <div className="flex justify-between items-center bg-muted/20 p-3 rounded-lg border">
+              <span className="font-bold">Total Final</span>
+              <span className="font-bold text-xl text-emerald-600">
+                {formatCurrency(
+                  ventaPerfumes.reduce((acc, it) => {
+                    const base = computePrecioUnitario(it.perfume, view === "mayorista", it.frascoLP, it.priceType);
+                    const d = it.devuelveEnvase ? getEnvaseUnitCost(it.perfume, it.frascoLP) : 0;
+                    return acc + Math.max(0, base - d) * it.cantidad;
+                  }, 0),
+                  "ARS",
+                  0,
+                )}
+              </span>
+            </div>
+          </div>
 
           <div className="mt-4 flex flex-col md:flex-row items-center justify-between gap-4">
             {/* Payment Method Selection for Resellers (Left) */}
@@ -1165,14 +1406,14 @@ export function DataTable({
             </div>
 
             {/* Action Buttons */}
-            <div className="flex justify-end gap-x-2 w-full md:w-auto">
+            <div className="flex flex-col sm:flex-row justify-end gap-2 w-full md:w-auto mt-4 md:mt-0">
 
               {/* Botón Admin: Agregar a Solicitud */}
               {userRole === "admin" && (
                 <Button
                   size="sm"
                   variant="outline"
-                  className="gap-2 border-dashed border-primary/50 hover:bg-primary/5"
+                  className="w-full sm:w-auto gap-2 border-dashed border-primary/50 hover:bg-primary/5"
                   disabled={isLoadingForm || cliente.trim() === ""}
                   onClick={() => {
                     let total = 0;
@@ -1193,9 +1434,10 @@ export function DataTable({
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <span>
+                    <span className="w-full sm:w-auto block">
                       <Button
                         size="sm"
+                        className="w-full sm:w-auto"
                         disabled={isLoadingForm || cliente.trim() === ""}
                         onClick={() => {
                           let total = 0;
@@ -1220,7 +1462,7 @@ export function DataTable({
                   ) : null}
                 </Tooltip>
               </TooltipProvider>
-              <Button variant="secondary" size="sm" onClick={handleCloseModal}>
+              <Button variant="secondary" size="sm" onClick={handleCloseModal} className="w-full sm:w-auto">
                 Cancelar
               </Button>
             </div>
@@ -1228,27 +1470,34 @@ export function DataTable({
         </DialogContent>
       </Dialog >
 
-      <div className="flex flex-col xl:flex-row gap-4 items-start xl:items-center justify-between mb-6">
-        <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
-          {/* Filtros disponibles para todos (Admin y Revendedor) */}
-          <div className="relative w-full sm:w-64">
+      <div className="flex flex-col gap-4 mb-6">
+        {/* Filtros y Buscador */}
+        <div className="grid grid-cols-2 md:grid-cols-3 min-[960px]:flex min-[960px]:items-center gap-3 w-full">
+          {/* Buscador */}
+          <div className="relative w-full col-span-2 md:col-span-3 min-[960px]:col-span-1 min-[960px]:w-72">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
             <Input
-              placeholder="Buscar por nombre..."
+              placeholder="Buscar perfume..."
               value={filterValue}
               onChange={(event) => table.getColumn("nombre")?.setFilterValue(event.target.value)}
-              className="pr-10"
+              className="pl-9 w-full bg-background"
             />
           </div>
+
+          {/* Filtro Género */}
           <Select
             onValueChange={(value) =>
               table.getColumn("genero")?.setFilterValue(value === "todos" ? undefined : value)
             }
           >
-            <SelectTrigger className="w-[150px]">
-              <SelectValue placeholder="Filtrar por género" />
+            <SelectTrigger className="w-full min-[960px]:w-[160px] bg-background">
+              <div className="flex items-center gap-2 truncate">
+                <Filter className="w-3.5 h-3.5 text-muted-foreground" />
+                <SelectValue placeholder="Género" />
+              </div>
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="todos">Todos</SelectItem>
+              <SelectItem value="todos">Todos los géneros</SelectItem>
               <SelectItem value="masculino">Masculino</SelectItem>
               <SelectItem value="femenino">Femenino</SelectItem>
               <SelectItem value="ambiente">Ambiente</SelectItem>
@@ -1256,16 +1505,20 @@ export function DataTable({
             </SelectContent>
           </Select>
 
+          {/* Filtro Categoría */}
           <Select
             onValueChange={(value) =>
               table.getColumn("categoria")?.setFilterValue(value === "todos" ? undefined : value)
             }
           >
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Filtrar por categoría" />
+            <SelectTrigger className="w-full min-[960px]:w-[190px] bg-background">
+              <div className="flex items-center gap-2 truncate">
+                <Filter className="w-3.5 h-3.5 text-muted-foreground" />
+                <SelectValue placeholder="Categoría" />
+              </div>
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="todos">Todas</SelectItem>
+              <SelectItem value="todos">Todas las categorías</SelectItem>
               {insumosCategorias.filter(c => c.nombre.toLowerCase() !== 'otro').map((c) => (
                 <SelectItem key={c.id} value={c.nombre}>
                   {c.nombre}
@@ -1274,62 +1527,110 @@ export function DataTable({
             </SelectContent>
           </Select>
 
-          {/* Filtros exclusivos de Admin */}
+          {/* Filtro Familia Olfativa */}
+          <Select
+            onValueChange={(value) =>
+              table.getColumn("familia_olfativa")?.setFilterValue(value === "todos" ? undefined : value)
+            }
+          >
+            <SelectTrigger className="w-full min-[960px]:w-[180px] bg-background">
+              <div className="flex items-center gap-2 truncate">
+                <Filter className="w-3.5 h-3.5 text-muted-foreground" />
+                <SelectValue placeholder="Familia Olfativa" />
+              </div>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todas las familias</SelectItem>
+              <SelectItem value="Cítrico">Cítrico</SelectItem>
+              <SelectItem value="Floral">Floral</SelectItem>
+              <SelectItem value="Amaderado">Amaderado</SelectItem>
+              <SelectItem value="Frutal">Frutal</SelectItem>
+              <SelectItem value="Dulce">Dulce</SelectItem>
+              <SelectItem value="Especiado">Especiado</SelectItem>
+              <SelectItem value="Fresco">Fresco</SelectItem>
+              <SelectItem value="Oriental">Oriental</SelectItem>
+              <SelectItem value="Gourmand">Gourmand</SelectItem>
+              <SelectItem value="Herbal">Herbal</SelectItem>
+              <SelectItem value="Almizclada">Almizclada</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {/* Filtro Proveedor (Admin) */}
           {userRole === "admin" && (
-            <>
-              <Select
-                value={
-                  typeof table.getColumn("proveedor_id")?.getFilterValue() === "string"
-                    ? (table.getColumn("proveedor_id")?.getFilterValue() as string)
-                    : "todos"
-                }
-                onValueChange={(value) =>
-                  table.getColumn("proveedor_id")?.setFilterValue(value === "todos" ? undefined : value)
-                }
-              >
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Filtrar por proveedor" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todos">Todos</SelectItem>
-                  {proveedores.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.nombre}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </>
+            <Select
+              value={
+                (table.getColumn("proveedor_id")?.getFilterValue() as string) ?? undefined
+              }
+              onValueChange={(value) =>
+                table.getColumn("proveedor_id")?.setFilterValue(value === "todos" ? undefined : value)
+              }
+            >
+              <SelectTrigger className="w-full min-[960px]:w-[180px] bg-background col-span-2 md:col-span-1">
+                <div className="flex items-center gap-2 truncate">
+                  <Filter className="w-3.5 h-3.5 text-muted-foreground" />
+                  <SelectValue placeholder="Proveedor" />
+                </div>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos los proveedores</SelectItem>
+                {proveedores.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.nombre}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           )}
+
+          {/* Botones de Acción (Desktop traslados al final en mobile) */}
+          <div className="hidden min-[960px]:flex items-center gap-3 ml-auto">
+            <Button
+              size="sm"
+              onClick={handleExportClick}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm hover:shadow transition-all font-medium gap-2"
+            >
+              <FileSpreadsheet size={16} />
+              Exportar
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleAgregarVenta}
+              className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm hover:shadow transition-all font-medium gap-2"
+            >
+              <ShoppingCart size={16} />
+              {Object.keys(rowSelection).length > 0 ? `Ver carrito (${Object.keys(rowSelection).length})` : "Ver carrito"}
+            </Button>
+          </div>
         </div>
 
-        <div className="flex items-center gap-3 ml-auto xl:ml-0 flex-shrink-0">
+        {/* Botones de Acción (Mobile Only - Full Width) */}
+        <div className="grid grid-cols-2 gap-3 min-[960px]:hidden">
           <Button
             size="sm"
             onClick={handleExportClick}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm hover:shadow transition-all font-medium gap-2"
+            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm font-medium gap-2"
           >
             <FileSpreadsheet size={16} />
-            Exportar {view === "mayorista" ? "Mayorista" : "Minorista"}
+            Exportar
           </Button>
           <Button
             size="sm"
             onClick={handleAgregarVenta}
-            className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm hover:shadow transition-all font-medium gap-2"
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white shadow-sm font-medium gap-2"
           >
             <ShoppingCart size={16} />
-            {Object.keys(rowSelection).length > 0 ? `Ver Carrito (${Object.keys(rowSelection).length})` : "Ver Carrito"}
+            {Object.keys(rowSelection).length > 0 ? `Carrito (${Object.keys(rowSelection).length})` : "Ver carrito"}
           </Button>
         </div>
       </div>
 
-      <div className="rounded-md border">
+      <div className="rounded-md border w-full">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id}>
+                  <TableHead key={header.id} className={["categoria", "genero", "proveedor_id"].includes(header.column.id) ? "hidden md:table-cell" : ""}>
                     {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
                   </TableHead>
                 ))}
@@ -1347,7 +1648,9 @@ export function DataTable({
               table.getRowModel().rows.map((row) => (
                 <TableRow key={row.id} data-state={row.getIsSelected() && "selected"}>
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TableCell>
+                    <TableCell key={cell.id} className={["categoria", "genero", "proveedor_id"].includes(cell.column.id) ? "hidden md:table-cell" : ""}>
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </TableCell>
                   ))}
                 </TableRow>
               ))
@@ -1579,6 +1882,40 @@ export function DataTable({
                 onChange={(e) => setEditName(e.target.value)}
               />
             </div>
+            {/* Familia Olfativa (Solo Aromatizantes) */}
+            {(() => {
+              const catId = productToEdit?.insumos_categorias_id;
+              const cat = insumosCategorias.find(c => c.id === catId);
+              const isAromatizante = cat?.nombre?.toLowerCase().includes("aromatizante") || catId === "999b53c3-f181-4910-86fd-5c5b1f74af7b";
+              const hasValue = !!productToEdit?.familia_olfativa;
+              return isAromatizante || hasValue;
+            })() && (
+                <div className="space-y-2">
+                  <Label htmlFor="familia_olfativa">Familia Olfativa</Label>
+                  <MultiSelect
+                    options={[
+                      { label: "Cítrico", value: "Cítrico" },
+                      { label: "Floral", value: "Floral" },
+                      { label: "Amaderado", value: "Amaderado" },
+                      { label: "Frutal", value: "Frutal" },
+                      { label: "Dulce", value: "Dulce" },
+                      { label: "Especiado", value: "Especiado" },
+                      { label: "Fresco", value: "Fresco" },
+                      { label: "Oriental", value: "Oriental" },
+                      { label: "Gourmand", value: "Gourmand" },
+                      { label: "Herbal", value: "Herbal" },
+                      { label: "Almizclada", value: "Almizclada" },
+                    ]}
+                    selected={productToEdit?.familia_olfativa ? productToEdit.familia_olfativa.split(",").map(s => s.trim()).filter(Boolean) : []}
+                    onChange={(selected) => {
+                      const val = selected.length > 0 ? selected.join(", ") : null;
+                      setProductToEdit(prev => prev ? ({ ...prev, familia_olfativa: val }) : null);
+                    }}
+                    placeholder="Seleccionar familias"
+                    className="w-full"
+                  />
+                </div>
+              )}
 
             {/* Costos Base */}
             <div className="grid grid-cols-2 gap-4">
@@ -1730,6 +2067,33 @@ export function DataTable({
               <p className="text-[10px] text-muted-foreground pl-1">
                 * El costo final se calcula sumando el costo base + costos de insumos.
               </p>
+            </div>
+
+            {/* Previsualización de Costos en Vivo de Costos */}
+            <div className="rounded-lg border p-4 bg-muted/20 space-y-3">
+              <h4 className="font-semibold text-sm flex items-center gap-2">
+                <Check className="w-4 h-4 text-green-600" /> Resumen Estimado
+              </h4>
+              <div className="grid grid-cols-3 gap-4 text-sm">
+                <div className="space-y-1">
+                  <span className="text-muted-foreground text-xs">Costo Total</span>
+                  <div className="font-medium text-lg text-slate-700">
+                    {formatCurrency(computedTotalCost, "ARS")}
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <span className="text-muted-foreground text-xs">Sug. Minorista</span>
+                  <div className="font-bold text-lg text-primary">
+                    {formatCurrency(computedSuggMinorista, "ARS")}
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <span className="text-muted-foreground text-xs">Sug. Mayorista</span>
+                  <div className="font-bold text-lg text-blue-600">
+                    {formatCurrency(computedSuggMayorista, "ARS")}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
           <DialogFooter>

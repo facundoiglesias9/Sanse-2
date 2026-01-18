@@ -33,6 +33,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { MultiSelect } from "@/components/ui/multi-select";
 
 interface EsenciaDialogProps {
   open: boolean;
@@ -64,6 +65,7 @@ const FormSchema = z.object({
   insumos_categorias_id: z
     .string()
     .nonempty({ message: "La categoría es obligatoria" }),
+  familia_olfativa: z.string().nullable().optional(),
 });
 
 export function EsenciaDialog({
@@ -108,6 +110,7 @@ export function EsenciaDialog({
       is_consultar: false,
       genero: generoPorDefault,
       insumos_categorias_id: "",
+      familia_olfativa: null,
     },
   });
 
@@ -182,6 +185,7 @@ export function EsenciaDialog({
           is_consultar: esenciaToEdit.is_consultar ?? false,
           genero: esenciaToEdit.genero ?? generoPorDefault,
           insumos_categorias_id: esenciaToEdit.insumos_categorias_id ?? "",
+          familia_olfativa: esenciaToEdit.familia_olfativa ?? null,
         });
       } else if (defaultValues) {
         form.reset({
@@ -193,6 +197,7 @@ export function EsenciaDialog({
           is_consultar: defaultValues.is_consultar ?? false,
           genero: defaultValues.genero ?? generoPorDefault,
           insumos_categorias_id: defaultValues.insumos_categorias_id ?? "",
+          familia_olfativa: defaultValues.familia_olfativa ?? null,
         });
       } else {
         form.reset({
@@ -204,6 +209,7 @@ export function EsenciaDialog({
           is_consultar: false,
           genero: generoPorDefault,
           insumos_categorias_id: "",
+          familia_olfativa: null,
         });
       }
     }
@@ -217,11 +223,16 @@ export function EsenciaDialog({
   async function onSubmit(data: z.infer<typeof FormSchema>) {
     setIsLoadingForm(true);
 
+    const isAromatizante =
+      categorias.find(c => c.id === data.insumos_categorias_id)?.nombre.toLowerCase().includes("aromatizante") ||
+      data.insumos_categorias_id === "999b53c3-f181-4910-86fd-5c5b1f74af7b";
+
     const safeData = {
       ...data,
       precio_usd: data.precio_usd || 0,
       precio_ars: data.precio_ars || 0,
       cantidad_gramos: data.cantidad_gramos || 0,
+      familia_olfativa: isAromatizante ? data.familia_olfativa : null,
     };
 
     let error;
@@ -494,6 +505,48 @@ export function EsenciaDialog({
                   </FormItem>
                 )}
               />
+              {/* Familia Olfativa - Solo si es Aromatizantes */}
+              {(() => {
+                const selectedCatId = form.watch("insumos_categorias_id");
+                const selectedCat = categorias.find((c) => c.id === selectedCatId);
+                const isAromatizante =
+                  selectedCat?.nombre?.toLowerCase().includes("aromatizante") ||
+                  selectedCatId === "999b53c3-f181-4910-86fd-5c5b1f74af7b"; // Fallback ID legacy
+                const hasValue = !!form.getValues("familia_olfativa");
+
+                return isAromatizante || hasValue;
+              })() && (
+                  <FormField
+                    control={form.control}
+                    name="familia_olfativa"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Familia Olfativa</FormLabel>
+                        <MultiSelect
+                          options={[
+                            { label: "Cítrico", value: "Cítrico" },
+                            { label: "Floral", value: "Floral" },
+                            { label: "Amaderado", value: "Amaderado" },
+                            { label: "Frutal", value: "Frutal" },
+                            { label: "Dulce", value: "Dulce" },
+                            { label: "Especiado", value: "Especiado" },
+                            { label: "Fresco", value: "Fresco" },
+                            { label: "Oriental", value: "Oriental" },
+                            { label: "Gourmand", value: "Gourmand" },
+                          ]}
+                          selected={field.value ? field.value.split(",").map((s) => s.trim()).filter(Boolean) : []}
+                          onChange={(selected) => {
+                            const val = selected.length > 0 ? selected.join(", ") : null;
+                            field.onChange(val);
+                          }}
+                          placeholder="Seleccionar familias"
+                          className="w-full"
+                        />
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
             </div>
 
             <div className="mt-4 flex items-center justify-end gap-x-2">

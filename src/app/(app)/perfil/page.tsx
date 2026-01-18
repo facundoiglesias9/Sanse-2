@@ -8,7 +8,7 @@ import { createClient } from "@/utils/supabase/client";
 import {
   Form,
   FormControl,
-  FormDescription,
+
   FormField,
   FormItem,
   FormLabel,
@@ -21,44 +21,13 @@ import { CheckCircle2, AlertCircle, Eye, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
 
-function getPasswordStrength(password: string) {
-  let score = 0;
-  if (password.length >= 8) score++;
-  if (/[a-z]/.test(password)) score++;
-  if (/[A-Z]/.test(password)) score++;
-  if (/\d/.test(password)) score++;
-  if (/[^A-Za-z0-9]/.test(password)) score++;
-  return score;
-}
-
-function getStrengthLabel(score: number) {
-  switch (score) {
-    case 5:
-      return { color: "bg-green-500", text: "Muy segura" };
-    case 4:
-      return { color: "bg-lime-500", text: "Segura" };
-    case 3:
-      return { color: "bg-yellow-400", text: "Media" };
-    case 2:
-      return { color: "bg-orange-400", text: "Débil" };
-    default:
-      return { color: "bg-red-500", text: "Muy débil" };
-  }
-}
+import { getPasswordStrength, getStrengthLabel, passwordSchema } from "@/lib/password-utils";
+import { PasswordRequirements } from "@/components/password-requirements";
 
 const schema = z
   .object({
     actual: z.string().min(1, "Ingresa tu contraseña actual"),
-    password: z
-      .string()
-      .min(8, "La contraseña debe tener al menos 8 caracteres")
-      .regex(/[a-z]/, "Debe contener al menos una minúscula")
-      .regex(/[A-Z]/, "Debe contener al menos una mayúscula")
-      .regex(/[0-9]/, "Debe contener al menos un número")
-      .regex(
-        /[!@#$%^&*]/,
-        "Debe contener al menos un carácter especial (!@#$%^&*)",
-      ),
+    password: passwordSchema,
   })
   .refine((data) => data.actual !== data.password, {
     message: "La nueva contraseña no puede ser igual a la anterior.",
@@ -73,6 +42,7 @@ export default function Perfil() {
   const [serverSuccess, setServerSuccess] = useState<string>("");
   const [showActual, setShowActual] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [isPasswordFocused, setIsPasswordFocused] = useState(false);
   const supabase = createClient();
 
   // Obtener usuario
@@ -203,6 +173,8 @@ export default function Perfil() {
                       placeholder="Nueva contraseña"
                       {...field}
                       className="pr-10"
+                      onFocus={() => setIsPasswordFocused(true)}
+                      onBlur={() => setIsPasswordFocused(false)}
                     />
                   </FormControl>
                   <Button
@@ -221,10 +193,11 @@ export default function Perfil() {
                     )}
                   </Button>
                 </div>
-                <FormDescription>
-                  Mínimo 8 caracteres, al menos una mayúscula, una minúscula, un
-                  número y un carácter especial.
-                </FormDescription>
+                {isPasswordFocused && (
+                  <div className="mt-2 relative z-50">
+                    <PasswordRequirements password={passwordValue || ""} />
+                  </div>
+                )}
                 {/* Barra fuerza */}
                 <motion.div
                   initial={{ width: 0 }}

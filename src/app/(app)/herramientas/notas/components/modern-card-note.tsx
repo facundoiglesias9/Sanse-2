@@ -6,7 +6,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { motion, AnimatePresence } from "framer-motion";
-import { MoreHorizontalIcon, CalendarIcon, Clock } from "lucide-react";
+import { MoreHorizontalIcon, CalendarIcon, Clock, Pin } from "lucide-react";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -47,7 +47,9 @@ export interface CardNoteProps {
     onDelete?: () => void;
     onSaveEdit?: () => void;
     onCancelEdit?: () => void;
-    profiles?: { id: string; nombre: string | null; }[];
+    onTogglePin?: () => void;
+    isPinned?: boolean;
+    profiles?: { id: string; nombre: string | null; rol: string | null; }[];
 }
 
 function priorityStyles(prioridad: string) {
@@ -101,6 +103,8 @@ export default function ModernCardNote({
     onDelete,
     onSaveEdit,
     onCancelEdit,
+    onTogglePin,
+    isPinned = false,
     profiles,
 }: CardNoteProps) {
     return (
@@ -127,9 +131,9 @@ export default function ModernCardNote({
                                     <SelectValue placeholder="Usuario" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {profiles?.map((p) => (
+                                    {profiles?.filter(p => p.rol === 'admin').map((p) => (
                                         <SelectItem key={p.id} value={p.id}>
-                                            {p.nombre || "Sin nombre"}
+                                            {p.nombre || "Admin sin nombre"}
                                         </SelectItem>
                                     ))}
                                 </SelectContent>
@@ -144,32 +148,51 @@ export default function ModernCardNote({
                     </div>
                 </div>
 
-                {!isEditing && (
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 -mr-2 -mt-2 opacity-0 group-hover:opacity-100 transition-opacity rounded-full hover:bg-black/5 dark:hover:bg-white/10"
-                            >
-                                <MoreHorizontalIcon className="w-4 h-4" />
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                            {onEdit && (
-                                <DropdownMenuItem onClick={onEdit}>Editar</DropdownMenuItem>
+                <div className="flex items-center gap-1 -mr-2 -mt-2">
+                    {onTogglePin && (
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className={clsx(
+                                "h-8 w-8 transition-all rounded-full hover:bg-black/5 dark:hover:bg-white/10",
+                                isPinned ? "opacity-100 text-primary" : "opacity-0 group-hover:opacity-100 placeholder:opacity-40"
                             )}
-                            {onDelete && (
-                                <DropdownMenuItem
-                                    onClick={onDelete}
-                                    className="text-destructive"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onTogglePin();
+                            }}
+                        >
+                            <Pin className={clsx("w-4 h-4", isPinned && "fill-current")} />
+                        </Button>
+                    )}
+
+                    {!isEditing && (
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity rounded-full hover:bg-black/5 dark:hover:bg-white/10"
                                 >
-                                    Eliminar
-                                </DropdownMenuItem>
-                            )}
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                )}
+                                    <MoreHorizontalIcon className="w-4 h-4" />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                {onEdit && (
+                                    <DropdownMenuItem onClick={onEdit}>Editar</DropdownMenuItem>
+                                )}
+                                {onDelete && (
+                                    <DropdownMenuItem
+                                        onClick={onDelete}
+                                        className="text-destructive"
+                                    >
+                                        Eliminar
+                                    </DropdownMenuItem>
+                                )}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    )}
+                </div>
             </div>
 
             <div className="flex-1 flex flex-col gap-2">

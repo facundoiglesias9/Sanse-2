@@ -330,7 +330,9 @@ export default function Caja2Page() {
 
     return (
         <div className="container mx-auto py-8 px-4 max-w-7xl">
-            <h1 className="text-3xl font-bold mb-8">Caja Unificada</h1>
+            <div className="mb-8 text-center flex justify-center">
+                <h1 className="text-3xl font-bold">Caja Unificada</h1>
+            </div>
 
             {/* Fila de Widgets */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
@@ -657,6 +659,6 @@ export default function Caja2Page() {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
-        </div >
+        </div>
     );
 }

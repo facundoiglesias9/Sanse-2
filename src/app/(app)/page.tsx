@@ -10,6 +10,7 @@ import { useCurrencies } from "@/app/contexts/CurrencyContext";
 import { LoaderTable } from "@/app/(app)/components/loader-table";
 import { FormulaInfoDialog } from "@/app/(app)/components/lista_de_precios/formula-info-dialog";
 
+
 export default function ListaDePreciosPage() {
   const [perfumes, setPerfumes] = useState<Perfume[]>([]);
   const [loadingTableListaDePrecios, setLoadingTableListaDePrecios] =
@@ -20,9 +21,14 @@ export default function ListaDePreciosPage() {
   const supabase = createClient();
   const { currencies, isLoading: loadingCurrencies } = useCurrencies();
 
-  // Obtener rol del usuario
+
+
+  // Obtener rol del usuario y config de mantenimiento
   useEffect(() => {
-    const getUserRole = async () => {
+    const initPage = async () => {
+      // 1. Get User Role
+
+
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
         const { data: profile } = await supabase
@@ -33,9 +39,12 @@ export default function ListaDePreciosPage() {
 
         const role = profile?.rol || session.user.user_metadata?.rol || "comprador";
         setUserRole(role);
+      } else {
+        // Guest user
+        setUserRole("comprador"); // O "guest" si manejas
       }
     };
-    getUserRole();
+    initPage();
   }, []);
 
   // Determinar vista: revendedores ven mayorista, compradores ven minorista
@@ -45,8 +54,12 @@ export default function ListaDePreciosPage() {
   if (userRole === "revendedor") view = "mayorista";
   if (userRole === "comprador") view = "minorista"; // El comprador siempre ve minorista
 
+  // EARLY RETURN logic moved to bottom to prevent Hook Error
+
+
+
   const fetchListaDePrecios = async () => {
-    if (userRole === null) return; // Wait for role to be determined
+    if (userRole === null) return; // Esperar a que se determine el rol
     setLoadingTableListaDePrecios(true);
 
     const { data: esencias } = await supabase
@@ -81,7 +94,7 @@ export default function ListaDePreciosPage() {
       .map((esencia) => {
         let precioFinalArs = 0;
 
-        let baseGramos = 0; // The size corresponding to precioFinalArs
+        let baseGramos = 0; // El tamaño correspondiente a precioFinalArs
 
         // Prioridad al precio de 100g, si existe
         const precio100g = precio100gByEsencia.get(esencia.id);
@@ -114,10 +127,13 @@ export default function ListaDePreciosPage() {
 
             if (insumoReal) {
               const costoU = insumoReal.cantidad_lote > 0
-                ? (insumoReal.precio_lote / insumoReal.cantidad_lote)
+                ? (Number(insumoReal.precio_lote) / Number(insumoReal.cantidad_lote))
                 : 0;
-              // Usamos la cantidad guardada en la receta
-              return acc + (costoU * (customIns.cantidad || 0));
+
+              const qty = Number(customIns.cantidad_necesaria || customIns.cantidad || 0);
+              const totalInsumo = Number(costoU) * qty;
+
+              return Number(acc) + totalInsumo;
             }
             return acc;
           }, 0);
@@ -129,7 +145,7 @@ export default function ListaDePreciosPage() {
         }
 
         const costoTotal =
-          costoMateriaPrima + costoFrasco + costoOtrosInsumos;
+          Number(costoMateriaPrima) + Number(costoFrasco) + Number(costoOtrosInsumos);
 
         // Margen Minorista
         const margenPorcentaje = esencia.margen_minorista ?? (esencia.proveedores?.margen_venta ?? 100);
@@ -148,6 +164,7 @@ export default function ListaDePreciosPage() {
           id: esencia.id,
           nombre: esencia.nombre,
           genero: esencia.genero,
+          familia_olfativa: esencia.familia_olfativa,
           proveedor: esencia.proveedor,
           costo: costoTotal,
           precio,
@@ -165,6 +182,26 @@ export default function ListaDePreciosPage() {
           custom_insumos: esencia.custom_insumos,
         };
       });
+
+    // Ordenar por Categoría (Fina primero) -> Nombre
+    perfumesCalculados.sort((a, b) => {
+      const catA = (a.insumos_categorias?.nombre || "").toLowerCase();
+      const catB = (b.insumos_categorias?.nombre || "").toLowerCase();
+
+      const isFinaA = catA.includes("perfumería fina");
+      const isFinaB = catB.includes("perfumería fina");
+
+      // 1. Prioridad: Perfumería Fina primero
+      if (isFinaA && !isFinaB) return -1;
+      if (!isFinaA && isFinaB) return 1;
+
+      // 2. Alfabetico por Categoría
+      if (catA < catB) return -1;
+      if (catA > catB) return 1;
+
+      // 3. Alfabetico por Nombre
+      return a.nombre.localeCompare(b.nombre);
+    });
 
     setPerfumes(perfumesCalculados);
     setLoadingTableListaDePrecios(false);
@@ -195,6 +232,8 @@ export default function ListaDePreciosPage() {
     })
     : perfumes;
 
+
+
   return (
     <div className="flex flex-col gap-4 p-4 max-w-6xl mx-auto">
       <div className="flex items-center justify-center gap-2 mb-6">
@@ -220,13 +259,4 @@ export default function ListaDePreciosPage() {
   );
 }
 
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Trophy, Gift } from "lucide-react";
+
