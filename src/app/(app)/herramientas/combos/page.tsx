@@ -272,16 +272,16 @@ export default function CombosPage() {
 
   return (
     <div className="container mx-auto py-8 px-4 max-w-5xl">
-      <div className="flex flex-col items-center mb-8 gap-4">
-        <div className="flex items-center justify-center gap-2 group">
-          <h1 className="text-3xl font-bold text-center">Configuración de Combos</h1>
-          <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
-            <Button variant="ghost" size="icon" onClick={() => setShowFieldsConfig(true)} title="Configurar Campos" className="h-8 w-8 hover:bg-muted">
-              <Settings className="w-5 h-5 text-muted-foreground" />
+      <div className="flex justify-between items-center mb-8">
+        <div>
+          <div className="flex items-center gap-2">
+            <h1 className="text-3xl font-bold">Configuración de Combos</h1>
+            <Button variant="ghost" size="icon" onClick={() => setShowFieldsConfig(true)} title="Configurar Campos">
+              <Settings className="w-6 h-6 text-muted-foreground hover:text-foreground cursor-pointer" />
             </Button>
             <Dialog>
               <DialogTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:bg-muted">
+                <Button variant="ghost" size="icon" className="text-muted-foreground">
                   <Info className="w-5 h-5" />
                 </Button>
               </DialogTrigger>
@@ -321,10 +321,12 @@ export default function CombosPage() {
             </Dialog>
           </div>
         </div>
-        <Button variant="outline" onClick={addRule} size="sm" className="gap-2">
-          <Plus className="w-4 h-4" />
-          Nueva regla
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={addRule}>
+            <Plus className="w-4 h-4 mr-2" />
+            Nueva regla
+          </Button>
+        </div>
       </div>
 
       <div className="mb-6 relative">
@@ -417,7 +419,7 @@ export default function CombosPage() {
         currentFields={fieldDefinitions}
         onSave={handleSaveFields}
       />
-    </div >
+    </div>
   );
 }
 
