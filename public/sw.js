@@ -1,4 +1,4 @@
-// Version: 1.0.2
+// Version: 1.0.3
 const CACHE_NAME = 'sanse-perfumes-v1';
 const urlsToCache = [
     '/',
