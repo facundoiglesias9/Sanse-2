@@ -1,0 +1,1252 @@
+[
+  {
+    "id": "c99a4156-aaf9-454f-a5f3-ae3328266dd9",
+    "created_at": "2026-01-17T01:22:11.452+00:00",
+    "usuario_id": null,
+    "cliente": "Prueba 9",
+    "detalle": "212 (C. Herrera) x 1 - masculino [$30000]; 212 (C. Herrera) x 1 - femenino [$20000]; Albaca italiana x 1 - ambiente [$4400]; Cherry x 1 - otro [$1400] - Envase: Botella (1L)",
+    "items": [
+      {
+        "genero": "masculino",
+        "cliente": "Prueba 9",
+        "perfume": {
+          "id": "791b8eb8-473a-49cf-b955-d16050ec9b9e",
+          "costo": 14556.533481042654,
+          "genero": "masculino",
+          "nombre": "212 (C. Herrera)",
+          "precio": 29113.066962085308,
+          "precio_ars": 28935.42,
+          "precio_usd": 0,
+          "proveedores": {
+            "id": "3b606262-42a7-49d9-a89c-fdabf8a28c4e",
+            "color": "purple",
+            "nombre": "Van Rossum",
+            "margen_venta": 100,
+            "gramos_configurados": 15
+          },
+          "proveedor_id": "3b606262-42a7-49d9-a89c-fdabf8a28c4e",
+          "custom_insumos": [
+            {
+              "id": "1f826bb3-0f2b-42db-9209-2f7a425a620c",
+              "type": "insumo",
+              "moneda": "ARS",
+              "nombre": "Frascos masculinos",
+              "unidad": "un",
+              "cantidad": 1,
+              "cantidad_necesaria": 1
+            },
+            {
+              "id": "7bd311f7-af73-4e50-ba2f-8c57416f045b",
+              "type": "insumo",
+              "nombre": "Etiquetas",
+              "unidad": "un",
+              "cantidad": 1
+            },
+            {
+              "id": "7c1479ad-7567-46e1-9473-b629aaf5dede",
+              "type": "insumo",
+              "nombre": "Roll-on",
+              "unidad": "un",
+              "cantidad": 1
+            },
+            {
+              "id": "f20bd670-b4a8-4c37-be85-61c6eac9f7c6",
+              "type": "insumo",
+              "nombre": "Bolsas de madera",
+              "unidad": "un",
+              "cantidad": 1
+            },
+            {
+              "id": "64297462-3384-481c-8ac9-77c24f301c8c",
+              "type": "insumo",
+              "nombre": "Alcohol",
+              "unidad": "un",
+              "cantidad": 80
+            }
+          ],
+          "cantidad_gramos": 30,
+          "familia_olfativa": null,
+          "margen_mayorista": null,
+          "margen_minorista": null,
+          "precio_mayorista": 24746.10691777251,
+          "insumos_categorias": {
+            "id": "999b53c3-f181-4910-86fd-5c5b1f74af7b",
+            "nombre": "Perfumería fina"
+          },
+          "insumos_categorias_id": "999b53c3-f181-4910-86fd-5c5b1f74af7b"
+        },
+        "cantidad": 1,
+        "priceType": "precio",
+        "devuelveEnvase": false
+      },
+      {
+        "genero": "femenino",
+        "cliente": "Prueba 9",
+        "perfume": {
+          "id": "757a4f34-4169-4d89-be83-63ef40d608a4",
+          "costo": 9952.331981042655,
+          "genero": "femenino",
+          "nombre": "212 (C. Herrera)",
+          "precio": 19904.66396208531,
+          "precio_ars": 13373.52,
+          "precio_usd": 0,
+          "proveedores": {
+            "id": "3b606262-42a7-49d9-a89c-fdabf8a28c4e",
+            "color": "purple",
+            "nombre": "Van Rossum",
+            "margen_venta": 100,
+            "gramos_configurados": 15
+          },
+          "proveedor_id": "3b606262-42a7-49d9-a89c-fdabf8a28c4e",
+          "custom_insumos": [
+            {
+              "id": "53733085-0cf6-4d9e-bdf1-00fae9d71fda",
+              "type": "insumo",
+              "moneda": "ARS",
+              "nombre": "Frascos femeninos",
+              "unidad": "un",
+              "cantidad": 1,
+              "cantidad_necesaria": 1
+            },
+            {
+              "id": "7bd311f7-af73-4e50-ba2f-8c57416f045b",
+              "type": "insumo",
+              "nombre": "Etiquetas",
+              "unidad": "un",
+              "cantidad": 1
+            },
+            {
+              "id": "7c1479ad-7567-46e1-9473-b629aaf5dede",
+              "type": "insumo",
+              "nombre": "Roll-on",
+              "unidad": "un",
+              "cantidad": 1
+            },
+            {
+              "id": "f20bd670-b4a8-4c37-be85-61c6eac9f7c6",
+              "type": "insumo",
+              "nombre": "Bolsas de madera",
+              "unidad": "un",
+              "cantidad": 1
+            },
+            {
+              "id": "64297462-3384-481c-8ac9-77c24f301c8c",
+              "type": "insumo",
+              "nombre": "Alcohol",
+              "unidad": "un",
+              "cantidad": 80
+            }
+          ],
+          "cantidad_gramos": 30,
+          "familia_olfativa": null,
+          "margen_mayorista": null,
+          "margen_minorista": null,
+          "precio_mayorista": 16918.96436777251,
+          "insumos_categorias": {
+            "id": "999b53c3-f181-4910-86fd-5c5b1f74af7b",
+            "nombre": "Perfumería fina"
+          },
+          "insumos_categorias_id": "999b53c3-f181-4910-86fd-5c5b1f74af7b"
+        },
+        "cantidad": 1,
+        "priceType": "precio",
+        "devuelveEnvase": false
+      },
+      {
+        "genero": "ambiente",
+        "cliente": "Prueba 9",
+        "perfume": {
+          "id": "22d7cd96-21c2-4418-971c-5b4e0fbec5db",
+          "costo": 2153.656,
+          "genero": "ambiente",
+          "nombre": "Albaca italiana",
+          "precio": 4307.312,
+          "precio_ars": 8303.04,
+          "precio_usd": 5.76,
+          "proveedores": {
+            "id": "6ee49726-6655-4ed3-8c27-a3dc9f84980a",
+            "color": null,
+            "nombre": "Ezentie (aromatizantes)",
+            "margen_venta": 100,
+            "gramos_configurados": 7
+          },
+          "proveedor_id": "6ee49726-6655-4ed3-8c27-a3dc9f84980a",
+          "custom_insumos": [
+            {
+              "id": "0b676f58-2cb6-4ad9-a9d3-08a0ef504b75",
+              "nombre": "Frasco para auto",
+              "is_general": false,
+              "precio_lote": 31340,
+              "cantidad_lote": 20,
+              "cantidad_necesaria": 1,
+              "insumos_categorias_id": "1849c0c4-929a-4f02-aa50-119bedfbe16f"
+            }
+          ],
+          "cantidad_gramos": 100,
+          "familia_olfativa": "Herbal",
+          "margen_mayorista": 70,
+          "margen_minorista": 100,
+          "precio_mayorista": 3661.2151999999996,
+          "insumos_categorias": {
+            "id": "1849c0c4-929a-4f02-aa50-119bedfbe16f",
+            "nombre": "Aromatizante"
+          },
+          "insumos_categorias_id": "1849c0c4-929a-4f02-aa50-119bedfbe16f"
+        },
+        "cantidad": 1,
+        "priceType": "precio",
+        "devuelveEnvase": false
+      },
+      {
+        "genero": "otro",
+        "cliente": "Prueba 9",
+        "perfume": {
+          "id": "94ef960b-040f-4e7b-99d8-1f1e22f1dec8",
+          "costo": 977.8133333333334,
+          "genero": "otro",
+          "nombre": "Cherry",
+          "precio": 1387.9082453333333,
+          "precio_ars": 20732,
+          "precio_usd": null,
+          "proveedores": {
+            "id": "0824df2a-d8a4-4cf7-a409-7a45d9686d57",
+            "color": "pink",
+            "nombre": "Maximus",
+            "margen_venta": 41.94,
+            "gramos_configurados": 15
+          },
+          "proveedor_id": "0824df2a-d8a4-4cf7-a409-7a45d9686d57",
+          "custom_insumos": [
+            {
+              "id": "4b33c9ba-7465-4a1c-b173-521431963ed8",
+              "nombre": "Botella (1L)",
+              "is_general": true,
+              "precio_lote": 20005,
+              "cantidad_lote": 30,
+              "cantidad_necesaria": 1,
+              "insumos_categorias_id": "6944056a-4b9c-4102-a368-7c2b9ff77d5a"
+            }
+          ],
+          "cantidad_gramos": 1000,
+          "familia_olfativa": null,
+          "margen_mayorista": 21,
+          "margen_minorista": 41.94,
+          "precio_mayorista": 1183.1541333333334,
+          "insumos_categorias": {
+            "id": "6944056a-4b9c-4102-a368-7c2b9ff77d5a",
+            "nombre": "Limpia Pisos 1L"
+          },
+          "insumos_categorias_id": "6944056a-4b9c-4102-a368-7c2b9ff77d5a"
+        },
+        "cantidad": 1,
+        "frascoLP": "botella",
+        "priceType": "precio",
+        "devuelveEnvase": false
+      }
+    ],
+    "total": 55800,
+    "estado": "entregado",
+    "metodo_pago": "Efectivo",
+    "motivo": null
+  },
+  {
+    "id": "f6c76b9f-7dca-4acf-85a1-941eff485a8d",
+    "created_at": "2026-01-17T01:19:38.181+00:00",
+    "usuario_id": null,
+    "cliente": "Prueba 8",
+    "detalle": "212 (C. Herrera) x 1 - masculino [$30000]; 212 (C. Herrera) x 1 - femenino [$20000]; Albaca italiana x 1 - ambiente [$4400]; Cherry x 1 - otro [$1400] - Envase: Botella (1L)",
+    "items": [
+      {
+        "genero": "masculino",
+        "cliente": "Prueba 8",
+        "perfume": {
+          "id": "791b8eb8-473a-49cf-b955-d16050ec9b9e",
+          "costo": 14556.533481042654,
+          "genero": "masculino",
+          "nombre": "212 (C. Herrera)",
+          "precio": 29113.066962085308,
+          "precio_ars": 28935.42,
+          "precio_usd": 0,
+          "proveedores": {
+            "id": "3b606262-42a7-49d9-a89c-fdabf8a28c4e",
+            "color": "purple",
+            "nombre": "Van Rossum",
+            "margen_venta": 100,
+            "gramos_configurados": 15
+          },
+          "proveedor_id": "3b606262-42a7-49d9-a89c-fdabf8a28c4e",
+          "custom_insumos": [
+            {
+              "id": "1f826bb3-0f2b-42db-9209-2f7a425a620c",
+              "type": "insumo",
+              "moneda": "ARS",
+              "nombre": "Frascos masculinos",
+              "unidad": "un",
+              "cantidad": 1,
+              "cantidad_necesaria": 1
+            },
+            {
+              "id": "7bd311f7-af73-4e50-ba2f-8c57416f045b",
+              "type": "insumo",
+              "nombre": "Etiquetas",
+              "unidad": "un",
+              "cantidad": 1
+            },
+            {
+              "id": "7c1479ad-7567-46e1-9473-b629aaf5dede",
+              "type": "insumo",
+              "nombre": "Roll-on",
+              "unidad": "un",
+              "cantidad": 1
+            },
+            {
+              "id": "f20bd670-b4a8-4c37-be85-61c6eac9f7c6",
+              "type": "insumo",
+              "nombre": "Bolsas de madera",
+              "unidad": "un",
+              "cantidad": 1
+            },
+            {
+              "id": "64297462-3384-481c-8ac9-77c24f301c8c",
+              "type": "insumo",
+              "nombre": "Alcohol",
+              "unidad": "un",
+              "cantidad": 80
+            }
+          ],
+          "cantidad_gramos": 30,
+          "familia_olfativa": null,
+          "margen_mayorista": null,
+          "margen_minorista": null,
+          "precio_mayorista": 24746.10691777251,
+          "insumos_categorias": {
+            "id": "999b53c3-f181-4910-86fd-5c5b1f74af7b",
+            "nombre": "Perfumería fina"
+          },
+          "insumos_categorias_id": "999b53c3-f181-4910-86fd-5c5b1f74af7b"
+        },
+        "cantidad": 1,
+        "priceType": "precio",
+        "devuelveEnvase": false
+      },
+      {
+        "genero": "femenino",
+        "cliente": "Prueba 8",
+        "perfume": {
+          "id": "757a4f34-4169-4d89-be83-63ef40d608a4",
+          "costo": 9952.331981042655,
+          "genero": "femenino",
+          "nombre": "212 (C. Herrera)",
+          "precio": 19904.66396208531,
+          "precio_ars": 13373.52,
+          "precio_usd": 0,
+          "proveedores": {
+            "id": "3b606262-42a7-49d9-a89c-fdabf8a28c4e",
+            "color": "purple",
+            "nombre": "Van Rossum",
+            "margen_venta": 100,
+            "gramos_configurados": 15
+          },
+          "proveedor_id": "3b606262-42a7-49d9-a89c-fdabf8a28c4e",
+          "custom_insumos": [
+            {
+              "id": "53733085-0cf6-4d9e-bdf1-00fae9d71fda",
+              "type": "insumo",
+              "moneda": "ARS",
+              "nombre": "Frascos femeninos",
+              "unidad": "un",
+              "cantidad": 1,
+              "cantidad_necesaria": 1
+            },
+            {
+              "id": "7bd311f7-af73-4e50-ba2f-8c57416f045b",
+              "type": "insumo",
+              "nombre": "Etiquetas",
+              "unidad": "un",
+              "cantidad": 1
+            },
+            {
+              "id": "7c1479ad-7567-46e1-9473-b629aaf5dede",
+              "type": "insumo",
+              "nombre": "Roll-on",
+              "unidad": "un",
+              "cantidad": 1
+            },
+            {
+              "id": "f20bd670-b4a8-4c37-be85-61c6eac9f7c6",
+              "type": "insumo",
+              "nombre": "Bolsas de madera",
+              "unidad": "un",
+              "cantidad": 1
+            },
+            {
+              "id": "64297462-3384-481c-8ac9-77c24f301c8c",
+              "type": "insumo",
+              "nombre": "Alcohol",
+              "unidad": "un",
+              "cantidad": 80
+            }
+          ],
+          "cantidad_gramos": 30,
+          "familia_olfativa": null,
+          "margen_mayorista": null,
+          "margen_minorista": null,
+          "precio_mayorista": 16918.96436777251,
+          "insumos_categorias": {
+            "id": "999b53c3-f181-4910-86fd-5c5b1f74af7b",
+            "nombre": "Perfumería fina"
+          },
+          "insumos_categorias_id": "999b53c3-f181-4910-86fd-5c5b1f74af7b"
+        },
+        "cantidad": 1,
+        "priceType": "precio",
+        "devuelveEnvase": false
+      },
+      {
+        "genero": "ambiente",
+        "cliente": "Prueba 8",
+        "perfume": {
+          "id": "22d7cd96-21c2-4418-971c-5b4e0fbec5db",
+          "costo": 2153.656,
+          "genero": "ambiente",
+          "nombre": "Albaca italiana",
+          "precio": 4307.312,
+          "precio_ars": 8303.04,
+          "precio_usd": 5.76,
+          "proveedores": {
+            "id": "6ee49726-6655-4ed3-8c27-a3dc9f84980a",
+            "color": null,
+            "nombre": "Ezentie (aromatizantes)",
+            "margen_venta": 100,
+            "gramos_configurados": 7
+          },
+          "proveedor_id": "6ee49726-6655-4ed3-8c27-a3dc9f84980a",
+          "custom_insumos": [
+            {
+              "id": "0b676f58-2cb6-4ad9-a9d3-08a0ef504b75",
+              "nombre": "Frasco para auto",
+              "is_general": false,
+              "precio_lote": 31340,
+              "cantidad_lote": 20,
+              "cantidad_necesaria": 1,
+              "insumos_categorias_id": "1849c0c4-929a-4f02-aa50-119bedfbe16f"
+            }
+          ],
+          "cantidad_gramos": 100,
+          "familia_olfativa": "Herbal",
+          "margen_mayorista": 70,
+          "margen_minorista": 100,
+          "precio_mayorista": 3661.2151999999996,
+          "insumos_categorias": {
+            "id": "1849c0c4-929a-4f02-aa50-119bedfbe16f",
+            "nombre": "Aromatizante"
+          },
+          "insumos_categorias_id": "1849c0c4-929a-4f02-aa50-119bedfbe16f"
+        },
+        "cantidad": 1,
+        "priceType": "precio",
+        "devuelveEnvase": false
+      },
+      {
+        "genero": "otro",
+        "cliente": "Prueba 8",
+        "perfume": {
+          "id": "94ef960b-040f-4e7b-99d8-1f1e22f1dec8",
+          "costo": 977.8133333333334,
+          "genero": "otro",
+          "nombre": "Cherry",
+          "precio": 1387.9082453333333,
+          "precio_ars": 20732,
+          "precio_usd": null,
+          "proveedores": {
+            "id": "0824df2a-d8a4-4cf7-a409-7a45d9686d57",
+            "color": "pink",
+            "nombre": "Maximus",
+            "margen_venta": 41.94,
+            "gramos_configurados": 15
+          },
+          "proveedor_id": "0824df2a-d8a4-4cf7-a409-7a45d9686d57",
+          "custom_insumos": [
+            {
+              "id": "4b33c9ba-7465-4a1c-b173-521431963ed8",
+              "nombre": "Botella (1L)",
+              "is_general": true,
+              "precio_lote": 20005,
+              "cantidad_lote": 30,
+              "cantidad_necesaria": 1,
+              "insumos_categorias_id": "6944056a-4b9c-4102-a368-7c2b9ff77d5a"
+            }
+          ],
+          "cantidad_gramos": 1000,
+          "familia_olfativa": null,
+          "margen_mayorista": 21,
+          "margen_minorista": 41.94,
+          "precio_mayorista": 1183.1541333333334,
+          "insumos_categorias": {
+            "id": "6944056a-4b9c-4102-a368-7c2b9ff77d5a",
+            "nombre": "Limpia Pisos 1L"
+          },
+          "insumos_categorias_id": "6944056a-4b9c-4102-a368-7c2b9ff77d5a"
+        },
+        "cantidad": 1,
+        "frascoLP": "botella",
+        "priceType": "precio",
+        "devuelveEnvase": false
+      }
+    ],
+    "total": 55800,
+    "estado": "entregado",
+    "metodo_pago": "Efectivo",
+    "motivo": null
+  },
+  {
+    "id": "72dc455e-ee7b-4c61-8926-c9806ec8b36a",
+    "created_at": "2026-01-17T01:14:31.248+00:00",
+    "usuario_id": null,
+    "cliente": "Prueba 7",
+    "detalle": "212 (C. Herrera) x 1 - masculino [$30000]; 212 (C. Herrera) x 1 - femenino [$20000]; Albaca italiana x 1 - ambiente [$4400]; Cherry x 1 - otro [$1400] - Envase: Botella (1L)",
+    "items": [
+      {
+        "genero": "masculino",
+        "cliente": "Prueba 7",
+        "perfume": {
+          "id": "791b8eb8-473a-49cf-b955-d16050ec9b9e",
+          "costo": 14556.533481042654,
+          "genero": "masculino",
+          "nombre": "212 (C. Herrera)",
+          "precio": 29113.066962085308,
+          "precio_ars": 28935.42,
+          "precio_usd": 0,
+          "proveedores": {
+            "id": "3b606262-42a7-49d9-a89c-fdabf8a28c4e",
+            "color": "purple",
+            "nombre": "Van Rossum",
+            "margen_venta": 100,
+            "gramos_configurados": 15
+          },
+          "proveedor_id": "3b606262-42a7-49d9-a89c-fdabf8a28c4e",
+          "custom_insumos": [
+            {
+              "id": "1f826bb3-0f2b-42db-9209-2f7a425a620c",
+              "type": "insumo",
+              "moneda": "ARS",
+              "nombre": "Frascos masculinos",
+              "unidad": "un",
+              "cantidad": 1,
+              "cantidad_necesaria": 1
+            },
+            {
+              "id": "7bd311f7-af73-4e50-ba2f-8c57416f045b",
+              "type": "insumo",
+              "nombre": "Etiquetas",
+              "unidad": "un",
+              "cantidad": 1
+            },
+            {
+              "id": "7c1479ad-7567-46e1-9473-b629aaf5dede",
+              "type": "insumo",
+              "nombre": "Roll-on",
+              "unidad": "un",
+              "cantidad": 1
+            },
+            {
+              "id": "f20bd670-b4a8-4c37-be85-61c6eac9f7c6",
+              "type": "insumo",
+              "nombre": "Bolsas de madera",
+              "unidad": "un",
+              "cantidad": 1
+            },
+            {
+              "id": "64297462-3384-481c-8ac9-77c24f301c8c",
+              "type": "insumo",
+              "nombre": "Alcohol",
+              "unidad": "un",
+              "cantidad": 80
+            }
+          ],
+          "cantidad_gramos": 30,
+          "familia_olfativa": null,
+          "margen_mayorista": null,
+          "margen_minorista": null,
+          "precio_mayorista": 24746.10691777251,
+          "insumos_categorias": {
+            "id": "999b53c3-f181-4910-86fd-5c5b1f74af7b",
+            "nombre": "Perfumería fina"
+          },
+          "insumos_categorias_id": "999b53c3-f181-4910-86fd-5c5b1f74af7b"
+        },
+        "cantidad": 1,
+        "priceType": "precio",
+        "devuelveEnvase": false
+      },
+      {
+        "genero": "femenino",
+        "cliente": "Prueba 7",
+        "perfume": {
+          "id": "757a4f34-4169-4d89-be83-63ef40d608a4",
+          "costo": 9952.331981042655,
+          "genero": "femenino",
+          "nombre": "212 (C. Herrera)",
+          "precio": 19904.66396208531,
+          "precio_ars": 13373.52,
+          "precio_usd": 0,
+          "proveedores": {
+            "id": "3b606262-42a7-49d9-a89c-fdabf8a28c4e",
+            "color": "purple",
+            "nombre": "Van Rossum",
+            "margen_venta": 100,
+            "gramos_configurados": 15
+          },
+          "proveedor_id": "3b606262-42a7-49d9-a89c-fdabf8a28c4e",
+          "custom_insumos": [
+            {
+              "id": "53733085-0cf6-4d9e-bdf1-00fae9d71fda",
+              "type": "insumo",
+              "moneda": "ARS",
+              "nombre": "Frascos femeninos",
+              "unidad": "un",
+              "cantidad": 1,
+              "cantidad_necesaria": 1
+            },
+            {
+              "id": "7bd311f7-af73-4e50-ba2f-8c57416f045b",
+              "type": "insumo",
+              "nombre": "Etiquetas",
+              "unidad": "un",
+              "cantidad": 1
+            },
+            {
+              "id": "7c1479ad-7567-46e1-9473-b629aaf5dede",
+              "type": "insumo",
+              "nombre": "Roll-on",
+              "unidad": "un",
+              "cantidad": 1
+            },
+            {
+              "id": "f20bd670-b4a8-4c37-be85-61c6eac9f7c6",
+              "type": "insumo",
+              "nombre": "Bolsas de madera",
+              "unidad": "un",
+              "cantidad": 1
+            },
+            {
+              "id": "64297462-3384-481c-8ac9-77c24f301c8c",
+              "type": "insumo",
+              "nombre": "Alcohol",
+              "unidad": "un",
+              "cantidad": 80
+            }
+          ],
+          "cantidad_gramos": 30,
+          "familia_olfativa": null,
+          "margen_mayorista": null,
+          "margen_minorista": null,
+          "precio_mayorista": 16918.96436777251,
+          "insumos_categorias": {
+            "id": "999b53c3-f181-4910-86fd-5c5b1f74af7b",
+            "nombre": "Perfumería fina"
+          },
+          "insumos_categorias_id": "999b53c3-f181-4910-86fd-5c5b1f74af7b"
+        },
+        "cantidad": 1,
+        "priceType": "precio",
+        "devuelveEnvase": false
+      },
+      {
+        "genero": "ambiente",
+        "cliente": "Prueba 7",
+        "perfume": {
+          "id": "22d7cd96-21c2-4418-971c-5b4e0fbec5db",
+          "costo": 2153.656,
+          "genero": "ambiente",
+          "nombre": "Albaca italiana",
+          "precio": 4307.312,
+          "precio_ars": 8303.04,
+          "precio_usd": 5.76,
+          "proveedores": {
+            "id": "6ee49726-6655-4ed3-8c27-a3dc9f84980a",
+            "color": null,
+            "nombre": "Ezentie (aromatizantes)",
+            "margen_venta": 100,
+            "gramos_configurados": 7
+          },
+          "proveedor_id": "6ee49726-6655-4ed3-8c27-a3dc9f84980a",
+          "custom_insumos": [
+            {
+              "id": "0b676f58-2cb6-4ad9-a9d3-08a0ef504b75",
+              "nombre": "Frasco para auto",
+              "is_general": false,
+              "precio_lote": 31340,
+              "cantidad_lote": 20,
+              "cantidad_necesaria": 1,
+              "insumos_categorias_id": "1849c0c4-929a-4f02-aa50-119bedfbe16f"
+            }
+          ],
+          "cantidad_gramos": 100,
+          "familia_olfativa": "Herbal",
+          "margen_mayorista": 70,
+          "margen_minorista": 100,
+          "precio_mayorista": 3661.2151999999996,
+          "insumos_categorias": {
+            "id": "1849c0c4-929a-4f02-aa50-119bedfbe16f",
+            "nombre": "Aromatizante"
+          },
+          "insumos_categorias_id": "1849c0c4-929a-4f02-aa50-119bedfbe16f"
+        },
+        "cantidad": 1,
+        "priceType": "precio",
+        "devuelveEnvase": false
+      },
+      {
+        "genero": "otro",
+        "cliente": "Prueba 7",
+        "perfume": {
+          "id": "94ef960b-040f-4e7b-99d8-1f1e22f1dec8",
+          "costo": 977.8133333333334,
+          "genero": "otro",
+          "nombre": "Cherry",
+          "precio": 1387.9082453333333,
+          "precio_ars": 20732,
+          "precio_usd": null,
+          "proveedores": {
+            "id": "0824df2a-d8a4-4cf7-a409-7a45d9686d57",
+            "color": "pink",
+            "nombre": "Maximus",
+            "margen_venta": 41.94,
+            "gramos_configurados": 15
+          },
+          "proveedor_id": "0824df2a-d8a4-4cf7-a409-7a45d9686d57",
+          "custom_insumos": [
+            {
+              "id": "4b33c9ba-7465-4a1c-b173-521431963ed8",
+              "nombre": "Botella (1L)",
+              "is_general": true,
+              "precio_lote": 20005,
+              "cantidad_lote": 30,
+              "cantidad_necesaria": 1,
+              "insumos_categorias_id": "6944056a-4b9c-4102-a368-7c2b9ff77d5a"
+            }
+          ],
+          "cantidad_gramos": 1000,
+          "familia_olfativa": null,
+          "margen_mayorista": 21,
+          "margen_minorista": 41.94,
+          "precio_mayorista": 1183.1541333333334,
+          "insumos_categorias": {
+            "id": "6944056a-4b9c-4102-a368-7c2b9ff77d5a",
+            "nombre": "Limpia Pisos 1L"
+          },
+          "insumos_categorias_id": "6944056a-4b9c-4102-a368-7c2b9ff77d5a"
+        },
+        "cantidad": 1,
+        "frascoLP": "botella",
+        "priceType": "precio",
+        "devuelveEnvase": false
+      }
+    ],
+    "total": 55800,
+    "estado": "entregado",
+    "metodo_pago": "Efectivo",
+    "motivo": null
+  },
+  {
+    "id": "e709d0a7-47a5-40f3-80d6-ab94e7921ced",
+    "created_at": "2026-01-17T01:08:21.521+00:00",
+    "usuario_id": null,
+    "cliente": "Prueba 6",
+    "detalle": "212 (C. Herrera) x 1 - masculino [$30000]; 212 (C. Herrera) x 1 - femenino [$20000]; Albaca italiana x 1 - ambiente [$4400]; Cherry x 1 - otro [$1400] - Envase: Botella (1L)",
+    "items": [
+      {
+        "genero": "masculino",
+        "cliente": "Prueba 6",
+        "perfume": {
+          "id": "791b8eb8-473a-49cf-b955-d16050ec9b9e",
+          "costo": 14556.533481042654,
+          "genero": "masculino",
+          "nombre": "212 (C. Herrera)",
+          "precio": 29113.066962085308,
+          "precio_ars": 28935.42,
+          "precio_usd": 0,
+          "proveedores": {
+            "id": "3b606262-42a7-49d9-a89c-fdabf8a28c4e",
+            "color": "purple",
+            "nombre": "Van Rossum",
+            "margen_venta": 100,
+            "gramos_configurados": 15
+          },
+          "proveedor_id": "3b606262-42a7-49d9-a89c-fdabf8a28c4e",
+          "custom_insumos": [
+            {
+              "id": "1f826bb3-0f2b-42db-9209-2f7a425a620c",
+              "type": "insumo",
+              "moneda": "ARS",
+              "nombre": "Frascos masculinos",
+              "unidad": "un",
+              "cantidad": 1,
+              "cantidad_necesaria": 1
+            },
+            {
+              "id": "7bd311f7-af73-4e50-ba2f-8c57416f045b",
+              "type": "insumo",
+              "nombre": "Etiquetas",
+              "unidad": "un",
+              "cantidad": 1
+            },
+            {
+              "id": "7c1479ad-7567-46e1-9473-b629aaf5dede",
+              "type": "insumo",
+              "nombre": "Roll-on",
+              "unidad": "un",
+              "cantidad": 1
+            },
+            {
+              "id": "f20bd670-b4a8-4c37-be85-61c6eac9f7c6",
+              "type": "insumo",
+              "nombre": "Bolsas de madera",
+              "unidad": "un",
+              "cantidad": 1
+            },
+            {
+              "id": "64297462-3384-481c-8ac9-77c24f301c8c",
+              "type": "insumo",
+              "nombre": "Alcohol",
+              "unidad": "un",
+              "cantidad": 80
+            }
+          ],
+          "cantidad_gramos": 30,
+          "familia_olfativa": null,
+          "margen_mayorista": null,
+          "margen_minorista": null,
+          "precio_mayorista": 24746.10691777251,
+          "insumos_categorias": {
+            "id": "999b53c3-f181-4910-86fd-5c5b1f74af7b",
+            "nombre": "Perfumería fina"
+          },
+          "insumos_categorias_id": "999b53c3-f181-4910-86fd-5c5b1f74af7b"
+        },
+        "cantidad": 1,
+        "priceType": "precio",
+        "devuelveEnvase": false
+      },
+      {
+        "genero": "femenino",
+        "cliente": "Prueba 6",
+        "perfume": {
+          "id": "757a4f34-4169-4d89-be83-63ef40d608a4",
+          "costo": 9952.331981042655,
+          "genero": "femenino",
+          "nombre": "212 (C. Herrera)",
+          "precio": 19904.66396208531,
+          "precio_ars": 13373.52,
+          "precio_usd": 0,
+          "proveedores": {
+            "id": "3b606262-42a7-49d9-a89c-fdabf8a28c4e",
+            "color": "purple",
+            "nombre": "Van Rossum",
+            "margen_venta": 100,
+            "gramos_configurados": 15
+          },
+          "proveedor_id": "3b606262-42a7-49d9-a89c-fdabf8a28c4e",
+          "custom_insumos": [
+            {
+              "id": "53733085-0cf6-4d9e-bdf1-00fae9d71fda",
+              "type": "insumo",
+              "moneda": "ARS",
+              "nombre": "Frascos femeninos",
+              "unidad": "un",
+              "cantidad": 1,
+              "cantidad_necesaria": 1
+            },
+            {
+              "id": "7bd311f7-af73-4e50-ba2f-8c57416f045b",
+              "type": "insumo",
+              "nombre": "Etiquetas",
+              "unidad": "un",
+              "cantidad": 1
+            },
+            {
+              "id": "7c1479ad-7567-46e1-9473-b629aaf5dede",
+              "type": "insumo",
+              "nombre": "Roll-on",
+              "unidad": "un",
+              "cantidad": 1
+            },
+            {
+              "id": "f20bd670-b4a8-4c37-be85-61c6eac9f7c6",
+              "type": "insumo",
+              "nombre": "Bolsas de madera",
+              "unidad": "un",
+              "cantidad": 1
+            },
+            {
+              "id": "64297462-3384-481c-8ac9-77c24f301c8c",
+              "type": "insumo",
+              "nombre": "Alcohol",
+              "unidad": "un",
+              "cantidad": 80
+            }
+          ],
+          "cantidad_gramos": 30,
+          "familia_olfativa": null,
+          "margen_mayorista": null,
+          "margen_minorista": null,
+          "precio_mayorista": 16918.96436777251,
+          "insumos_categorias": {
+            "id": "999b53c3-f181-4910-86fd-5c5b1f74af7b",
+            "nombre": "Perfumería fina"
+          },
+          "insumos_categorias_id": "999b53c3-f181-4910-86fd-5c5b1f74af7b"
+        },
+        "cantidad": 1,
+        "priceType": "precio",
+        "devuelveEnvase": false
+      },
+      {
+        "genero": "ambiente",
+        "cliente": "Prueba 6",
+        "perfume": {
+          "id": "22d7cd96-21c2-4418-971c-5b4e0fbec5db",
+          "costo": 2153.656,
+          "genero": "ambiente",
+          "nombre": "Albaca italiana",
+          "precio": 4307.312,
+          "precio_ars": 8303.04,
+          "precio_usd": 5.76,
+          "proveedores": {
+            "id": "6ee49726-6655-4ed3-8c27-a3dc9f84980a",
+            "color": null,
+            "nombre": "Ezentie (aromatizantes)",
+            "margen_venta": 100,
+            "gramos_configurados": 7
+          },
+          "proveedor_id": "6ee49726-6655-4ed3-8c27-a3dc9f84980a",
+          "custom_insumos": [
+            {
+              "id": "0b676f58-2cb6-4ad9-a9d3-08a0ef504b75",
+              "nombre": "Frasco para auto",
+              "is_general": false,
+              "precio_lote": 31340,
+              "cantidad_lote": 20,
+              "cantidad_necesaria": 1,
+              "insumos_categorias_id": "1849c0c4-929a-4f02-aa50-119bedfbe16f"
+            }
+          ],
+          "cantidad_gramos": 100,
+          "familia_olfativa": "Herbal",
+          "margen_mayorista": 70,
+          "margen_minorista": 100,
+          "precio_mayorista": 3661.2151999999996,
+          "insumos_categorias": {
+            "id": "1849c0c4-929a-4f02-aa50-119bedfbe16f",
+            "nombre": "Aromatizante"
+          },
+          "insumos_categorias_id": "1849c0c4-929a-4f02-aa50-119bedfbe16f"
+        },
+        "cantidad": 1,
+        "priceType": "precio",
+        "devuelveEnvase": false
+      },
+      {
+        "genero": "otro",
+        "cliente": "Prueba 6",
+        "perfume": {
+          "id": "94ef960b-040f-4e7b-99d8-1f1e22f1dec8",
+          "costo": 977.8133333333334,
+          "genero": "otro",
+          "nombre": "Cherry",
+          "precio": 1387.9082453333333,
+          "precio_ars": 20732,
+          "precio_usd": null,
+          "proveedores": {
+            "id": "0824df2a-d8a4-4cf7-a409-7a45d9686d57",
+            "color": "pink",
+            "nombre": "Maximus",
+            "margen_venta": 41.94,
+            "gramos_configurados": 15
+          },
+          "proveedor_id": "0824df2a-d8a4-4cf7-a409-7a45d9686d57",
+          "custom_insumos": [
+            {
+              "id": "4b33c9ba-7465-4a1c-b173-521431963ed8",
+              "nombre": "Botella (1L)",
+              "is_general": true,
+              "precio_lote": 20005,
+              "cantidad_lote": 30,
+              "cantidad_necesaria": 1,
+              "insumos_categorias_id": "6944056a-4b9c-4102-a368-7c2b9ff77d5a"
+            }
+          ],
+          "cantidad_gramos": 1000,
+          "familia_olfativa": null,
+          "margen_mayorista": 21,
+          "margen_minorista": 41.94,
+          "precio_mayorista": 1183.1541333333334,
+          "insumos_categorias": {
+            "id": "6944056a-4b9c-4102-a368-7c2b9ff77d5a",
+            "nombre": "Limpia Pisos 1L"
+          },
+          "insumos_categorias_id": "6944056a-4b9c-4102-a368-7c2b9ff77d5a"
+        },
+        "cantidad": 1,
+        "frascoLP": "botella",
+        "priceType": "precio",
+        "devuelveEnvase": false
+      }
+    ],
+    "total": 55800,
+    "estado": "entregado",
+    "metodo_pago": "Efectivo",
+    "motivo": null
+  },
+  {
+    "id": "01198d1a-6673-499e-9d06-a173d5ae0171",
+    "created_at": "2026-01-17T01:02:22.857+00:00",
+    "usuario_id": null,
+    "cliente": "Prueba 5",
+    "detalle": "212 (C. Herrera) x 1 - masculino [$30000]; 212 (C. Herrera) x 1 - femenino [$20000]; Albaca italiana x 1 - ambiente [$4400]; Cherry x 1 - otro [$1400] - Envase: Botella (1L)",
+    "items": [
+      {
+        "genero": "masculino",
+        "cliente": "Prueba 5",
+        "perfume": {
+          "id": "791b8eb8-473a-49cf-b955-d16050ec9b9e",
+          "costo": 14556.533481042654,
+          "genero": "masculino",
+          "nombre": "212 (C. Herrera)",
+          "precio": 29113.066962085308,
+          "precio_ars": 28935.42,
+          "precio_usd": 0,
+          "proveedores": {
+            "id": "3b606262-42a7-49d9-a89c-fdabf8a28c4e",
+            "color": "purple",
+            "nombre": "Van Rossum",
+            "margen_venta": 100,
+            "gramos_configurados": 15
+          },
+          "proveedor_id": "3b606262-42a7-49d9-a89c-fdabf8a28c4e",
+          "custom_insumos": [
+            {
+              "id": "1f826bb3-0f2b-42db-9209-2f7a425a620c",
+              "type": "insumo",
+              "moneda": "ARS",
+              "nombre": "Frascos masculinos",
+              "unidad": "un",
+              "cantidad": 1,
+              "cantidad_necesaria": 1
+            },
+            {
+              "id": "7bd311f7-af73-4e50-ba2f-8c57416f045b",
+              "type": "insumo",
+              "nombre": "Etiquetas",
+              "unidad": "un",
+              "cantidad": 1
+            },
+            {
+              "id": "7c1479ad-7567-46e1-9473-b629aaf5dede",
+              "type": "insumo",
+              "nombre": "Roll-on",
+              "unidad": "un",
+              "cantidad": 1
+            },
+            {
+              "id": "f20bd670-b4a8-4c37-be85-61c6eac9f7c6",
+              "type": "insumo",
+              "nombre": "Bolsas de madera",
+              "unidad": "un",
+              "cantidad": 1
+            },
+            {
+              "id": "64297462-3384-481c-8ac9-77c24f301c8c",
+              "type": "insumo",
+              "nombre": "Alcohol",
+              "unidad": "un",
+              "cantidad": 80
+            }
+          ],
+          "cantidad_gramos": 30,
+          "familia_olfativa": null,
+          "margen_mayorista": null,
+          "margen_minorista": null,
+          "precio_mayorista": 24746.10691777251,
+          "insumos_categorias": {
+            "id": "999b53c3-f181-4910-86fd-5c5b1f74af7b",
+            "nombre": "Perfumería fina"
+          },
+          "insumos_categorias_id": "999b53c3-f181-4910-86fd-5c5b1f74af7b"
+        },
+        "cantidad": 1,
+        "priceType": "precio",
+        "devuelveEnvase": false
+      },
+      {
+        "genero": "femenino",
+        "cliente": "Prueba 5",
+        "perfume": {
+          "id": "757a4f34-4169-4d89-be83-63ef40d608a4",
+          "costo": 9952.331981042655,
+          "genero": "femenino",
+          "nombre": "212 (C. Herrera)",
+          "precio": 19904.66396208531,
+          "precio_ars": 13373.52,
+          "precio_usd": 0,
+          "proveedores": {
+            "id": "3b606262-42a7-49d9-a89c-fdabf8a28c4e",
+            "color": "purple",
+            "nombre": "Van Rossum",
+            "margen_venta": 100,
+            "gramos_configurados": 15
+          },
+          "proveedor_id": "3b606262-42a7-49d9-a89c-fdabf8a28c4e",
+          "custom_insumos": [
+            {
+              "id": "53733085-0cf6-4d9e-bdf1-00fae9d71fda",
+              "type": "insumo",
+              "moneda": "ARS",
+              "nombre": "Frascos femeninos",
+              "unidad": "un",
+              "cantidad": 1,
+              "cantidad_necesaria": 1
+            },
+            {
+              "id": "7bd311f7-af73-4e50-ba2f-8c57416f045b",
+              "type": "insumo",
+              "nombre": "Etiquetas",
+              "unidad": "un",
+              "cantidad": 1
+            },
+            {
+              "id": "7c1479ad-7567-46e1-9473-b629aaf5dede",
+              "type": "insumo",
+              "nombre": "Roll-on",
+              "unidad": "un",
+              "cantidad": 1
+            },
+            {
+              "id": "f20bd670-b4a8-4c37-be85-61c6eac9f7c6",
+              "type": "insumo",
+              "nombre": "Bolsas de madera",
+              "unidad": "un",
+              "cantidad": 1
+            },
+            {
+              "id": "64297462-3384-481c-8ac9-77c24f301c8c",
+              "type": "insumo",
+              "nombre": "Alcohol",
+              "unidad": "un",
+              "cantidad": 80
+            }
+          ],
+          "cantidad_gramos": 30,
+          "familia_olfativa": null,
+          "margen_mayorista": null,
+          "margen_minorista": null,
+          "precio_mayorista": 16918.96436777251,
+          "insumos_categorias": {
+            "id": "999b53c3-f181-4910-86fd-5c5b1f74af7b",
+            "nombre": "Perfumería fina"
+          },
+          "insumos_categorias_id": "999b53c3-f181-4910-86fd-5c5b1f74af7b"
+        },
+        "cantidad": 1,
+        "priceType": "precio",
+        "devuelveEnvase": false
+      },
+      {
+        "genero": "ambiente",
+        "cliente": "Prueba 5",
+        "perfume": {
+          "id": "22d7cd96-21c2-4418-971c-5b4e0fbec5db",
+          "costo": 2153.656,
+          "genero": "ambiente",
+          "nombre": "Albaca italiana",
+          "precio": 4307.312,
+          "precio_ars": 8303.04,
+          "precio_usd": 5.76,
+          "proveedores": {
+            "id": "6ee49726-6655-4ed3-8c27-a3dc9f84980a",
+            "color": null,
+            "nombre": "Ezentie (aromatizantes)",
+            "margen_venta": 100,
+            "gramos_configurados": 7
+          },
+          "proveedor_id": "6ee49726-6655-4ed3-8c27-a3dc9f84980a",
+          "custom_insumos": [
+            {
+              "id": "0b676f58-2cb6-4ad9-a9d3-08a0ef504b75",
+              "nombre": "Frasco para auto",
+              "is_general": false,
+              "precio_lote": 31340,
+              "cantidad_lote": 20,
+              "cantidad_necesaria": 1,
+              "insumos_categorias_id": "1849c0c4-929a-4f02-aa50-119bedfbe16f"
+            }
+          ],
+          "cantidad_gramos": 100,
+          "familia_olfativa": "Herbal",
+          "margen_mayorista": 70,
+          "margen_minorista": 100,
+          "precio_mayorista": 3661.2151999999996,
+          "insumos_categorias": {
+            "id": "1849c0c4-929a-4f02-aa50-119bedfbe16f",
+            "nombre": "Aromatizante"
+          },
+          "insumos_categorias_id": "1849c0c4-929a-4f02-aa50-119bedfbe16f"
+        },
+        "cantidad": 1,
+        "priceType": "precio",
+        "devuelveEnvase": false
+      },
+      {
+        "genero": "otro",
+        "cliente": "Prueba 5",
+        "perfume": {
+          "id": "94ef960b-040f-4e7b-99d8-1f1e22f1dec8",
+          "costo": 977.8133333333334,
+          "genero": "otro",
+          "nombre": "Cherry",
+          "precio": 1387.9082453333333,
+          "precio_ars": 20732,
+          "precio_usd": null,
+          "proveedores": {
+            "id": "0824df2a-d8a4-4cf7-a409-7a45d9686d57",
+            "color": "pink",
+            "nombre": "Maximus",
+            "margen_venta": 41.94,
+            "gramos_configurados": 15
+          },
+          "proveedor_id": "0824df2a-d8a4-4cf7-a409-7a45d9686d57",
+          "custom_insumos": [
+            {
+              "id": "4b33c9ba-7465-4a1c-b173-521431963ed8",
+              "nombre": "Botella (1L)",
+              "is_general": true,
+              "precio_lote": 20005,
+              "cantidad_lote": 30,
+              "cantidad_necesaria": 1,
+              "insumos_categorias_id": "6944056a-4b9c-4102-a368-7c2b9ff77d5a"
+            }
+          ],
+          "cantidad_gramos": 1000,
+          "familia_olfativa": null,
+          "margen_mayorista": 21,
+          "margen_minorista": 41.94,
+          "precio_mayorista": 1183.1541333333334,
+          "insumos_categorias": {
+            "id": "6944056a-4b9c-4102-a368-7c2b9ff77d5a",
+            "nombre": "Limpia Pisos 1L"
+          },
+          "insumos_categorias_id": "6944056a-4b9c-4102-a368-7c2b9ff77d5a"
+        },
+        "cantidad": 1,
+        "frascoLP": "botella",
+        "priceType": "precio",
+        "devuelveEnvase": false
+      }
+    ],
+    "total": 55800,
+    "estado": "entregado",
+    "metodo_pago": "Efectivo",
+    "motivo": null
+  }
+]

@@ -7,6 +7,7 @@ import * as z from "zod";
 import { toast } from "sonner";
 import { createClient } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
+import { getGlobalConfig } from "@/app/actions/config-actions";
 import { motion } from "framer-motion";
 
 import { Button } from "@/components/ui/button";
@@ -29,7 +30,7 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { Loader2, Plus, Sparkles, Car, Droplets, Trash2, Calculator, Package, Check, ChevronsUpDown, FlaskConical, Filter, User, Wallet } from "lucide-react";
+import { Loader2, Plus, Sparkles, Car, Droplets, Trash2, Calculator, Package, Check, ChevronsUpDown, FlaskConical, Filter, User, Wallet, Edit2, X } from "lucide-react";
 import {
     Table,
     TableBody,
@@ -66,7 +67,7 @@ import { cn } from "@/lib/utils";
 // Schema modificado: se eliminan precios y cantidad
 const formSchema = z.object({
     nombre: z.string().min(2, { message: "El nombre debe tener al menos 2 caracteres." }),
-    genero: z.enum(["masculino", "femenino", "ambiente", "otro"]),
+    genero: z.enum(["masculino", "femenino", "unisex", "ambiente", "otro"]),
     proveedor_id: z.string().min(1, { message: "Selecciona un proveedor." }),
     insumos_categorias_id: z.string().optional().nullable(),
 });
@@ -79,6 +80,9 @@ export default function AgregarProductoPage() {
     const [insumos, setInsumos] = useState<any[]>([]);
     const [esencias, setEsencias] = useState<any[]>([]);
     const [categories, setCategories] = useState<{ id: string; nombre: string; }[]>([]);
+    const [insumoRecipes, setInsumoRecipes] = useState<any[]>([]);
+    const [comboRules, setComboRules] = useState<any[]>([]);
+    const [inventario, setInventario] = useState<any[]>([]);
 
     // Estado de agregar categoría
     const [isAddCategoryOpen, setIsAddCategoryOpen] = useState(false);
@@ -112,6 +116,10 @@ export default function AgregarProductoPage() {
     const [currentInsumoId, setCurrentInsumoId] = useState("");
     const [currentCantidad, setCurrentCantidad] = useState("");
     const [currentUnidad, setCurrentUnidad] = useState("un"); // Unidad por defecto
+
+    // Estado para edición en tabla
+    const [editingIdx, setEditingIdx] = useState<number | null>(null);
+    const [editingCantidad, setEditingCantidad] = useState("");
 
     const form = useForm<FormValues>({
         resolver: zodResolver(formSchema),
@@ -158,10 +166,33 @@ export default function AgregarProductoPage() {
                     .order("nombre");
                 if (esenciasData) setEsencias(esenciasData);
 
-                // Obtener Tasa de Dólar
                 const res = await fetch("/api/dolar");
                 const rates = await res.json();
                 if (rates && rates.ARS) setDollarRate(rates.ARS);
+
+                // Obtener Recetas de Insumos
+                const recipesRaw = await getGlobalConfig("insumos_por_stock_data");
+                if (recipesRaw) {
+                    try {
+                        setInsumoRecipes(JSON.parse(recipesRaw));
+                    } catch (e) {
+                        console.error("Error parsing recipes", e);
+                    }
+                }
+
+                // Obtener Reglas de Combos
+                const rulesRaw = await getGlobalConfig("sales_deduction_rules");
+                if (rulesRaw) {
+                    try {
+                        setComboRules(JSON.parse(rulesRaw));
+                    } catch (e) {
+                        console.error("Error parsing combo rules", e);
+                    }
+                }
+
+                // Obtener Inventario (para resolver nombres de combos)
+                const { data: invData } = await supabase.from("inventario").select("id, nombre, tipo");
+                if (invData) setInventario(invData);
 
             } catch (error) {
                 console.error("Error fetching data:", error);
@@ -202,6 +233,147 @@ export default function AgregarProductoPage() {
             }
         }
     }, [activeTab, categories, form]);
+
+    // Lógica unificada para auto-cargar insumos (Prioriza Combos > Sugerencias por Género)
+    useEffect(() => {
+        const selectedGenero = form.watch("genero");
+        const categoryId = activeTab;
+        const currentCat = categories.find(c => c.id === categoryId);
+
+        if (!selectedGenero || selectedGenero === "otro" || (insumoRecipes.length === 0 && comboRules.length === 0)) return;
+
+        const categoryName = currentCat?.nombre || "";
+        const newItems: any[] = [];
+        const addedNames = new Set<string>();
+
+        // 1. Procesar Reglas de Combos (Prioridad: traen cantidades específicas)
+        if (comboRules.length > 0 && currentCat) {
+            const matchingComboRules = comboRules.filter(rule => {
+                return rule.conditions.every((cond: any) => {
+                    let itemValue = "";
+                    if (cond.field === "genero") itemValue = selectedGenero;
+                    else if (cond.field === "categoria") itemValue = categoryName;
+                    else return true;
+
+                    const valString = String(itemValue || "").toLowerCase();
+                    const condVal = String(cond.value || "").toLowerCase();
+                    if (cond.operator === "eq") return valString === condVal;
+                    if (cond.operator === "contains") return valString.includes(condVal);
+                    return false;
+                });
+            });
+
+            matchingComboRules.forEach(rule => {
+                rule.deductions.forEach((ded: any) => {
+                    if (ded.type === "fixed" && ded.inventario_id) {
+                        const invItem = inventario.find(i => i.id === ded.inventario_id);
+                        if (invItem && !addedNames.has(invItem.nombre.toLowerCase())) {
+                            const foundInsumo = insumos.find(i => i.nombre.toLowerCase() === invItem.nombre.toLowerCase());
+                            if (foundInsumo) {
+                                const costoUnitario = foundInsumo.cantidad_lote > 0 ? (foundInsumo.precio_lote / foundInsumo.cantidad_lote) : 0;
+                                newItems.push({
+                                    id: foundInsumo.id,
+                                    nombre: foundInsumo.nombre,
+                                    cantidad: ded.quantity,
+                                    costoOriginal: costoUnitario * ded.quantity,
+                                    moneda: "ARS",
+                                    type: "insumo",
+                                    unidad: "un"
+                                });
+                                addedNames.add(foundInsumo.nombre.toLowerCase());
+                            } else {
+                                const foundEsencia = esencias.find(e => e.nombre.toLowerCase() === invItem.nombre.toLowerCase());
+                                if (foundEsencia) {
+                                    const moneda = foundEsencia.precio_usd ? "USD" : "ARS";
+                                    const precioBase = foundEsencia.precio_usd || foundEsencia.precio_ars || 0;
+                                    const cantidadBase = foundEsencia.cantidad_gramos > 0 ? foundEsencia.cantidad_gramos : 1;
+                                    newItems.push({
+                                        id: foundEsencia.id,
+                                        nombre: foundEsencia.nombre,
+                                        cantidad: ded.quantity,
+                                        costoOriginal: (precioBase / cantidadBase) * ded.quantity,
+                                        moneda,
+                                        type: "esencia",
+                                        unidad: "gr"
+                                    });
+                                    addedNames.add(foundEsencia.nombre.toLowerCase());
+                                }
+                            }
+                        }
+                    } else if (ded.type === "dynamic_label") {
+                        const productName = form.getValues("nombre");
+                        if (!productName) return;
+                        const foundInsumo = insumos.find(i => i.nombre.toLowerCase() === productName.toLowerCase() || i.nombre.toLowerCase().includes(productName.toLowerCase()));
+                        if (foundInsumo && !addedNames.has(foundInsumo.nombre.toLowerCase())) {
+                            const costoUnitario = foundInsumo.cantidad_lote > 0 ? (foundInsumo.precio_lote / foundInsumo.cantidad_lote) : 0;
+                            newItems.push({
+                                id: foundInsumo.id,
+                                nombre: foundInsumo.nombre,
+                                cantidad: ded.quantity,
+                                costoOriginal: costoUnitario * ded.quantity,
+                                moneda: "ARS",
+                                type: "insumo",
+                                unidad: "un"
+                            });
+                            addedNames.add(foundInsumo.nombre.toLowerCase());
+                        }
+                    }
+                });
+            });
+        }
+
+        // 2. Procesar Insumos por Stock (Sugerencias genéricas con cantidad 1)
+        if (insumoRecipes.length > 0) {
+            const matchingRecipes = insumoRecipes.filter(r => {
+                const genderMatch = r.genero === selectedGenero;
+                const categoryMatch = !r.categoriaId || r.categoriaId === categoryId;
+                return genderMatch && categoryMatch;
+            });
+
+            matchingRecipes.forEach(r => {
+                r.insumos.forEach((name: string) => {
+                    if (!addedNames.has(name.toLowerCase())) {
+                        const foundInsumo = insumos.find(i => i.nombre.toLowerCase() === name.toLowerCase());
+                        if (foundInsumo) {
+                            const costoUnitario = foundInsumo.cantidad_lote > 0 ? (foundInsumo.precio_lote / foundInsumo.cantidad_lote) : 0;
+                            newItems.push({
+                                id: foundInsumo.id,
+                                nombre: foundInsumo.nombre,
+                                cantidad: 1,
+                                costoOriginal: costoUnitario,
+                                moneda: "ARS",
+                                type: "insumo",
+                                unidad: "un"
+                            });
+                            addedNames.add(foundInsumo.nombre.toLowerCase());
+                        } else {
+                            const foundEsencia = esencias.find(e => e.nombre.toLowerCase() === name.toLowerCase());
+                            if (foundEsencia) {
+                                const moneda = foundEsencia.precio_usd ? "USD" : "ARS";
+                                const precioBase = foundEsencia.precio_usd || foundEsencia.precio_ars || 0;
+                                const cantidadBase = foundEsencia.cantidad_gramos > 0 ? foundEsencia.cantidad_gramos : 1;
+                                newItems.push({
+                                    id: foundEsencia.id,
+                                    nombre: foundEsencia.nombre,
+                                    cantidad: 1,
+                                    costoOriginal: precioBase / cantidadBase,
+                                    moneda,
+                                    type: "esencia",
+                                    unidad: "gr"
+                                });
+                                addedNames.add(foundEsencia.nombre.toLowerCase());
+                            }
+                        }
+                    }
+                });
+            });
+        }
+
+        if (newItems.length > 0) {
+            setSelectedInsumos(newItems);
+            toast.info(`Se cargaron automáticamente ${newItems.length} insumos sugeridos.`);
+        }
+    }, [form.watch("genero"), activeTab, insumoRecipes, comboRules, inventario, insumos, esencias]);
 
     const handleAddItem = () => {
         if (!currentInsumoId || !currentCantidad) return;
@@ -289,6 +461,44 @@ export default function AgregarProductoPage() {
         const newInsumos = [...selectedInsumos];
         newInsumos.splice(index, 1);
         setSelectedInsumos(newInsumos);
+        if (editingIdx === index) setEditingIdx(null);
+    };
+
+    const startEditing = (idx: number, currentQty: number) => {
+        setEditingIdx(idx);
+        setEditingCantidad(currentQty.toString());
+    };
+
+    const saveEditing = (idx: number) => {
+        const val = parseFloat(editingCantidad);
+        if (isNaN(val) || val <= 0) {
+            toast.error("Cantidad inválida");
+            return;
+        }
+
+        const newInsumos = [...selectedInsumos];
+        const item = newInsumos[idx];
+
+        let costoUnitario = 0;
+        if (item.type === "insumo") {
+            const original = insumos.find(i => i.id === item.id);
+            costoUnitario = original && original.cantidad_lote > 0 ? (original.precio_lote / original.cantidad_lote) : 0;
+        } else {
+            const original = esencias.find(e => e.id === item.id);
+            const precioBase = original ? (original.precio_usd || original.precio_ars || 0) : 0;
+            const cantidadBase = original && original.cantidad_gramos > 0 ? original.cantidad_gramos : 1;
+            costoUnitario = precioBase / cantidadBase;
+        }
+
+        newInsumos[idx] = {
+            ...item,
+            cantidad: val,
+            costoOriginal: costoUnitario * val
+        };
+
+        setSelectedInsumos(newInsumos);
+        setEditingIdx(null);
+        toast.success("Cantidad actualizada");
     };
 
     async function onSubmit(data: FormValues) {
@@ -753,7 +963,21 @@ export default function AgregarProductoPage() {
                                                                     </div>
                                                                 </TableCell>
                                                                 <TableCell className="text-right font-mono text-muted-foreground py-4">
-                                                                    {item.cantidad} <span className="text-xs">{item.unidad}</span>
+                                                                    {editingIdx === idx ? (
+                                                                        <div className="flex items-center justify-end gap-1">
+                                                                            <Input
+                                                                                type="number"
+                                                                                value={editingCantidad}
+                                                                                onChange={(e) => setEditingCantidad(e.target.value)}
+                                                                                className="w-16 h-8 text-right bg-background"
+                                                                            />
+                                                                            <span className="text-xs">{item.unidad}</span>
+                                                                        </div>
+                                                                    ) : (
+                                                                        <>
+                                                                            {item.cantidad} <span className="text-xs">{item.unidad}</span>
+                                                                        </>
+                                                                    )}
                                                                 </TableCell>
                                                                 <TableCell className="text-right font-mono text-muted-foreground py-4">
                                                                     {item.moneda === "USD" && !hasZeroCost ? (
@@ -774,14 +998,47 @@ export default function AgregarProductoPage() {
                                                                     )}
                                                                 </TableCell>
                                                                 <TableCell className="py-4">
-                                                                    <Button
-                                                                        variant="ghost"
-                                                                        size="icon"
-                                                                        className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-all"
-                                                                        onClick={() => handleRemoveInsumo(idx)}
-                                                                    >
-                                                                        <Trash2 className="w-4 h-4" />
-                                                                    </Button>
+                                                                    <div className="flex items-center gap-1">
+                                                                        {editingIdx === idx ? (
+                                                                            <>
+                                                                                <Button
+                                                                                    variant="ghost"
+                                                                                    size="icon"
+                                                                                    className="h-8 w-8 text-emerald-600 hover:bg-emerald-50"
+                                                                                    onClick={() => saveEditing(idx)}
+                                                                                >
+                                                                                    <Check className="h-4 w-4" />
+                                                                                </Button>
+                                                                                <Button
+                                                                                    variant="ghost"
+                                                                                    size="icon"
+                                                                                    className="h-8 w-8 text-muted-foreground hover:bg-muted"
+                                                                                    onClick={() => setEditingIdx(null)}
+                                                                                >
+                                                                                    <X className="h-4 w-4" />
+                                                                                </Button>
+                                                                            </>
+                                                                        ) : (
+                                                                            <>
+                                                                                <Button
+                                                                                    variant="ghost"
+                                                                                    size="icon"
+                                                                                    className="h-8 w-8 text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-blue-50"
+                                                                                    onClick={() => startEditing(idx, item.cantidad)}
+                                                                                >
+                                                                                    <Edit2 className="h-4 w-4" />
+                                                                                </Button>
+                                                                                <Button
+                                                                                    variant="ghost"
+                                                                                    size="icon"
+                                                                                    className="h-8 w-8 text-destructive opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive/10"
+                                                                                    onClick={() => handleRemoveInsumo(idx)}
+                                                                                >
+                                                                                    <Trash2 className="h-4 w-4" />
+                                                                                </Button>
+                                                                            </>
+                                                                        )}
+                                                                    </div>
                                                                 </TableCell>
                                                             </TableRow>
                                                         );

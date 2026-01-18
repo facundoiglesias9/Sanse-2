@@ -1,0 +1,6 @@
+{
+  "code": "23502",
+  "details": "Failing row contains (1c3ac6bf-a034-40ee-b318-09475f202ddd, 2026-01-18 19:20:43.13128+00, null, null, , , null, null, 2026-01-18 19:20:43.13128+00, f, null).",
+  "hint": null,
+  "message": "null value in column \"precio_total\" of relation \"ventas\" violates not-null constraint"
+}
