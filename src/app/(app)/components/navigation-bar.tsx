@@ -117,7 +117,7 @@ export function NavigationBar({ maintenanceMode = false }: { maintenanceMode?: b
   const [realtimeStatus, setRealtimeStatus] = useState<'connecting' | 'connected' | 'error'>('connecting');
   const [permissionStatus, setPermissionStatus] = useState<string>('default');
   const [audioUnlocked, setAudioUnlocked] = useState(false);
-  const APP_VERSION = "2.1.2";
+  const APP_VERSION = "2.1.4";
 
 
   // Refs para que el listener de Realtime siempre tenga el valor actual
@@ -213,23 +213,16 @@ export function NavigationBar({ maintenanceMode = false }: { maintenanceMode?: b
   const testSound = () => {
     playNotificationSound();
     toast.success("Prueba de sonido enviada");
+    sendSystemNotification("Prueba de Sanse", "Si ves esto, las notificaciones visuales están OK.");
+  };
 
-    if (!("Notification" in window)) {
-      toast.error("Este navegador no soporta notificaciones de escritorio");
-      return;
-    }
-
-    if (Notification.permission === "granted") {
-      sendSystemNotification("Prueba de Sanse", "Si ves esto, las notificaciones funcionan.");
-    } else if (Notification.permission !== "denied") {
-      Notification.requestPermission().then(permission => {
-        if (permission === "granted") {
-          sendSystemNotification("Prueba de Sanse", "Permiso concedido ahora.");
-        }
-      });
-    } else {
-      toast.error("Las notificaciones están BLOQUEADAS en este navegador. Debes habilitarlas en el candadito de la barra de direcciones.");
-    }
+  const testDelayedNotification = () => {
+    setOpen(false);
+    toast.info("Aviso en 5 seg. SALÍ DE LA APP AHORA para probar el cartel arriba...");
+    setTimeout(() => {
+      playNotificationSound();
+      sendSystemNotification("Sanse Perfumes", "🚨 PRUEBA: Nueva venta recibida ahora mismo");
+    }, 5000);
   };
 
   const forceUpdate = () => {
@@ -255,9 +248,11 @@ export function NavigationBar({ maintenanceMode = false }: { maintenanceMode?: b
             body,
             icon: "/icon.png",
             badge: "/icon.png",
-            vibrate: [200, 100, 200],
-            tag: "venta-nueva",
+            vibrate: [500, 100, 500, 100, 500],
+            tag: "venta-" + Date.now(), // Unique tag so they stack like WhatsApp
             renotify: true,
+            requireInteraction: true,
+            data: { url: "/" }
           } as any);
         });
       } else {
@@ -401,8 +396,8 @@ export function NavigationBar({ maintenanceMode = false }: { maintenanceMode?: b
     // Llamada inicial
     fetchNotifications();
 
-    // Polling cada 5 segundos (Backup para Realtime)
-    const interval = setInterval(fetchNotifications, 5000);
+    // Polling cada 2 segundos (Backup para Realtime más rápido)
+    const interval = setInterval(fetchNotifications, 2000);
 
     // Suscripción Realtime (Actualización inmediata)
     channel = supabase
@@ -976,7 +971,10 @@ export function NavigationBar({ maintenanceMode = false }: { maintenanceMode?: b
                 <DropdownMenuSeparator />
                 <div className="p-2 space-y-2">
                   <Button variant="outline" size="sm" className="w-full text-[10px] h-7" onClick={testSound}>
-                    Probar Sonido y Avisos
+                    Probar Sonido
+                  </Button>
+                  <Button variant="secondary" size="sm" className="w-full text-[10px] h-7" onClick={testDelayedNotification}>
+                    Probar Cartel (5 seg)
                   </Button>
                   <Button variant="ghost" size="sm" className="w-full text-[10px] h-7 opacity-50" onClick={forceUpdate}>
                     Forzar Actualización (v{APP_VERSION})
@@ -1381,7 +1379,16 @@ export function NavigationBar({ maintenanceMode = false }: { maintenanceMode?: b
                           }}
                         >
                           <Bell className="w-3 h-3" />
-                          Probar Sonido e INFO
+                          Probar Sonido
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          className="w-full justify-start gap-2 h-9 text-xs"
+                          onClick={testDelayedNotification}
+                        >
+                          <Info className="w-3 h-3" />
+                          Probar Cartel Arriba (5s)
                         </Button>
                         <Button
                           variant="ghost"

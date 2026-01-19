@@ -1,5 +1,5 @@
-// VERSION: 2.1.2 - NOTIFICACIONES NATIVAS
-const CACHE_NAME = 'sanse-perfumes-v2.1.2';
+// VERSION: 2.1.4 - NOTIFICACIONES NATIVAS (STACKING)
+const CACHE_NAME = 'sanse-perfumes-v2.1.4';
 
 self.addEventListener('install', (event) => {
     self.skipWaiting();
