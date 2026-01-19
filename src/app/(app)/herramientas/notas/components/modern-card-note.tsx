@@ -166,7 +166,7 @@ export default function ModernCardNote({
                         </Button>
                     )}
 
-                    {!isEditing && (
+                    {!isEditing && (onEdit || onDelete) && (
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                                 <Button

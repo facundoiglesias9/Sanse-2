@@ -114,6 +114,16 @@ export function NavigationBar({ maintenanceMode = false }: { maintenanceMode?: b
   const [userName, setUserName] = useState<string | null>(null);
   const [dismissedIds, setDismissedIds] = useState<string[]>([]);
 
+  const playNotificationSound = () => {
+    try {
+      const audio = new Audio("https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3");
+      audio.volume = 0.5;
+      audio.play().catch(e => console.log("Audio play blocked by browser policy until user interacts."));
+    } catch (err) {
+      console.error("Error playing sound:", err);
+    }
+  };
+
   // PWA Install Prompt
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [isInstallable, setIsInstallable] = useState(false);
@@ -201,7 +211,9 @@ export function NavigationBar({ maintenanceMode = false }: { maintenanceMode?: b
     let channel: any;
 
     const fetchNotifications = async () => {
-      // Buscar premios pendientes
+      if (!userName) return;
+
+      // 1. Buscar premios pendientes (Solo para el usuario actual)
       const { data: prizes } = await supabase
         .from('premios')
         .select('*')
@@ -214,14 +226,24 @@ export function NavigationBar({ maintenanceMode = false }: { maintenanceMode?: b
         setPendingPrizes(prizes.filter(p => !dismissedIds.includes(p.id)));
       }
 
-      // Buscar actualizaciones de solicitudes
-      const { data: requestUpdates } = await supabase
+      // 2. Buscar solicitudes
+      let requestQuery = supabase
         .from('solicitudes')
         .select('*')
-        .ilike('cliente', userName)
-        .in('estado', ['rechazado', 'en_preparacion', 'preparado'])
         .order('created_at', { ascending: false })
         .limit(10);
+
+      // Si es ADMIN, ve TODOS los pedidos PENDIENTES
+      if (userRole === 'admin') {
+        requestQuery = requestQuery.eq('estado', 'pendiente');
+      } else {
+        // Si no es admin, ve SUS pedidos que fueron actualizados
+        requestQuery = requestQuery
+          .ilike('cliente', userName)
+          .in('estado', ['rechazado', 'en_preparacion', 'preparado']);
+      }
+
+      const { data: requestUpdates } = await requestQuery;
 
       if (requestUpdates) {
         setSolicitudNotifications(
@@ -239,17 +261,34 @@ export function NavigationBar({ maintenanceMode = false }: { maintenanceMode?: b
     // Suscripción Realtime (Actualización inmediata)
     channel = supabase
       .channel('nav_notifications_realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'solicitudes' }, () => {
-        console.log("Solitudes change detected!");
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'solicitudes' }, (payload: any) => {
+        console.log("Solitudes change detected!", payload.eventType);
+
+        // Lógica de Sonido
+        if (payload.eventType === 'INSERT') {
+          // Si entra un pedido nuevo y soy ADMIN -> Suena
+          if (userRole === 'admin' && payload.new.estado === 'pendiente') {
+            playNotificationSound();
+          }
+        } else if (payload.eventType === 'UPDATE') {
+          // Si actualizan un pedido de este usuario -> Suena
+          if (userRole !== 'admin' && payload.new.cliente === userName) {
+            // Solo si cambió el estado
+            if (payload.new.estado !== payload.old?.estado) {
+              playNotificationSound();
+            }
+          }
+        }
+
         fetchNotifications();
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'premios' }, () => {
-        console.log("Premios change detected!");
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'premios' }, (payload: any) => {
+        if (payload.new.revendedor_nombre === userName) {
+          playNotificationSound();
+        }
         fetchNotifications();
       })
-      .subscribe((status) => {
-        console.log("Subscription status:", status);
-      });
+      .subscribe();
 
     return () => {
       clearInterval(interval);
@@ -643,6 +682,11 @@ export function NavigationBar({ maintenanceMode = false }: { maintenanceMode?: b
                       let title = "Actualización de pedido";
 
                       switch (req.estado) {
+                        case 'pendiente':
+                          icon = <PlusCircle className="w-4 h-4 text-primary" />;
+                          bgClass = "bg-primary/10";
+                          title = "Nueva Solicitud";
+                          break;
                         case 'rechazado':
                           icon = <X className="w-4 h-4 text-red-500" />;
                           bgClass = "bg-red-100";
@@ -685,7 +729,8 @@ export function NavigationBar({ maintenanceMode = false }: { maintenanceMode?: b
                               <p className="text-xs text-muted-foreground mt-1 pr-4">
                                 {req.estado === 'rechazado' ? "Tu pedido no pudo ser procesado." :
                                   req.estado === 'en_preparacion' ? "Estamos armando tu pedido." :
-                                    req.estado === 'preparado' ? "Pasa a buscarlo por el local." : ""}
+                                    req.estado === 'preparado' ? "Pasa a buscarlo por el local." :
+                                      req.estado === 'pendiente' ? `${req.cliente} ha enviado un nuevo pedido.` : ""}
                                 <span className="block font-semibold mt-0.5">{formatCurrency(req.total, "ARS", 0)}</span>
                               </p>
                               <p className="text-[10px] text-muted-foreground mt-2 text-right">

@@ -1,7 +1,7 @@
 "use client";
 
 import { createClient } from "@/utils/supabase/client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Nota } from "@/app/types/nota";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -162,6 +162,12 @@ export default function Notas2Page() {
         fetchProfiles();
         supabase.auth.getSession().then(({ data }) => setSession(data.session));
     }, []);
+
+    const isAdmin = useMemo(() => {
+        if (!session?.user?.id || profiles.length === 0) return false;
+        const currentProfile = profiles.find(p => p.id === session.user.id);
+        return currentProfile?.rol === 'admin';
+    }, [session, profiles]);
 
     const form = useForm<z.infer<typeof FormSchema>>({
         resolver: zodResolver(FormSchema),
@@ -325,199 +331,203 @@ export default function Notas2Page() {
                 </div>
 
                 <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-8">
-                    <div className="flex flex-wrap gap-3 justify-center md:justify-start w-full md:w-auto">
-                        <Select value={filterUser} onValueChange={setFilterUser}>
-                            <SelectTrigger className="w-full md:w-[200px] h-11 bg-zinc-900/50 backdrop-blur-md border-zinc-800 hover:bg-zinc-800/50 hover:border-zinc-700 transition-all rounded-2xl shadow-sm ring-offset-0 focus:ring-0">
-                                <div className="flex items-center gap-2 text-zinc-400">
-                                    <User className="w-4 h-4" />
-                                    <SelectValue placeholder="Usuario" />
-                                </div>
-                            </SelectTrigger>
-                            <SelectContent className="bg-zinc-900 border-zinc-800 rounded-xl">
-                                <SelectItem value="all" className="focus:bg-zinc-800 focus:text-zinc-100 cursor-pointer rounded-lg my-1">Todos los usuarios</SelectItem>
-                                {profiles.map(p => (
-                                    <SelectItem key={p.id} value={p.id} className="focus:bg-zinc-800 focus:text-zinc-100 cursor-pointer rounded-lg my-1">
-                                        {p.nombre || "Usuario"}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-
-                        <Select value={filterPriority} onValueChange={setFilterPriority}>
-                            <SelectTrigger className="w-full md:w-[220px] h-11 bg-zinc-900/50 backdrop-blur-md border-zinc-800 hover:bg-zinc-800/50 hover:border-zinc-700 transition-all rounded-2xl shadow-sm ring-offset-0 focus:ring-0">
-                                <div className="flex items-center gap-2 text-zinc-400">
-                                    <Flag className="w-4 h-4" />
-                                    <SelectValue placeholder="Prioridad" />
-                                </div>
-                            </SelectTrigger>
-                            <SelectContent className="bg-zinc-900 border-zinc-800 rounded-xl">
-                                <SelectItem value="all" className="focus:bg-zinc-800 focus:text-zinc-100 cursor-pointer rounded-lg my-1">Todas las prioridades</SelectItem>
-                                <SelectItem value="alta" className="text-red-400 focus:bg-red-500/10 focus:text-red-300 cursor-pointer rounded-lg my-1">
-                                    Alta
-                                </SelectItem>
-                                <SelectItem value="normal" className="text-blue-400 focus:bg-blue-500/10 focus:text-blue-300 cursor-pointer rounded-lg my-1">
-                                    Normal
-                                </SelectItem>
-                                <SelectItem value="baja" className="text-green-400 focus:bg-green-500/10 focus:text-green-300 cursor-pointer rounded-lg my-1">
-                                    Baja
-                                </SelectItem>
-                            </SelectContent>
-                        </Select>
-
-                        <Select value={filterDate} onValueChange={setFilterDate}>
-                            <SelectTrigger className="w-full md:w-[180px] h-11 bg-zinc-900/50 backdrop-blur-md border-zinc-800 hover:bg-zinc-800/50 hover:border-zinc-700 transition-all rounded-2xl shadow-sm ring-offset-0 focus:ring-0">
-                                <div className="flex items-center gap-2 text-zinc-400">
-                                    <Calendar className="w-4 h-4" />
-                                    <SelectValue placeholder="Fecha" />
-                                </div>
-                            </SelectTrigger>
-                            <SelectContent className="bg-zinc-900 border-zinc-800 rounded-xl">
-                                <SelectItem value="all" className="focus:bg-zinc-800 focus:text-zinc-100 cursor-pointer rounded-lg my-1">Cualquier fecha</SelectItem>
-                                <SelectItem value="expired" className="text-orange-400 focus:bg-orange-500/10 focus:text-orange-300 cursor-pointer rounded-lg my-1">Vencidas</SelectItem>
-                                <SelectItem value="today" className="text-emerald-400 focus:bg-emerald-500/10 focus:text-emerald-300 cursor-pointer rounded-lg my-1">Vence Hoy</SelectItem>
-                                <SelectItem value="this_week" className="focus:bg-zinc-800 focus:text-zinc-100 cursor-pointer rounded-lg my-1">Vence esta semana</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-
-                    <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-                        <DialogTrigger asChild>
-                            <Button size="lg" className="rounded-full shadow-lg hover:shadow-xl transition-all font-semibold gap-2 w-full md:w-auto">
-                                <Plus className="w-5 h-5" />
-                                Nueva Nota
-                            </Button>
-                        </DialogTrigger>
-                        <DialogContent className="sm:max-w-[500px] border-none shadow-2xl bg-card">
-                            <DialogHeader>
-                                <DialogTitle className="text-2xl font-bold">Crear nueva nota</DialogTitle>
-                            </DialogHeader>
-                            <Form {...form}>
-                                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 mt-4">
-                                    <FormField
-                                        control={form.control}
-                                        name="titulo"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel className="font-semibold text-foreground/80">Título</FormLabel>
-                                                <FormControl>
-                                                    <Input
-                                                        placeholder="Ej: Revisar stock"
-                                                        className="bg-muted/50 border-transparent focus:border-primary/20"
-                                                        disabled={isLoading}
-                                                        {...field}
-                                                    />
-                                                </FormControl>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
-
-                                    <div className="grid grid-cols-1 gap-4">
-                                        <FormField
-                                            control={form.control}
-                                            name="assigned_to"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel className="font-semibold text-foreground/80">Asignar a</FormLabel>
-                                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                                        <FormControl>
-                                                            <SelectTrigger className="bg-muted/50 border-transparent focus:border-primary/20 w-full">
-                                                                <SelectValue placeholder="Seleccionar usuario (Opcional)" />
-                                                            </SelectTrigger>
-                                                        </FormControl>
-                                                        <SelectContent>
-                                                            {profiles.filter(p => p.rol === 'admin').map((profile) => (
-                                                                <SelectItem key={profile.id} value={profile.id}>
-                                                                    {profile.nombre || "Admin sin nombre"}
-                                                                </SelectItem>
-                                                            ))}
-                                                        </SelectContent>
-                                                    </Select>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
+                    {isAdmin && (
+                        <div className="flex flex-wrap gap-3 justify-center md:justify-start w-full md:w-auto">
+                            <Select value={filterUser} onValueChange={setFilterUser}>
+                                <SelectTrigger className="w-full md:w-[200px] h-11 bg-zinc-900/50 backdrop-blur-md border-zinc-800 hover:bg-zinc-800/50 hover:border-zinc-700 transition-all rounded-2xl shadow-sm ring-offset-0 focus:ring-0">
+                                    <div className="flex items-center gap-2 text-zinc-400">
+                                        <User className="w-4 h-4" />
+                                        <SelectValue placeholder="Usuario" />
                                     </div>
+                                </SelectTrigger>
+                                <SelectContent className="bg-zinc-900 border-zinc-800 rounded-xl">
+                                    <SelectItem value="all" className="focus:bg-zinc-800 focus:text-zinc-100 cursor-pointer rounded-lg my-1">Todos los usuarios</SelectItem>
+                                    {profiles.map(p => (
+                                        <SelectItem key={p.id} value={p.id} className="focus:bg-zinc-800 focus:text-zinc-100 cursor-pointer rounded-lg my-1">
+                                            {p.nombre || "Usuario"}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
 
-                                    <div className="grid grid-cols-2 gap-4">
+                            <Select value={filterPriority} onValueChange={setFilterPriority}>
+                                <SelectTrigger className="w-full md:w-[220px] h-11 bg-zinc-900/50 backdrop-blur-md border-zinc-800 hover:bg-zinc-800/50 hover:border-zinc-700 transition-all rounded-2xl shadow-sm ring-offset-0 focus:ring-0">
+                                    <div className="flex items-center gap-2 text-zinc-400">
+                                        <Flag className="w-4 h-4" />
+                                        <SelectValue placeholder="Prioridad" />
+                                    </div>
+                                </SelectTrigger>
+                                <SelectContent className="bg-zinc-900 border-zinc-800 rounded-xl">
+                                    <SelectItem value="all" className="focus:bg-zinc-800 focus:text-zinc-100 cursor-pointer rounded-lg my-1">Todas las prioridades</SelectItem>
+                                    <SelectItem value="alta" className="text-red-400 focus:bg-red-500/10 focus:text-red-300 cursor-pointer rounded-lg my-1">
+                                        Alta
+                                    </SelectItem>
+                                    <SelectItem value="normal" className="text-blue-400 focus:bg-blue-500/10 focus:text-blue-300 cursor-pointer rounded-lg my-1">
+                                        Normal
+                                    </SelectItem>
+                                    <SelectItem value="baja" className="text-green-400 focus:bg-green-500/10 focus:text-green-300 cursor-pointer rounded-lg my-1">
+                                        Baja
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+
+                            <Select value={filterDate} onValueChange={setFilterDate}>
+                                <SelectTrigger className="w-full md:w-[180px] h-11 bg-zinc-900/50 backdrop-blur-md border-zinc-800 hover:bg-zinc-800/50 hover:border-zinc-700 transition-all rounded-2xl shadow-sm ring-offset-0 focus:ring-0">
+                                    <div className="flex items-center gap-2 text-zinc-400">
+                                        <Calendar className="w-4 h-4" />
+                                        <SelectValue placeholder="Fecha" />
+                                    </div>
+                                </SelectTrigger>
+                                <SelectContent className="bg-zinc-900 border-zinc-800 rounded-xl">
+                                    <SelectItem value="all" className="focus:bg-zinc-800 focus:text-zinc-100 cursor-pointer rounded-lg my-1">Cualquier fecha</SelectItem>
+                                    <SelectItem value="expired" className="text-orange-400 focus:bg-orange-500/10 focus:text-orange-300 cursor-pointer rounded-lg my-1">Vencidas</SelectItem>
+                                    <SelectItem value="today" className="text-emerald-400 focus:bg-emerald-500/10 focus:text-emerald-300 cursor-pointer rounded-lg my-1">Vence Hoy</SelectItem>
+                                    <SelectItem value="this_week" className="focus:bg-zinc-800 focus:text-zinc-100 cursor-pointer rounded-lg my-1">Vence esta semana</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    )}
+
+                    {isAdmin && (
+                        <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+                            <DialogTrigger asChild>
+                                <Button size="lg" className="rounded-full shadow-lg hover:shadow-xl transition-all font-semibold gap-2 w-full md:w-auto">
+                                    <Plus className="w-5 h-5" />
+                                    Nueva Nota
+                                </Button>
+                            </DialogTrigger>
+                            <DialogContent className="sm:max-w-[500px] border-none shadow-2xl bg-card">
+                                <DialogHeader>
+                                    <DialogTitle className="text-2xl font-bold">Crear nueva nota</DialogTitle>
+                                </DialogHeader>
+                                <Form {...form}>
+                                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 mt-4">
                                         <FormField
                                             control={form.control}
-                                            name="prioridad"
+                                            name="titulo"
                                             render={({ field }) => (
                                                 <FormItem>
-                                                    <FormLabel className="font-semibold text-foreground/80">Prioridad</FormLabel>
-                                                    <Select value={field.value} onValueChange={field.onChange}>
-                                                        <FormControl>
-                                                            <SelectTrigger className="bg-muted/50 border-transparent focus:border-primary/20">
-                                                                <SelectValue />
-                                                            </SelectTrigger>
-                                                        </FormControl>
-                                                        <SelectContent>
-                                                            {prioridades.map((prioridad) => (
-                                                                <SelectItem key={prioridad} value={prioridad}>
-                                                                    {prioridad.charAt(0).toUpperCase() +
-                                                                        prioridad.slice(1)}
-                                                                </SelectItem>
-                                                            ))}
-                                                        </SelectContent>
-                                                    </Select>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-                                        <FormField
-                                            control={form.control}
-                                            name="fecha_vencimiento"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel className="font-semibold text-foreground/80">Vencimiento</FormLabel>
+                                                    <FormLabel className="font-semibold text-foreground/80">Título</FormLabel>
                                                     <FormControl>
-                                                        <Calendar22
-                                                            value={field.value ?? null}
-                                                            onChange={field.onChange}
+                                                        <Input
+                                                            placeholder="Ej: Revisar stock"
                                                             className="bg-muted/50 border-transparent focus:border-primary/20"
-                                                            disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+                                                            disabled={isLoading}
+                                                            {...field}
                                                         />
                                                     </FormControl>
                                                     <FormMessage />
                                                 </FormItem>
                                             )}
                                         />
-                                    </div>
 
-                                    <FormField
-                                        control={form.control}
-                                        name="nota"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel className="font-semibold text-foreground/80">Contenido</FormLabel>
-                                                <FormControl>
-                                                    <Textarea
-                                                        placeholder="Escribe los detalles aquí..."
-                                                        className="min-h-[120px] resize-none bg-muted/50 border-transparent focus:border-primary/20"
-                                                        disabled={isLoading}
-                                                        {...field}
-                                                    />
-                                                </FormControl>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
+                                        <div className="grid grid-cols-1 gap-4">
+                                            <FormField
+                                                control={form.control}
+                                                name="assigned_to"
+                                                render={({ field }) => (
+                                                    <FormItem>
+                                                        <FormLabel className="font-semibold text-foreground/80">Asignar a</FormLabel>
+                                                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                                            <FormControl>
+                                                                <SelectTrigger className="bg-muted/50 border-transparent focus:border-primary/20 w-full">
+                                                                    <SelectValue placeholder="Seleccionar usuario (Opcional)" />
+                                                                </SelectTrigger>
+                                                            </FormControl>
+                                                            <SelectContent>
+                                                                {profiles.filter(p => p.rol === 'admin').map((profile) => (
+                                                                    <SelectItem key={profile.id} value={profile.id}>
+                                                                        {profile.nombre || "Admin sin nombre"}
+                                                                    </SelectItem>
+                                                                ))}
+                                                            </SelectContent>
+                                                        </Select>
+                                                        <FormMessage />
+                                                    </FormItem>
+                                                )}
+                                            />
+                                        </div>
 
-                                    <div className="flex justify-end gap-3 pt-2">
-                                        <Button type="button" variant="ghost" onClick={() => setCreateDialogOpen(false)}>Cancelar</Button>
-                                        <Button
-                                            type="submit"
-                                            disabled={isLoading}
-                                        >
-                                            {isLoading ? <Loader2 className="animate-spin mr-2" /> : null}
-                                            Crear Nota
-                                        </Button>
-                                    </div>
-                                </form>
-                            </Form>
-                        </DialogContent>
-                    </Dialog>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <FormField
+                                                control={form.control}
+                                                name="prioridad"
+                                                render={({ field }) => (
+                                                    <FormItem>
+                                                        <FormLabel className="font-semibold text-foreground/80">Prioridad</FormLabel>
+                                                        <Select value={field.value} onValueChange={field.onChange}>
+                                                            <FormControl>
+                                                                <SelectTrigger className="bg-muted/50 border-transparent focus:border-primary/20">
+                                                                    <SelectValue />
+                                                                </SelectTrigger>
+                                                            </FormControl>
+                                                            <SelectContent>
+                                                                {prioridades.map((prioridad) => (
+                                                                    <SelectItem key={prioridad} value={prioridad}>
+                                                                        {prioridad.charAt(0).toUpperCase() +
+                                                                            prioridad.slice(1)}
+                                                                    </SelectItem>
+                                                                ))}
+                                                            </SelectContent>
+                                                        </Select>
+                                                        <FormMessage />
+                                                    </FormItem>
+                                                )}
+                                            />
+                                            <FormField
+                                                control={form.control}
+                                                name="fecha_vencimiento"
+                                                render={({ field }) => (
+                                                    <FormItem>
+                                                        <FormLabel className="font-semibold text-foreground/80">Vencimiento</FormLabel>
+                                                        <FormControl>
+                                                            <Calendar22
+                                                                value={field.value ?? null}
+                                                                onChange={field.onChange}
+                                                                className="bg-muted/50 border-transparent focus:border-primary/20"
+                                                                disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+                                                            />
+                                                        </FormControl>
+                                                        <FormMessage />
+                                                    </FormItem>
+                                                )}
+                                            />
+                                        </div>
+
+                                        <FormField
+                                            control={form.control}
+                                            name="nota"
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel className="font-semibold text-foreground/80">Contenido</FormLabel>
+                                                    <FormControl>
+                                                        <Textarea
+                                                            placeholder="Escribe los detalles aquí..."
+                                                            className="min-h-[120px] resize-none bg-muted/50 border-transparent focus:border-primary/20"
+                                                            disabled={isLoading}
+                                                            {...field}
+                                                        />
+                                                    </FormControl>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+
+                                        <div className="flex justify-end gap-3 pt-2">
+                                            <Button type="button" variant="ghost" onClick={() => setCreateDialogOpen(false)}>Cancelar</Button>
+                                            <Button
+                                                type="submit"
+                                                disabled={isLoading}
+                                            >
+                                                {isLoading ? <Loader2 className="animate-spin mr-2" /> : null}
+                                                Crear Nota
+                                            </Button>
+                                        </div>
+                                    </form>
+                                </Form>
+                            </DialogContent>
+                        </Dialog>
+                    )}
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -542,8 +552,8 @@ export default function Notas2Page() {
                                             : null
                                     }
                                     prioridad={nota.prioridad}
-                                    onDelete={() => confirmDelete(nota.id)}
-                                    onEdit={() => comenzarEdit(nota)}
+                                    onDelete={isAdmin ? () => confirmDelete(nota.id) : undefined}
+                                    onEdit={isAdmin ? () => comenzarEdit(nota) : undefined}
                                     isEditing={editingId === nota.id}
                                     editingTitulo={editingTitulo}
                                     editingNota={editingNota}
@@ -556,7 +566,7 @@ export default function Notas2Page() {
                                     setEditingAssignedTo={setEditingAssignedTo}
                                     onSaveEdit={guardarEdit}
                                     onCancelEdit={cancelarEdit}
-                                    onTogglePin={() => togglePin(nota)}
+                                    onTogglePin={isAdmin ? () => togglePin(nota) : undefined}
                                     isPinned={nota.is_pinned}
                                     profiles={profiles}
                                     editingAssignedTo={editingAssignedTo}
