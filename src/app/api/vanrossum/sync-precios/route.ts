@@ -12,12 +12,6 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-const SCRAPER_PROFILE_ID = process.env.SCRAPING_PROFILE_ID || null;
-
-const supabase = createClient(url, serviceKey);
-
 /* -------------------------------------------------------------
  * UTIL / HELPERS
  * ----------------------------------------------------------- */
@@ -304,6 +298,16 @@ const RESCUE_URLS: Record<string, string> = {
  * HANDLER
  * ----------------------------------------------------------- */
 export async function POST(req: Request) {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const SCRAPER_PROFILE_ID = process.env.SCRAPING_PROFILE_ID || null;
+
+  if (!url || !serviceKey) {
+    return NextResponse.json({ ok: false, error: "Falla de configuración de Supabase" }, { status: 500 });
+  }
+
+  const supabase = createClient(url, serviceKey);
+
   const u = new URL(req.url);
   const isDebug = u.searchParams.get("debug") === "1";
 
