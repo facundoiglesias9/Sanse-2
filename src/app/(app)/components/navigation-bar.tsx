@@ -117,7 +117,7 @@ export function NavigationBar({ maintenanceMode = false }: { maintenanceMode?: b
   const [realtimeStatus, setRealtimeStatus] = useState<'connecting' | 'connected' | 'error'>('connecting');
   const [permissionStatus, setPermissionStatus] = useState<string>('default');
   const [audioUnlocked, setAudioUnlocked] = useState(false);
-  const APP_VERSION = "2.2.0";
+  const APP_VERSION = "2.2.1";
 
 
   // Refs para que el listener de Realtime siempre tenga el valor actual

@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { NumberInput } from "@/components/ui/number-input";
+import Link from "next/link";
 import { Plus, Trash2, TrendingUp, TrendingDown, Wallet } from "lucide-react";
 import {
     Table,
@@ -319,7 +320,15 @@ export default function CajaPage() {
 
     return (
         <div className="container mx-auto py-8 px-4 max-w-7xl">
-            <h1 className="text-3xl font-bold mb-8">Caja Unificada</h1>
+            <div className="text-center mb-8">
+                <h1 className="text-3xl font-bold">Caja Unificada</h1>
+                <Link
+                    href="/caja/dashboard"
+                    className="text-sm font-medium text-primary hover:underline mt-2 inline-block"
+                >
+                    Dashboards
+                </Link>
+            </div>
 
             {/* Fila de Widgets */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">

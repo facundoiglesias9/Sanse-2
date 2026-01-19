@@ -1,5 +1,5 @@
-// VERSION: 2.2.0 - CLEAN & STABLE
-const CACHE_NAME = 'sanse-perfumes-v2.2.0';
+// VERSION: 2.2.1 - DASHBOARD RELEASE
+const CACHE_NAME = 'sanse-perfumes-v2.2.1';
 
 self.addEventListener('install', (event) => {
     self.skipWaiting();
