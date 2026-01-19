@@ -113,6 +113,8 @@ export function NavigationBar({ maintenanceMode = false }: { maintenanceMode?: b
   const [solicitudNotifications, setSolicitudNotifications] = useState<any[]>([]);
   const [userName, setUserName] = useState<string | null>(null);
   const [dismissedIds, setDismissedIds] = useState<string[]>([]);
+  const APP_VERSION = "2.0.5"; // Actualizar esto para forzar visualmente la cache
+
 
   // Refs para que el listener de Realtime siempre tenga el valor actual
   const userRoleRef = useRef(userRole);
@@ -155,7 +157,38 @@ export function NavigationBar({ maintenanceMode = false }: { maintenanceMode?: b
 
   const testSound = () => {
     playNotificationSound();
-    toast.success("Probando sonido...");
+    toast.success("Prueba de sonido enviada");
+
+    if (!("Notification" in window)) {
+      toast.error("Este navegador no soporta notificaciones de escritorio");
+      return;
+    }
+
+    if (Notification.permission === "granted") {
+      sendSystemNotification("Prueba de Sanse", "Si ves esto, las notificaciones funcionan.");
+    } else if (Notification.permission !== "denied") {
+      Notification.requestPermission().then(permission => {
+        if (permission === "granted") {
+          sendSystemNotification("Prueba de Sanse", "Permiso concedido ahora.");
+        }
+      });
+    } else {
+      toast.error("Las notificaciones están BLOQUEADAS en este navegador. Debes habilitarlas en el candadito de la barra de direcciones.");
+    }
+  };
+
+  const forceUpdate = () => {
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.getRegistrations().then(registrations => {
+        for (let registration of registrations) {
+          registration.update();
+        }
+        toast.info("Buscando actualizaciones...");
+        setTimeout(() => window.location.reload(), 1000);
+      });
+    } else {
+      window.location.reload();
+    }
   };
 
   const sendSystemNotification = (title: string, body: string) => {
@@ -867,9 +900,14 @@ export function NavigationBar({ maintenanceMode = false }: { maintenanceMode?: b
                   </div>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={testSound} className="text-xs opacity-50">
-                  Probar Sonido e INFO
-                </DropdownMenuItem>
+                <div className="p-2 space-y-2">
+                  <Button variant="outline" size="sm" className="w-full text-[10px] h-7" onClick={testSound}>
+                    Probar Sonido y Avisos
+                  </Button>
+                  <Button variant="ghost" size="sm" className="w-full text-[10px] h-7 opacity-50" onClick={forceUpdate}>
+                    Forzar Actualización (v{APP_VERSION})
+                  </Button>
+                </div>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
