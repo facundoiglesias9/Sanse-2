@@ -1,5 +1,5 @@
-// VERSION: 2.1.5 - FIX ICON AND POLLING
-const CACHE_NAME = 'sanse-perfumes-v2.1.5';
+// VERSION: 2.1.6 - PERSONALIZED NOTIFS & CLEAN UI
+const CACHE_NAME = 'sanse-perfumes-v2.1.6';
 
 self.addEventListener('install', (event) => {
     self.skipWaiting();

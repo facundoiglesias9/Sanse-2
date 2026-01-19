@@ -117,7 +117,7 @@ export function NavigationBar({ maintenanceMode = false }: { maintenanceMode?: b
   const [realtimeStatus, setRealtimeStatus] = useState<'connecting' | 'connected' | 'error'>('connecting');
   const [permissionStatus, setPermissionStatus] = useState<string>('default');
   const [audioUnlocked, setAudioUnlocked] = useState(false);
-  const APP_VERSION = "2.1.5";
+  const APP_VERSION = "2.1.6";
 
 
   // Refs para que el listener de Realtime siempre tenga el valor actual
@@ -138,18 +138,20 @@ export function NavigationBar({ maintenanceMode = false }: { maintenanceMode?: b
       const lastIds = prevNotificationsRef.current;
 
       // Si hay un ID nuevo que es 'pendiente' (venta nueva) -> Suena
-      const hasNewRequest = solicitudNotifications.some(n =>
+      const newRequests = solicitudNotifications.filter(n =>
         n.estado === 'pendiente' && !lastIds.includes(n.id)
       );
 
-      if (hasNewRequest && lastIds.length > 0) {
+      if (newRequests.length > 0 && lastIds.length > 0) {
         const currentRole = userRoleRef.current?.toLowerCase()?.trim();
-        console.log("!!! TRIGGER: New pending request in Polling. Role:", currentRole);
+        console.log("!!! TRIGGER: New pending requests found in Polling:", newRequests.length);
 
         if (currentRole === 'admin') {
           playNotificationSound();
-          sendSystemNotification("Sanse Perfumes", "🚨 NUEVA VENTA DETECTADA");
-          toast.info("🔔 ¡Nueva solicitud recibida!");
+          newRequests.forEach(req => {
+            sendSystemNotification("Sanse Perfumes", `${req.cliente} inició un pedido`);
+            toast.info(`🔔 NUEVO PEDIDO de ${req.cliente}`);
+          });
         }
       }
 
@@ -420,7 +422,7 @@ export function NavigationBar({ maintenanceMode = false }: { maintenanceMode?: b
             console.log("USER IS ADMIN - TRIGGERING SOUND");
             playNotificationSound();
             toast.info(`🔔 NUEVO PEDIDO de ${payload.new.cliente || 'Desconocido'}`);
-            sendSystemNotification("Sanse Perfumes", `Nuevo pedido de ${payload.new.cliente}`);
+            sendSystemNotification("Sanse Perfumes", `${payload.new.cliente} inició un pedido`);
           } else if (payload.new.cliente === currentName) {
             console.log("USER OWNED REQUEST - TRIGGERING SOUND");
             playNotificationSound();
@@ -973,18 +975,6 @@ export function NavigationBar({ maintenanceMode = false }: { maintenanceMode?: b
                     Cerrar sesión
                   </div>
                 </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <div className="p-2 space-y-2">
-                  <Button variant="outline" size="sm" className="w-full text-[10px] h-7" onClick={testSound}>
-                    Probar Sonido
-                  </Button>
-                  <Button variant="secondary" size="sm" className="w-full text-[10px] h-7" onClick={testDelayedNotification}>
-                    Probar Cartel (5 seg)
-                  </Button>
-                  <Button variant="ghost" size="sm" className="w-full text-[10px] h-7 opacity-50" onClick={forceUpdate}>
-                    Forzar Actualización (v{APP_VERSION})
-                  </Button>
-                </div>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -1342,27 +1332,9 @@ export function NavigationBar({ maintenanceMode = false }: { maintenanceMode?: b
                         Cerrar sesión
                       </Button>
 
-                      {/* Grupo: Sistema (Debug/Update) en Mobile */}
-                      <div className="pt-4 border-t space-y-2">
-                        <p className="text-[10px] font-semibold text-muted-foreground uppercase px-3">Estado del Sistema</p>
-
-                        <div className="px-3 flex flex-col gap-2 mb-2">
-                          <div className="flex items-center justify-between text-[11px]">
-                            <span className="opacity-70 text-black dark:text-white">Base de Datos:</span>
-                            <div className="flex items-center gap-1.5">
-                              <div className={clsx("w-2 h-2 rounded-full", realtimeStatus === 'connected' ? "bg-green-500" : "bg-red-500")} />
-                              <span className="font-semibold">{realtimeStatus === 'connected' ? "Conectado" : "Error de Conexión"}</span>
-                            </div>
-                          </div>
-                          <div className="flex items-center justify-between text-[11px]">
-                            <span className="opacity-70 text-black dark:text-white">Avisos Navegador:</span>
-                            <span className={clsx("font-semibold", permissionStatus === 'granted' ? "text-green-500" : "text-amber-500")}>
-                              {permissionStatus === 'granted' ? "Habilitados" : "Bloqueados"}
-                            </span>
-                          </div>
-                        </div>
-
-                        {permissionStatus !== 'granted' && (
+                      {/* Grupo: Sistema en Mobile (Status only) */}
+                      {permissionStatus !== 'granted' && (
+                        <div className="pt-4 border-t px-3">
                           <Button
                             variant="destructive"
                             size="sm"
@@ -1372,39 +1344,8 @@ export function NavigationBar({ maintenanceMode = false }: { maintenanceMode?: b
                             <Bell className="w-3 h-3" />
                             Habilitar Notificaciones
                           </Button>
-                        )}
-
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="w-full justify-start gap-2 h-9 text-xs"
-                          onClick={() => {
-                            setOpen(false);
-                            testSound();
-                          }}
-                        >
-                          <Bell className="w-3 h-3" />
-                          Probar Sonido
-                        </Button>
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          className="w-full justify-start gap-2 h-9 text-xs"
-                          onClick={testDelayedNotification}
-                        >
-                          <Info className="w-3 h-3" />
-                          Probar Cartel Arriba (5s)
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="w-full justify-start gap-2 h-9 text-xs opacity-60"
-                          onClick={forceUpdate}
-                        >
-                          <RotateCcw className="w-3 h-3" />
-                          Actualizar App (v{APP_VERSION})
-                        </Button>
-                      </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </nav>
@@ -1413,6 +1354,6 @@ export function NavigationBar({ maintenanceMode = false }: { maintenanceMode?: b
           </Sheet>
         </div>
       </div>
-    </header >
+    </header>
   );
 }
