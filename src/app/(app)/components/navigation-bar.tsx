@@ -1,4 +1,3 @@
-
 "use client";
 
 
@@ -12,12 +11,13 @@ import {
 import Link from "next/link";
 import clsx from "clsx";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
 import { useCurrencies } from "@/app/contexts/CurrencyContext";
 import { useTheme } from "next-themes";
 import { formatCurrency } from "@/app/helpers/formatCurrency";
+import { toast } from "sonner";
 import {
   Sheet,
   SheetContent,
@@ -114,6 +114,15 @@ export function NavigationBar({ maintenanceMode = false }: { maintenanceMode?: b
   const [userName, setUserName] = useState<string | null>(null);
   const [dismissedIds, setDismissedIds] = useState<string[]>([]);
 
+  // Refs para que el listener de Realtime siempre tenga el valor actual
+  const userRoleRef = useRef(userRole);
+  const userNameRef = useRef(userName);
+
+  useEffect(() => {
+    userRoleRef.current = userRole;
+    userNameRef.current = userName;
+  }, [userRole, userName]);
+
   // Pre-load audio
   const [notificationAudio, setNotificationAudio] = useState<HTMLAudioElement | null>(null);
 
@@ -121,12 +130,30 @@ export function NavigationBar({ maintenanceMode = false }: { maintenanceMode?: b
     const audio = new Audio("https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3");
     audio.load();
     setNotificationAudio(audio);
+
+    // Pedir permisos de notificación al cargar
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
   }, []);
 
   const playNotificationSound = () => {
     if (notificationAudio) {
       notificationAudio.currentTime = 0;
       notificationAudio.play().catch(e => console.log("Audio play blocked: interaction needed."));
+    }
+    // Vibrar si es posible (bueno para móviles)
+    if ("vibrate" in navigator) {
+      navigator.vibrate([200, 100, 200]);
+    }
+  };
+
+  const sendSystemNotification = (title: string, body: string) => {
+    if ("Notification" in window && Notification.permission === "granted") {
+      new Notification(title, {
+        body,
+        icon: "/icons/icon-192x192.png", // Asegúrate de que esta ruta sea válida
+      });
     }
   };
 
@@ -270,24 +297,42 @@ export function NavigationBar({ maintenanceMode = false }: { maintenanceMode?: b
     channel = supabase
       .channel('nav_notifications_realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'solicitudes' }, (payload: any) => {
-        console.log("Solitudes change detected!", payload.eventType, payload.new?.estado);
+        const currentRole = userRoleRef.current;
+        const currentName = userNameRef.current;
 
-        // Lógica de Sonido
+        console.log("Solitudes change detected!", payload.eventType, payload.new?.estado, "Role:", currentRole);
+
+        // Lógica de Sonido y Notificación de Sistema
         if (payload.eventType === 'INSERT') {
           // Suena para ADMIN siempre
-          if (userRole === 'admin') {
+          if (currentRole === 'admin') {
             playNotificationSound();
+            toast.info(`Nueva solicitud de ${payload.new.cliente}`);
+            sendSystemNotification("Sanse Perfumes", `Nueva solicitud de ${payload.new.cliente}`);
           }
           // Suena para el REPRODUCTOR si él mismo lo creó (Confirmación)
-          else if (payload.new.cliente === userName) {
+          else if (payload.new.cliente === currentName) {
             playNotificationSound();
           }
         } else if (payload.eventType === 'UPDATE') {
           // Si actualizan un pedido de este usuario -> Suena
-          if (payload.new.cliente === userName) {
+          if (payload.new.cliente === currentName) {
             // Solo si cambió el estado
             if (payload.new.estado !== payload.old?.estado) {
               playNotificationSound();
+
+              let msg = "";
+              switch (payload.new.estado) {
+                case 'en_preparacion': msg = "Estamos armando tu pedido"; break;
+                case 'preparado': msg = "¡Tu pedido está listo!"; break;
+                case 'rechazado': msg = "Tu pedido fue rechazado"; break;
+                case 'cancelado': msg = "Tu pedido fue cancelado"; break;
+              }
+
+              if (msg) {
+                toast.success(msg);
+                sendSystemNotification("Aviso de Pedido", msg);
+              }
             }
           }
         }
