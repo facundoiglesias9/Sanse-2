@@ -4,7 +4,7 @@
 import { usePathname, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
-  Menu, LogOut, Info, X, Package, Check, Bell, Gift, Truck, Trash2,
+  Menu, LogOut, Info, X, Package, Check, Bell, Gift, Truck, Trash2, RotateCcw,
   DollarSign, Moon, Sun, Monitor, SoapDispenserDroplet, Boxes, Users,
   ClipboardList, ShoppingBag, PlusCircle, Calculator, FileText, Download
 } from "lucide-react";
@@ -113,7 +113,7 @@ export function NavigationBar({ maintenanceMode = false }: { maintenanceMode?: b
   const [solicitudNotifications, setSolicitudNotifications] = useState<any[]>([]);
   const [userName, setUserName] = useState<string | null>(null);
   const [dismissedIds, setDismissedIds] = useState<string[]>([]);
-  const APP_VERSION = "2.0.5"; // Actualizar esto para forzar visualmente la cache
+  const APP_VERSION = "2.0.7";
 
 
   // Refs para que el listener de Realtime siempre tenga el valor actual
@@ -1254,9 +1254,8 @@ export function NavigationBar({ maintenanceMode = false }: { maintenanceMode?: b
                     </div>
                   )}
 
-                  {/* Cerrar Sesión */}
-                  <div className="pt-4 mt-auto border-t">
-                    {session && (
+                  {session && (
+                    <div className="space-y-4">
                       <Button
                         variant="ghost"
                         className="w-full justify-start items-center gap-3 h-10 text-sm font-medium text-destructive hover:bg-destructive/10 hover:text-destructive"
@@ -1265,8 +1264,34 @@ export function NavigationBar({ maintenanceMode = false }: { maintenanceMode?: b
                         <LogOut className="w-4 h-4 opacity-70" />
                         Cerrar sesión
                       </Button>
-                    )}
-                  </div>
+
+                      {/* Grupo: Sistema (Debug/Update) en Mobile */}
+                      <div className="pt-4 border-t space-y-2">
+                        <p className="text-[10px] font-semibold text-muted-foreground uppercase px-3">Mantenimiento (v{APP_VERSION})</p>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full justify-start gap-2 h-9 text-xs"
+                          onClick={() => {
+                            setOpen(false);
+                            testSound();
+                          }}
+                        >
+                          <Bell className="w-3 h-3" />
+                          Probar Notificaciones
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="w-full justify-start gap-2 h-9 text-xs opacity-60"
+                          onClick={forceUpdate}
+                        >
+                          <RotateCcw className="w-3 h-3" />
+                          Limpiar Cache y Actualizar
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </nav>
               </div>
             </SheetContent>

@@ -1,29 +1,34 @@
-// Version: 1.0.3
-const CACHE_NAME = 'sanse-perfumes-v1';
-const urlsToCache = [
-    '/',
-    '/manifest.webmanifest',
-    '/icon.png',
-];
+// Version: 1.0.5
+const CACHE_NAME = 'sanse-perfumes-v2.0.7';
 
 self.addEventListener('install', (event) => {
+    self.skipWaiting();
+});
+
+self.addEventListener('activate', (event) => {
     event.waitUntil(
-        caches.open(CACHE_NAME)
-            .then((cache) => {
-                return cache.addAll(urlsToCache);
-            })
+        caches.keys().then((cacheNames) => {
+            return Promise.all(
+                cacheNames.map((cacheName) => {
+                    if (cacheName !== CACHE_NAME) {
+                        return caches.delete(cacheName);
+                    }
+                })
+            );
+        })
     );
 });
 
 self.addEventListener('fetch', (event) => {
+    if (event.request.mode === 'navigate') {
+        event.respondWith(
+            fetch(event.request).catch(() => caches.match(event.request))
+        );
+        return;
+    }
     event.respondWith(
-        caches.match(event.request)
-            .then((response) => {
-                if (response) {
-                    return response;
-                }
-                return fetch(event.request);
-            }
-            )
+        caches.match(event.request).then((response) => {
+            return response || fetch(event.request);
+        })
     );
 });
