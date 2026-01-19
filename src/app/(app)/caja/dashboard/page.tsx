@@ -175,9 +175,9 @@ export default function BusinessDashboard() {
                     else if (low.includes("aromatizante") || low.includes("aroma")) cat = "Aromatizantes";
                     else if (low.includes("textil")) cat = "Textiles";
 
-                    if (!categoryMap[cat]) categoryMap[cat] = { name: cat, revenue: 0, count: 0 };
+                    if (!categoryMap[cat]) categoryMap[cat] = { name: cat, revenue: 0, quantity: 0 };
                     categoryMap[cat].revenue += (avgPricePerUnit * quantity);
-                    categoryMap[cat].count += quantity;
+                    categoryMap[cat].quantity += quantity;
                 });
             }
         });
