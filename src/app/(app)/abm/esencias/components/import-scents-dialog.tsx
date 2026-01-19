@@ -30,6 +30,7 @@ import {
     Image as ImageIcon,
     FileText,
     Upload,
+    PlusCircle,
     Globe
 } from "lucide-react";
 import { toast } from "sonner";
@@ -37,8 +38,9 @@ import { createClient } from "@/utils/supabase/client";
 import * as pdfjsLib from "pdfjs-dist";
 import Tesseract from "tesseract.js";
 
-// Worker configuration for PDF.js - Use a reliable CDN
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+// Worker configuration for PDF.js
+const PDFJS_VERSION = "4.10.38";
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${PDFJS_VERSION}/pdf.worker.min.js`;
 
 interface ImportScentsDialogProps {
     open: boolean;
@@ -73,35 +75,75 @@ export function ImportScentsDialog({
     const fileInputRef = useRef<HTMLInputElement>(null);
     const supabase = createClient();
 
+    const preprocessImage = async (file: File): Promise<string> => {
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement("canvas");
+                    const ctx = canvas.getContext("2d");
+                    if (!ctx) return resolve(e.target?.result as string);
+
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+
+                    // Filtros básicos para mejorar OCR
+                    ctx.filter = "contrast(1.5) brightness(1.1) grayscale(1)";
+                    ctx.drawImage(img, 0, 0);
+
+                    resolve(canvas.toDataURL("image/jpeg", 0.9));
+                };
+                img.src = e.target?.result as string;
+            };
+            reader.readAsDataURL(file);
+        });
+    };
+
     const parseTextToItems = (text: string) => {
-        const lines = text.split("\n");
+        // Limpieza agresiva de caracteres raros que mete el OCR
+        const lines = text.split("\n").map(l => l.replace(/[|¦!¡]/g, "").trim());
         const foundItems: ParsedItem[] = [];
 
         lines.forEach(line => {
-            const lineText = line.trim();
-            if (!lineText) return;
+            if (!line || line.length < 3) return;
 
-            // Regex para detectar precios (números con o sin puntos/comas)
-            const priceRegex = /(\d+[\d.,]*)/g;
-            const matches = lineText.match(priceRegex);
+            // Regex para detectar precios (soporta US$, $, números con decimales)
+            // Buscamos patrones como: 4.32, 10,50, $4.32, US$4.32
+            const priceRegex = /(?:US\$|\$)?\s*(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{2})?|\d+(?:[.,]\d{2})?)/g;
+            const matches = [...line.matchAll(priceRegex)];
 
-            if (matches && matches.length >= 1) {
-                const firstPriceIndex = lineText.search(priceRegex);
-                const nombre = lineText.substring(0, firstPriceIndex).replace(/[:\-]/g, "").trim();
+            if (matches.length >= 1) {
+                // El nombre es lo que está antes del primer precio
+                const firstMatchIndex = line.search(priceRegex);
+                if (firstMatchIndex === -1) return;
 
-                if (nombre.length > 3) {
+                const nombre = line.substring(0, firstMatchIndex)
+                    .replace(/[_]/g, "")
+                    .replace(/\s+/g, " ")
+                    .trim();
+
+                if (nombre.length > 2) {
                     const prices = matches.map(m => {
-                        // Limpiar formato de moneda común ($ 1.200,00 -> 1200.00)
-                        const cleaned = m.replace(/\./g, "").replace(/,/g, ".");
-                        return parseFloat(cleaned);
-                    }).filter(p => !isNaN(p));
+                        let val = m[1].replace(/\./g, "").replace(/,/g, ".");
+                        // Si tiene más de un punto (ej: 4.32.00 por error), nos quedamos con el último como decimal
+                        const parts = val.split(".");
+                        if (parts.length > 2) {
+                            const decimals = parts.pop();
+                            val = parts.join("") + "." + decimals;
+                        }
+                        return parseFloat(val);
+                    }).filter(p => !isNaN(p) && p > 0);
 
                     if (prices.length > 0) {
                         foundItems.push({
                             id: Math.random().toString(36).substr(2, 9),
                             nombre: nombre,
-                            precio_30g: prices[0] || null,
-                            precio_100g: prices[1] || null,
+                            // En tablas de proveedores (como la de la imagen), 
+                            // el primer precio suele ser 100g si no es 30g.
+                            // Mapeamos inteligentemente: si el nombre es corto o parece cabecera, ignoramos.
+                            precio_30g: null,
+                            precio_100g: prices[0],
                             selected: true,
                             genero: "masculino",
                         });
@@ -120,16 +162,23 @@ export function ImportScentsDialog({
         try {
             if (file.type === "application/pdf") {
                 const arrayBuffer = await file.arrayBuffer();
-                const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                const loadingTask = pdfjsLib.getDocument({
+                    data: arrayBuffer,
+                    useSystemFonts: true,
+                    disableFontFace: false
+                });
+
+                const pdf = await loadingTask.promise;
                 let fullText = "";
 
                 for (let i = 1; i <= pdf.numPages; i++) {
                     const page = await pdf.getPage(i);
                     const textContent = await page.getTextContent();
 
-                    // Agrupar por líneas aproximadamente (Y coordinate)
                     const lines: Record<number, any[]> = {};
                     textContent.items.forEach((item: any) => {
+                        if (!item.str && item.str !== "") return;
+                        // PDF.js a veces separa letras, intentamos agrupar por Y y X
                         const y = Math.round(item.transform[5]);
                         if (!lines[y]) lines[y] = [];
                         lines[y].push(item);
@@ -144,22 +193,29 @@ export function ImportScentsDialog({
 
                 const parsed = parseTextToItems(fullText);
                 setItems(parsed);
-                if (parsed.length === 0) toast.warning("No se detectaron productos legibles en el PDF.");
             }
             else if (file.type.startsWith("image/")) {
-                const result = await Tesseract.recognize(file, 'spa', {
-                    logger: m => console.log(m)
+                const processedImageUrl = await preprocessImage(file);
+
+                // Usamos Tesseract con reconocimiento de líneas
+                const { data } = await Tesseract.recognize(processedImageUrl, 'spa', {
+                    logger: m => console.log(m.status, Math.round(m.progress * 100) + "%")
                 });
-                const parsed = parseTextToItems(result.data.text);
+
+                // Intentamos reconstruir la tabla basándonos en la estructura de bloques/líneas
+                const parsed = parseTextToItems(data.text);
                 setItems(parsed);
-                if (parsed.length === 0) toast.warning("No se detectaron productos en la imagen. Asegúrate de que el texto sea claro.");
+
+                if (parsed.length === 0) {
+                    toast.warning("No se detectaron datos. Intenta con una imagen más nítida o PDF.");
+                }
             }
             else {
-                toast.error("Formato no soportado. Usa PDF o imágenes (JPG, PNG).");
+                toast.error("Formato no soportado. Usa PDF o imágenes.");
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error("Error processing file:", error);
-            toast.error("Error al procesar el archivo");
+            toast.error(`Error al procesar: ${error.message || "Error desconocido"}`);
         } finally {
             setIsProcessing(false);
         }
@@ -483,27 +539,5 @@ export function ImportScentsDialog({
                 </DialogFooter>
             </DialogContent>
         </Dialog>
-    );
-}
-
-// Sub-componentes de Lucide que faltaban en el primer batch si se copian por separado
-function PlusCircle(props: any) {
-    return (
-        <svg
-            {...props}
-            xmlns="http://www.w3.org/2000/svg"
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-        >
-            <circle cx="12" cy="12" r="10" />
-            <path d="M8 12h8" />
-            <path d="M12 8v8" />
-        </svg>
     );
 }
