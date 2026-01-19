@@ -117,7 +117,7 @@ export function NavigationBar({ maintenanceMode = false }: { maintenanceMode?: b
   const [realtimeStatus, setRealtimeStatus] = useState<'connecting' | 'connected' | 'error'>('connecting');
   const [permissionStatus, setPermissionStatus] = useState<string>('default');
   const [audioUnlocked, setAudioUnlocked] = useState(false);
-  const APP_VERSION = "2.1.0";
+  const APP_VERSION = "2.1.1";
 
 
   // Refs para que el listener de Realtime siempre tenga el valor actual
@@ -142,8 +142,9 @@ export function NavigationBar({ maintenanceMode = false }: { maintenanceMode?: b
         n.estado === 'pendiente' && !lastIds.includes(n.id)
       );
 
-      if (hasNewRequest && lastIds.length > 0) { // Solo si no es la primera carga
-        console.log("New notification detected via polling diff!");
+      if (hasNewRequest && lastIds.length > 0) {
+        console.log("!!! SOUND TRIGGER: New pending request found in Polling !!!");
+        toast.info("Nueva solicitud detectada (Polling)");
         playNotificationSound();
       }
 
@@ -395,22 +396,24 @@ export function NavigationBar({ maintenanceMode = false }: { maintenanceMode?: b
     channel = supabase
       .channel('nav_notifications_realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'solicitudes' }, (payload: any) => {
-        const currentRole = userRoleRef.current?.toLowerCase();
+        const currentRole = userRoleRef.current?.toLowerCase()?.trim();
         const currentName = userNameRef.current;
 
-        console.log("Solitudes change detected!", payload.eventType, payload.new?.estado, "Role:", currentRole);
+        console.log("REALTIME EVENT:", payload.eventType, "Table:", payload.table, "State:", payload.new?.estado, "CurrentRole:", currentRole);
 
         // Lógica de Sonido y Notificación de Sistema
         if (payload.eventType === 'INSERT') {
-          // Suena para ADMIN siempre (Case insensitive)
+          console.log("INSERT detected. Checking if user is admin...");
           if (currentRole === 'admin') {
+            console.log("USER IS ADMIN - TRIGGERING SOUND");
             playNotificationSound();
-            toast.info(`Nueva solicitud de ${payload.new.cliente}`);
-            sendSystemNotification("Sanse Perfumes", `Nueva solicitud de ${payload.new.cliente}`);
-          }
-          // Suena para el REPRODUCTOR si él mismo lo creó (Confirmación)
-          else if (payload.new.cliente === currentName) {
+            toast.info(`🔔 NUEVO PEDIDO de ${payload.new.cliente || 'Desconocido'}`);
+            sendSystemNotification("Sanse Perfumes", `Nuevo pedido de ${payload.new.cliente}`);
+          } else if (payload.new.cliente === currentName) {
+            console.log("USER OWNED REQUEST - TRIGGERING SOUND");
             playNotificationSound();
+          } else {
+            console.log("Ignoring insert: Not admin and not owner. Role:", currentRole);
           }
         } else if (payload.eventType === 'UPDATE') {
           // Si actualizan un pedido de este usuario -> Suena
