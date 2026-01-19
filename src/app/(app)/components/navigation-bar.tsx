@@ -113,7 +113,7 @@ export function NavigationBar({ maintenanceMode = false }: { maintenanceMode?: b
   const [solicitudNotifications, setSolicitudNotifications] = useState<any[]>([]);
   const [userName, setUserName] = useState<string | null>(null);
   const [dismissedIds, setDismissedIds] = useState<string[]>([]);
-  const APP_VERSION = "2.0.7";
+  const APP_VERSION = "2.0.8";
 
 
   // Refs para que el listener de Realtime siempre tenga el valor actual
