@@ -2,9 +2,8 @@
 const CACHE_NAME = 'sanse-perfumes-v1';
 const urlsToCache = [
     '/',
-    '/manifest.json',
+    '/manifest.webmanifest',
     '/icon.png',
-    '/logo.ico',
 ];
 
 self.addEventListener('install', (event) => {

@@ -6,6 +6,8 @@ export default function manifest(): MetadataRoute.Manifest {
         short_name: 'Sanse',
         description: 'Gestión de Perfumería Sanse',
         start_url: '/',
+        scope: '/',
+        id: '/',
         display: 'standalone',
         background_color: '#000000',
         theme_color: '#000000',
