@@ -111,11 +111,13 @@ export function NavigationBar({ maintenanceMode = false }: { maintenanceMode?: b
   const [open, setOpen] = useState(false);
   const [pendingPrizes, setPendingPrizes] = useState<any[]>([]);
   const [solicitudNotifications, setSolicitudNotifications] = useState<any[]>([]);
+  const [notificationAudio, setNotificationAudio] = useState<HTMLAudioElement | null>(null);
   const [userName, setUserName] = useState<string | null>(null);
   const [dismissedIds, setDismissedIds] = useState<string[]>([]);
   const [realtimeStatus, setRealtimeStatus] = useState<'connecting' | 'connected' | 'error'>('connecting');
   const [permissionStatus, setPermissionStatus] = useState<string>('default');
-  const APP_VERSION = "2.0.9";
+  const [audioUnlocked, setAudioUnlocked] = useState(false);
+  const APP_VERSION = "2.1.0";
 
 
   // Refs para que el listener de Realtime siempre tenga el valor actual
@@ -149,17 +151,31 @@ export function NavigationBar({ maintenanceMode = false }: { maintenanceMode?: b
     }
   }, [solicitudNotifications]);
 
-  // Pre-load audio
-  const [notificationAudio, setNotificationAudio] = useState<HTMLAudioElement | null>(null);
-
   useEffect(() => {
-    const audio = new Audio("https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3");
-    audio.load();
-    setNotificationAudio(audio);
+    // Intentar "desbloquear" el audio en el primer toque/clic
+    const unlock = () => {
+      const audio = new Audio("https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3");
+      audio.volume = 0;
+      audio.play().then(() => {
+        console.log("Audio Unlocked!");
+        setAudioUnlocked(true);
+        setNotificationAudio(audio);
+        window.removeEventListener('click', unlock);
+        window.removeEventListener('touchstart', unlock);
+      }).catch(e => console.log("Unlock failed", e));
+    };
+
+    window.addEventListener('click', unlock);
+    window.addEventListener('touchstart', unlock);
 
     if ("Notification" in window) {
       setPermissionStatus(Notification.permission);
     }
+
+    return () => {
+      window.removeEventListener('click', unlock);
+      window.removeEventListener('touchstart', unlock);
+    };
   }, []);
 
   const requestPermission = async () => {
@@ -176,19 +192,21 @@ export function NavigationBar({ maintenanceMode = false }: { maintenanceMode?: b
   };
 
   const playNotificationSound = () => {
-    if (notificationAudio) {
-      notificationAudio.currentTime = 0;
-      notificationAudio.play().then(() => {
-        console.log("Sound played successfully");
-      }).catch(e => {
-        console.log("Sound blocked or failed", e);
-        // Fallback visual
-        toast.info("Nueva notificación (Sonido bloqueado)");
-      });
-    }
     if ("vibrate" in navigator) {
-      navigator.vibrate([200, 100, 200]);
+      navigator.vibrate([300, 100, 300, 100, 300]); // Vibración más larga
     }
+
+    const soundUrl = "https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3";
+    const audio = notificationAudio || new Audio(soundUrl);
+    audio.volume = 1.0;
+    audio.currentTime = 0;
+
+    audio.play()
+      .then(() => console.log("Sound played successfully"))
+      .catch(e => {
+        console.log("Sound blocked, trying fallback toast", e);
+        toast.info("🔔 ¡NUEVA VENTA! (Sonido bloqueado por el celu)");
+      });
   };
 
   const testSound = () => {
@@ -377,14 +395,14 @@ export function NavigationBar({ maintenanceMode = false }: { maintenanceMode?: b
     channel = supabase
       .channel('nav_notifications_realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'solicitudes' }, (payload: any) => {
-        const currentRole = userRoleRef.current;
+        const currentRole = userRoleRef.current?.toLowerCase();
         const currentName = userNameRef.current;
 
         console.log("Solitudes change detected!", payload.eventType, payload.new?.estado, "Role:", currentRole);
 
         // Lógica de Sonido y Notificación de Sistema
         if (payload.eventType === 'INSERT') {
-          // Suena para ADMIN siempre
+          // Suena para ADMIN siempre (Case insensitive)
           if (currentRole === 'admin') {
             playNotificationSound();
             toast.info(`Nueva solicitud de ${payload.new.cliente}`);
