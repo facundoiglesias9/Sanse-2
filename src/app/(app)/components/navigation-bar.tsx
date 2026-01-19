@@ -117,7 +117,7 @@ export function NavigationBar({ maintenanceMode = false }: { maintenanceMode?: b
   const [realtimeStatus, setRealtimeStatus] = useState<'connecting' | 'connected' | 'error'>('connecting');
   const [permissionStatus, setPermissionStatus] = useState<string>('default');
   const [audioUnlocked, setAudioUnlocked] = useState(false);
-  const APP_VERSION = "2.1.4";
+  const APP_VERSION = "2.1.5";
 
 
   // Refs para que el listener de Realtime siempre tenga el valor actual
@@ -143,9 +143,14 @@ export function NavigationBar({ maintenanceMode = false }: { maintenanceMode?: b
       );
 
       if (hasNewRequest && lastIds.length > 0) {
-        console.log("!!! SOUND TRIGGER: New pending request found in Polling !!!");
-        toast.info("Nueva solicitud detectada (Polling)");
-        playNotificationSound();
+        const currentRole = userRoleRef.current?.toLowerCase()?.trim();
+        console.log("!!! TRIGGER: New pending request in Polling. Role:", currentRole);
+
+        if (currentRole === 'admin') {
+          playNotificationSound();
+          sendSystemNotification("Sanse Perfumes", "🚨 NUEVA VENTA DETECTADA");
+          toast.info("🔔 ¡Nueva solicitud recibida!");
+        }
       }
 
       prevNotificationsRef.current = currentIds;
@@ -247,9 +252,9 @@ export function NavigationBar({ maintenanceMode = false }: { maintenanceMode?: b
           registration.showNotification(title, {
             body,
             icon: "/icon.png",
-            badge: "/icon.png",
+            // quitamos 'badge' para evitar el cuadrado blanco en Samsung/Android
             vibrate: [500, 100, 500, 100, 500],
-            tag: "venta-" + Date.now(), // Unique tag so they stack like WhatsApp
+            tag: "venta-" + Date.now(),
             renotify: true,
             requireInteraction: true,
             data: { url: "/" }
