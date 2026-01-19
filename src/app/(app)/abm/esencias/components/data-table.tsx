@@ -244,11 +244,11 @@ export function DataTable<TData>({
           <Button
             size="sm"
             variant="outline"
-            className="gap-x-2"
+            className="hidden md:flex gap-x-2"
             onClick={() => setIsImportDialogOpen(true)}
           >
             <FileUp width={18} />
-            Importar PDF
+            Importar PDF/Imagen
           </Button>
           <Button size="sm" className="gap-x-2" onClick={handleNew}>
             <Plus width={18} />
