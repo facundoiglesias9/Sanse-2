@@ -140,12 +140,22 @@ export function NavigationBar({ maintenanceMode = false }: { maintenanceMode?: b
   const playNotificationSound = () => {
     if (notificationAudio) {
       notificationAudio.currentTime = 0;
-      notificationAudio.play().catch(e => console.log("Audio play blocked: interaction needed."));
+      notificationAudio.play().then(() => {
+        console.log("Sound played successfully");
+      }).catch(e => {
+        console.log("Sound blocked or failed", e);
+        // Fallback visual
+        toast.info("Nueva notificación (Sonido bloqueado)");
+      });
     }
-    // Vibrar si es posible (bueno para móviles)
     if ("vibrate" in navigator) {
       navigator.vibrate([200, 100, 200]);
     }
+  };
+
+  const testSound = () => {
+    playNotificationSound();
+    toast.success("Probando sonido...");
   };
 
   const sendSystemNotification = (title: string, body: string) => {
@@ -222,14 +232,15 @@ export function NavigationBar({ maintenanceMode = false }: { maintenanceMode?: b
           .eq('id', session.user.id)
           .single();
 
-        const role = profile?.rol || session.user.user_metadata?.rol || "revendedor";
-        setUserRole(role);
-
         let resolvedName = profile?.nombre;
         if (!resolvedName) {
           const meta = session.user.user_metadata;
           resolvedName = meta?.nombre || meta?.full_name || meta?.name || session.user.email || "";
         }
+
+        const role = profile?.rol || session.user.user_metadata?.rol || "revendedor";
+        console.log("Resolved Role:", role, "for user:", resolvedName);
+        setUserRole(role);
         setUserName(resolvedName);
       }
     };
@@ -351,7 +362,7 @@ export function NavigationBar({ maintenanceMode = false }: { maintenanceMode?: b
       clearInterval(interval);
       supabase.removeChannel(channel);
     };
-  }, [userName, dismissedIds]);
+  }, [userName, userRole, dismissedIds]);
 
 
   const handleDismiss = (id: string) => {
@@ -854,6 +865,10 @@ export function NavigationBar({ maintenanceMode = false }: { maintenanceMode?: b
                     <LogOut width={24} className="text-destructive" />
                     Cerrar sesión
                   </div>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={testSound} className="text-xs opacity-50">
+                  Probar Sonido e INFO
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
