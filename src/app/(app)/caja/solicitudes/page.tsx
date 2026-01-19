@@ -267,13 +267,23 @@ export default function SolicitudesPage() {
             ? solicitud.items.reduce((acc: number, item: any) => acc + (item.cantidad || 0), 0)
             : 0;
 
+        // Determinar si el cliente es revendedor
+        const { data: clientProfile } = await supabase
+            .from('profiles')
+            .select('rol')
+            .ilike('nombre', solicitud.cliente)
+            .limit(1)
+            .single();
+
+        const isReseller = clientProfile?.rol === 'revendedor';
+
         const { error: saleError } = await supabase.from("ventas").insert({
             created_at: new Date(),
             cliente: solicitud.cliente,
             cantidad_perfumes: Math.round(cantidadTotal),
             precio_total: Math.round(solicitud.total),
             perfumes: solicitud.detalle,
-            is_reseller_sale: true,
+            is_reseller_sale: isReseller,
             metodo_pago: solicitud.metodo_pago
         });
 

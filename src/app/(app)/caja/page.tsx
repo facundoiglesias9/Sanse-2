@@ -145,7 +145,6 @@ export default function CajaPage() {
         const { data: ventasData } = await supabase
             .from("ventas")
             .select("*")
-            .or("is_reseller_sale.is.null,is_reseller_sale.eq.false")
             .order("created_at", { ascending: false });
         setVentas(ventasData || []);
 
