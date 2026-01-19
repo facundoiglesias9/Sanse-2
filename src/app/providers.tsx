@@ -15,7 +15,7 @@ export function Providers({ children, ...props }: any) {
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", function () {
         // Añadimos un query string para forzar al navegador a detectar un cambio en el archivo sw.js
-        navigator.serviceWorker.register("/sw.js?v=2.0.8").then(
+        navigator.serviceWorker.register("/sw.js?v=2.1.2").then(
           function (registration) {
             console.log("Service Worker registrado con éxito:", registration.scope);
             // Forzar actualización si hay un worker nuevo

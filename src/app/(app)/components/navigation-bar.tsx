@@ -117,7 +117,7 @@ export function NavigationBar({ maintenanceMode = false }: { maintenanceMode?: b
   const [realtimeStatus, setRealtimeStatus] = useState<'connecting' | 'connected' | 'error'>('connecting');
   const [permissionStatus, setPermissionStatus] = useState<string>('default');
   const [audioUnlocked, setAudioUnlocked] = useState(false);
-  const APP_VERSION = "2.1.1";
+  const APP_VERSION = "2.1.2";
 
 
   // Refs para que el listener de Realtime siempre tenga el valor actual
@@ -248,10 +248,22 @@ export function NavigationBar({ maintenanceMode = false }: { maintenanceMode?: b
 
   const sendSystemNotification = (title: string, body: string) => {
     if ("Notification" in window && Notification.permission === "granted") {
-      new Notification(title, {
-        body,
-        icon: "/icons/icon-192x192.png", // Asegúrate de que esta ruta sea válida
-      });
+      // Intentar vía Service Worker (más fiable en móviles/PWA)
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.ready.then(registration => {
+          registration.showNotification(title, {
+            body,
+            icon: "/icon.png",
+            badge: "/icon.png",
+            vibrate: [200, 100, 200],
+            tag: "venta-nueva",
+            renotify: true,
+          } as any);
+        });
+      } else {
+        // Fallback básico
+        new Notification(title, { body, icon: "/icon.png" });
+      }
     }
   };
 
