@@ -114,15 +114,22 @@ export function NavigationBar({ maintenanceMode = false }: { maintenanceMode?: b
   const [userName, setUserName] = useState<string | null>(null);
   const [dismissedIds, setDismissedIds] = useState<string[]>([]);
 
+  // Pre-load audio
+  const [notificationAudio, setNotificationAudio] = useState<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    const audio = new Audio("https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3");
+    audio.load();
+    setNotificationAudio(audio);
+  }, []);
+
   const playNotificationSound = () => {
-    try {
-      const audio = new Audio("https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3");
-      audio.volume = 0.5;
-      audio.play().catch(e => console.log("Audio play blocked by browser policy until user interacts."));
-    } catch (err) {
-      console.error("Error playing sound:", err);
+    if (notificationAudio) {
+      notificationAudio.currentTime = 0;
+      notificationAudio.play().catch(e => console.log("Audio play blocked: interaction needed."));
     }
   };
+
 
   // PWA Install Prompt
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
@@ -237,10 +244,11 @@ export function NavigationBar({ maintenanceMode = false }: { maintenanceMode?: b
       if (userRole === 'admin') {
         requestQuery = requestQuery.eq('estado', 'pendiente');
       } else {
-        // Si no es admin, ve SUS pedidos que fueron actualizados
+        // Si no es admin, ve SUS pedidos
+        // Agregamos 'pendiente' y 'cancelado' para que vea sus propios movimientos recientes
         requestQuery = requestQuery
           .ilike('cliente', userName)
-          .in('estado', ['rechazado', 'en_preparacion', 'preparado']);
+          .in('estado', ['pendiente', 'rechazado', 'en_preparacion', 'preparado', 'cancelado']);
       }
 
       const { data: requestUpdates } = await requestQuery;
@@ -262,17 +270,21 @@ export function NavigationBar({ maintenanceMode = false }: { maintenanceMode?: b
     channel = supabase
       .channel('nav_notifications_realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'solicitudes' }, (payload: any) => {
-        console.log("Solitudes change detected!", payload.eventType);
+        console.log("Solitudes change detected!", payload.eventType, payload.new?.estado);
 
         // Lógica de Sonido
         if (payload.eventType === 'INSERT') {
-          // Si entra un pedido nuevo y soy ADMIN -> Suena
-          if (userRole === 'admin' && payload.new.estado === 'pendiente') {
+          // Suena para ADMIN siempre
+          if (userRole === 'admin') {
+            playNotificationSound();
+          }
+          // Suena para el REPRODUCTOR si él mismo lo creó (Confirmación)
+          else if (payload.new.cliente === userName) {
             playNotificationSound();
           }
         } else if (payload.eventType === 'UPDATE') {
           // Si actualizan un pedido de este usuario -> Suena
-          if (userRole !== 'admin' && payload.new.cliente === userName) {
+          if (payload.new.cliente === userName) {
             // Solo si cambió el estado
             if (payload.new.estado !== payload.old?.estado) {
               playNotificationSound();
@@ -692,6 +704,11 @@ export function NavigationBar({ maintenanceMode = false }: { maintenanceMode?: b
                           bgClass = "bg-red-100";
                           title = "Pedido Rechazado";
                           break;
+                        case 'cancelado':
+                          icon = <Trash2 className="w-4 h-4 text-gray-500" />;
+                          bgClass = "bg-gray-100";
+                          title = "Pedido Cancelado";
+                          break;
                         case 'en_preparacion':
                           icon = <Package className="w-4 h-4 text-amber-500" />;
                           bgClass = "bg-amber-100";
@@ -730,7 +747,8 @@ export function NavigationBar({ maintenanceMode = false }: { maintenanceMode?: b
                                 {req.estado === 'rechazado' ? "Tu pedido no pudo ser procesado." :
                                   req.estado === 'en_preparacion' ? "Estamos armando tu pedido." :
                                     req.estado === 'preparado' ? "Pasa a buscarlo por el local." :
-                                      req.estado === 'pendiente' ? `${req.cliente} ha enviado un nuevo pedido.` : ""}
+                                      req.estado === 'cancelado' ? "El pedido ha sido cancelado." :
+                                        req.estado === 'pendiente' ? `${req.cliente} ha enviado un nuevo pedido.` : ""}
                                 <span className="block font-semibold mt-0.5">{formatCurrency(req.total, "ARS", 0)}</span>
                               </p>
                               <p className="text-[10px] text-muted-foreground mt-2 text-right">
