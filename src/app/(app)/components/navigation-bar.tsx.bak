@@ -1345,13 +1345,14 @@ export function NavigationBar({ maintenanceMode = false }: { maintenanceMode?: b
                         </div>
                       )}
                     </div>
+                    </div>
                   )}
-                </nav>
-              </div>
-            </SheetContent>
-          </Sheet>
+            </nav>
         </div>
-      </div>
-    </header>
+      </SheetContent>
+    </Sheet>
+        </div >
+      </div >
+    </header >
   );
 }
