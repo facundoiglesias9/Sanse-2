@@ -117,7 +117,7 @@ export function NavigationBar({ maintenanceMode = false }: { maintenanceMode?: b
   const [realtimeStatus, setRealtimeStatus] = useState<'connecting' | 'connected' | 'error'>('connecting');
   const [permissionStatus, setPermissionStatus] = useState<string>('default');
   const [audioUnlocked, setAudioUnlocked] = useState(false);
-  const APP_VERSION = "2.1.8";
+  const APP_VERSION = "2.2.0";
 
 
   // Refs para que el listener de Realtime siempre tenga el valor actual
@@ -147,6 +147,7 @@ export function NavigationBar({ maintenanceMode = false }: { maintenanceMode?: b
         console.log("!!! TRIGGER: New pending requests found in Polling:", newRequests.length);
 
         if (currentRole === 'admin') {
+          console.log("!!! SOUND TRIGGER (Polling):", newRequests.length, "pending requests");
           playNotificationSound();
           newRequests.forEach(req => {
             sendSystemNotification("Sanse Perfumes", `${req.cliente} inició un pedido`);
@@ -417,17 +418,13 @@ export function NavigationBar({ maintenanceMode = false }: { maintenanceMode?: b
 
         // Lógica de Sonido y Notificación de Sistema
         if (payload.eventType === 'INSERT') {
-          console.log("INSERT detected. Checking if user is admin...");
+          console.log("!!! REALTIME INSERT:", payload.new.cliente, " - Role:", currentRole);
           if (currentRole === 'admin') {
-            console.log("USER IS ADMIN - TRIGGERING SOUND");
             playNotificationSound();
             toast.info(`🔔 NUEVO PEDIDO de ${payload.new.cliente || 'Desconocido'}`);
             sendSystemNotification("Sanse Perfumes", `${payload.new.cliente} inició un pedido`);
           } else if (payload.new.cliente === currentName) {
-            console.log("USER OWNED REQUEST - TRIGGERING SOUND");
             playNotificationSound();
-          } else {
-            console.log("Ignoring insert: Not admin and not owner. Role:", currentRole);
           }
         } else if (payload.eventType === 'UPDATE') {
           // Si actualizan un pedido de este usuario -> Suena
@@ -1322,36 +1319,52 @@ export function NavigationBar({ maintenanceMode = false }: { maintenanceMode?: b
                   )}
 
                   {session && (
-                    <div className="pt-4 border-t">
-                      <div className="px-3 flex items-center justify-between text-[10px] opacity-60 mb-4">
-                        <span>Estado del Sistema</span>
-                        <div className="flex items-center gap-2">
-                          <div className={clsx("w-1.5 h-1.5 rounded-full", realtimeStatus === 'connected' ? "bg-green-500" : "bg-red-500")} />
-                          <div className={clsx("w-1.5 h-1.5 rounded-full", permissionStatus === 'granted' ? "bg-green-500" : "bg-amber-500")} />
-                        </div>
+                    <div className="space-y-4">
+                      <div className="pt-2">
+                        <Button
+                          variant="ghost"
+                          className="w-full justify-start items-center gap-3 h-10 text-sm font-medium text-destructive hover:bg-destructive/10 hover:text-destructive"
+                          onClick={() => {
+                            setOpen(false);
+                            handleLogout();
+                          }}
+                        >
+                          <LogOut className="w-4 h-4 opacity-70" />
+                          Cerrar sesión
+                        </Button>
                       </div>
 
-                      {permissionStatus !== 'granted' && (
-                        <div className="px-3 pb-4">
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            className="w-full justify-start gap-2 h-9 text-xs font-bold animate-pulse"
-                            onClick={requestPermission}
-                          >
-                            <Bell className="w-3 h-3" />
-                            Habilitar Notificaciones
-                          </Button>
+                      <div className="pt-4 border-t">
+                        <div className="px-3 flex items-center justify-between text-[10px] opacity-60">
+                          <span>Estado del Sistema</span>
+                          <div className="flex items-center gap-2">
+                            <div className={clsx("w-1.5 h-1.5 rounded-full", realtimeStatus === 'connected' ? "bg-green-500" : "bg-red-500")} title="Base de Datos" />
+                            <div className={clsx("w-1.5 h-1.5 rounded-full", permissionStatus === 'granted' ? "bg-green-500" : "bg-amber-500")} title="Notificaciones" />
+                          </div>
                         </div>
-                      )}
+
+                        {permissionStatus !== 'granted' && (
+                          <div className="px-3 mt-4">
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              className="w-full justify-start gap-2 h-9 text-xs font-bold animate-pulse"
+                              onClick={requestPermission}
+                            >
+                              <Bell className="w-3 h-3" />
+                              Habilitar Notificaciones
+                            </Button>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
                 </nav>
               </div>
             </SheetContent>
           </Sheet>
-        </div>
-      </div>
-    </header>
+        </div >
+      </div >
+    </header >
   );
 }
