@@ -9,7 +9,7 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "Sanse Perfumes",
   description: "Aplicación privada de perfumes",
-  manifest: "/manifest.json",
+  manifest: "/manifest.webmanifest",
   themeColor: "#000000",
   viewport: "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0",
   appleWebApp: {

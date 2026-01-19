@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import {
   Menu, LogOut, Info, X, Package, Check, Bell, Gift, Truck, Trash2,
   DollarSign, Moon, Sun, Monitor, SoapDispenserDroplet, Boxes, Users,
-  ClipboardList, ShoppingBag, PlusCircle, Calculator, FileText
+  ClipboardList, ShoppingBag, PlusCircle, Calculator, FileText, Download
 } from "lucide-react";
 import Link from "next/link";
 import clsx from "clsx";
@@ -108,6 +108,42 @@ export function NavigationBar({ maintenanceMode = false }: { maintenanceMode?: b
   const [solicitudNotifications, setSolicitudNotifications] = useState<any[]>([]);
   const [userName, setUserName] = useState<string | null>(null);
   const [dismissedIds, setDismissedIds] = useState<string[]>([]);
+
+  // PWA Install Prompt
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [isInstallable, setIsInstallable] = useState(false);
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setIsInstallable(true);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    // Verificar si ya está instalada
+    if (window.matchMedia('(display-mode: standalone)').matches) {
+      setIsInstallable(false);
+    }
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  const handleInstallApp = async () => {
+    if (!deferredPrompt) {
+      alert("La opción de instalación se está preparando. Si no aparece en unos segundos, puedes instalarla desde el menú de opciones de tu navegador (los tres puntos arriba a la derecha) buscando 'Instalar aplicación'.");
+      return;
+    }
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      setDeferredPrompt(null);
+      setIsInstallable(false);
+    }
+  };
 
   // Cargar IDs descartados del localStorage
   useEffect(() => {
@@ -695,6 +731,11 @@ export function NavigationBar({ maintenanceMode = false }: { maintenanceMode?: b
                   );
                 })}
                 <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleInstallApp} className="text-primary font-bold">
+                  <Download className="w-4 h-4 mr-2" />
+                  Instalar App
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleLogout}>
                   <div className="flex items-center gap-2">
                     <LogOut width={24} className="text-destructive" />
@@ -991,6 +1032,16 @@ export function NavigationBar({ maintenanceMode = false }: { maintenanceMode?: b
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
+
+                    {/* Instalar App (PWA) */}
+                    <Button
+                      variant="ghost"
+                      className="w-full justify-start items-center gap-3 h-10 text-sm font-bold text-primary"
+                      onClick={handleInstallApp}
+                    >
+                      <Download className="w-4 h-4" />
+                      Instalar App
+                    </Button>
                   </div>
 
 
