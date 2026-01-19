@@ -7,7 +7,7 @@ import { Esencia } from "@/app/types/esencia";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DataTablePagination } from "@/components/ui/data-table-pagination";
-import { X, Plus, Filter, Search } from "lucide-react";
+import { X, Plus, Filter, Search, FileUp } from "lucide-react";
 import {
   ColumnDef,
   ColumnFiltersState,
@@ -35,6 +35,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { EsenciaDialog } from "./esencia-dialog";
+import { ImportPDFDialog } from "./import-pdf-dialog";
 
 interface DataTableProps<TData> {
   columns: ColumnDef<TData, any>[];
@@ -76,6 +77,7 @@ export function DataTable<TData>({
   headerChildren,
 }: DataTableProps<TData>) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [proveedores, setProveedores] = useState<
     { id: string; nombre: string; }[]
   >([]);
@@ -239,6 +241,15 @@ export function DataTable<TData>({
 
         <div className="flex items-center gap-4 w-full xl:w-auto justify-end">
           {headerChildren}
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-x-2"
+            onClick={() => setIsImportDialogOpen(true)}
+          >
+            <FileUp width={18} />
+            Importar PDF
+          </Button>
           <Button size="sm" className="gap-x-2" onClick={handleNew}>
             <Plus width={18} />
             Agregar esencia
@@ -253,6 +264,13 @@ export function DataTable<TData>({
         onSuccess={onEsenciaCreated}
         dolarARS={dolarARS}
         generoPorDefault={generoPorDefault}
+      />
+
+      <ImportPDFDialog
+        open={isImportDialogOpen}
+        onOpenChange={setIsImportDialogOpen}
+        onSuccess={onEsenciaCreated}
+        proveedores={proveedores}
       />
 
       <div className="border rounded-md">
