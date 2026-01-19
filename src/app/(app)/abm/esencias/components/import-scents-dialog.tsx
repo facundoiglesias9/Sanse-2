@@ -35,12 +35,13 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/utils/supabase/client";
+import { useCurrencies } from "@/app/contexts/CurrencyContext";
 import * as pdfjsLib from "pdfjs-dist";
 import Tesseract from "tesseract.js";
 
 // Worker configuration for PDF.js
 const PDFJS_VERSION = "4.10.38";
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${PDFJS_VERSION}/pdf.worker.min.js`;
+// Configuración global movida dentro de la función para mayor robustez
 
 interface ImportScentsDialogProps {
     open: boolean;
@@ -56,6 +57,10 @@ interface ParsedItem {
     precio_100g: number | null;
     selected: boolean;
     genero: "masculino" | "femenino" | "ambiente" | "otro";
+    isSmartMatched?: boolean;
+    alreadyExists?: boolean;
+    needsUpdate?: boolean;
+    existingPrice?: number | null;
 }
 
 export function ImportScentsDialog({
@@ -71,9 +76,13 @@ export function ImportScentsDialog({
     const [url, setUrl] = useState("");
     const [activeTab, setActiveTab] = useState<"file" | "url">("file");
     const [dragActive, setDragActive] = useState(false);
+    const [existingEsencias, setExistingEsencias] = useState<any[]>([]);
+    const [detectedCurrency, setDetectedCurrency] = useState<'USD' | 'ARS'>('ARS');
 
     const fileInputRef = useRef<HTMLInputElement>(null);
     const supabase = createClient();
+    const { currencies } = useCurrencies();
+    const arsRate = currencies["ARS"] || 1;
 
     const preprocessImage = async (file: File): Promise<string> => {
         return new Promise((resolve) => {
@@ -109,29 +118,99 @@ export function ImportScentsDialog({
         });
     };
 
+    // Cargar esencias existentes para validación
+    React.useEffect(() => {
+        if (open) {
+            const fetchExisting = async () => {
+                const { data } = await supabase.from("esencias").select("nombre, precio_usd, precio_ars_100g");
+                if (data) {
+                    setExistingEsencias(data);
+                }
+            };
+            fetchExisting();
+        }
+    }, [open, supabase]);
+
+    // Función de normalización para Fuzzy Match
+    const normalizeName = (name: string) => {
+        return name.toLowerCase()
+            .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // Quitar tildes
+            .replace(/[|¦!¡_:.#\-*]/g, "")
+            .replace(/\s+/g, "")
+            .trim();
+    };
+
     const parseTextToItems = (text: string) => {
+        // Normalizar texto para evitar problemas con espacios de OCR
         const lines = text.split("\n").map(l => l.trim().replace(/\s+/g, " "));
         const foundItems: ParsedItem[] = [];
 
-        const headerKeywords = ["GRAMOS", "LISTA", "PRECIOS", "ACEITES", "FRAGANCIAS", "CODIGO", "DETALLE", "PÁGINA", "PAGE"];
+        console.log("Analizando texto extraído (primeras 5 líneas):", lines.slice(0, 5));
+
+        // --- DETECCIÓN DINÁMICA DE COLUMNAS (MEJORADA) ---
+        let index30 = -1;
+        let index100 = 0; // Por defecto el primer precio es 100g
+
+        // Buscamos la línea que contiene los encabezados de peso
+        const headerLine = lines.find(l => {
+            const up = l.toUpperCase();
+            return up.includes("GRAMOS") || up.includes("GRS") || (up.includes("100") && up.includes("250"));
+        });
+
+        if (headerLine) {
+            const upHeader = headerLine.toUpperCase();
+            // Solo buscamos números aislados que representen pesos
+            const weights = [...upHeader.matchAll(/\b(30|100|250|500|1000)\b/g)]
+                .map(m => ({ val: m[1], pos: m.index }));
+
+            // Ordenamos por posición en la línea
+            weights.sort((a, b) => a.pos - b.pos);
+
+            weights.forEach((w, idx) => {
+                if (w.val === "30") index30 = idx;
+                if (w.val === "100") index100 = idx;
+            });
+
+            console.log("Encabezado detectado en línea:", headerLine);
+        } else {
+            console.log("No se detectó línea de encabezado de pesos. Usando default.");
+        }
+
+        // --- DETECCIÓN DE MONEDA ---
+        const textUp = text.toUpperCase();
+        const hasUSDSymbol = textUp.includes("US$") || textUp.includes("U$S") || textUp.includes("USD");
+        const currentCurrency = hasUSDSymbol ? 'USD' : 'ARS';
+        setDetectedCurrency(currentCurrency);
+        console.log(`Moneda detectada: ${currentCurrency}`);
+
+        const headerKeywords = ["GRAMOS", "LISTA", "PRECIOS", "ACEITES", "FRAGANCIAS", "CODIGO", "DETALLE", "PÁGINA", "PAGE", "PROVEEDOR"];
+
+        const MASCULINO_KEYWORDS = ["MASC", "HOMBRE", "MAN", "MEN", "MALE", "HOMME", "HIM", "BOY", "KING", "PRINCE", "POUR HOMME", "INVICTUS", "SAUVAGE", "POLO", "AVENTUS", "BAD BOY", "CH MEN", "FANTASY MASC", "212 VIP"];
+        const FEMENINO_KEYWORDS = ["FEM", "MUJER", "WOMAN", "WOMEN", "FEMALE", "FEMME", "HER", "GIRL", "QUEEN", "PRINCESS", "LADY", "POUR FEMME", "LA VIE EST BELLE", "GOOD GIRL", "OLYMPEA", "IDOLE", "CHANEL", "MISS DIOR", "FANTASY FEM", "SCANDAL"];
+        const AMBIENTE_KEYWORDS = ["AMBIENTE", "TEXTIL", "HOME", "SCENT", "DIFFUSER", "SPRAY", "ROOM", "SPA", "VARILLAS", "DIFUSOR", "AUTO", "CAR", "AROMATIZANTE"];
 
         lines.forEach(line => {
-            if (!line || line.length < 3) return;
+            if (!line || line.length < 5) return;
 
             const upperLine = line.toUpperCase();
             if (headerKeywords.some(k => upperLine.includes(k))) return;
-            if (/^\d+$/.test(line.replace(/\s/g, ""))) return; // Ignorar solo números
 
-            // Regex ultra-robusto: busca bloques numéricos que parezcan precios (X.XX o X,XX)
-            // Soporta: US$ 4.32, $4.32, 4.32, 4,32, 1.250,00
-            const pricePattern = /(?:US\$|\$)?\s*(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{1,3})?|\d+(?:[.,]\d{1,2})?)/g;
+            // Regex de precios más permisiva para errores de OCR ($ o S o 5 a veces)
+            const pricePattern = /(?:US\$|\$|S\/|5)?\s*(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{1,3})?|\d+(?:[.,]\d{1,2})?)/g;
             const matches = [...line.matchAll(pricePattern)];
 
-            // Filtramos las coincidencias que realmente parecen precios (tienen decimales o son números razonables)
             const validMatches = matches.filter(m => {
-                const val = m[1].replace(/\./g, "").replace(/,/g, ".");
+                let val = m[1];
+                // Si tiene una coma y un punto, o múltiples puntos, es un formato de miles.
+                // Si solo tiene un punto/coma y 2 decimales, es un decimal.
+                if (val.includes(",") && val.includes(".")) {
+                    val = val.replace(/\./g, "").replace(",", ".");
+                } else if (val.includes(",") && val.split(",")[1].length <= 2) {
+                    val = val.replace(",", ".");
+                }
+
                 const num = parseFloat(val);
-                return !isNaN(num) && num > 0 && num < 100000; // Un precio razonable
+                return !isNaN(num) && num > 0 && num < 100000 && num !== 2024 && num !== 2025;
             });
 
             if (validMatches.length > 0) {
@@ -139,48 +218,84 @@ export function ImportScentsDialog({
                 const priceIndex = line.indexOf(firstMatch[0]);
 
                 let nombre = line.substring(0, priceIndex)
-                    .replace(/[|¦!¡_:.#\-*]/g, "") // Limpiar basura
+                    .replace(/[|¦!¡_:.#\-*]/g, " ")
+                    .replace(/\s+/g, " ")
                     .trim();
 
-                // Caso fallback: si el nombre es muy corto o vacío, intentamos buscar texto después de los precios o separarlo
-                if (nombre.length < 2) {
-                    const textWithoutPrices = line.replace(pricePattern, " ").trim();
-                    if (textWithoutPrices.length > 2) {
-                        nombre = textWithoutPrices;
-                    }
+                // Fallback: si el nombre es corto, buscamos lo que no sea precio
+                if (nombre.length < 3) {
+                    const textWithoutPrices = line.replace(pricePattern, "").replace(/[|¦!¡_:.#\-*]/g, " ").trim();
+                    if (textWithoutPrices.length > 3) nombre = textWithoutPrices;
                 }
 
-                if (nombre.length > 2 && !/^\d+$/.test(nombre.replace(/\s/g, ""))) {
+                if (nombre.length > 3 && !/^\d+$/.test(nombre.replace(/\s/g, ""))) {
                     const prices = validMatches.map(m => {
-                        let val = m[1].replace(/\./g, "").replace(/,/g, ".");
-                        const parts = val.split(".");
-                        if (parts.length > 2) {
-                            val = parts.slice(0, -1).join("") + "." + parts[parts.length - 1];
+                        let val = m[1];
+                        if (val.includes(",") && val.includes(".")) {
+                            val = val.replace(/\./g, "").replace(",", ".");
+                        } else if (val.includes(",") && val.split(",")[1].length <= 2) {
+                            val = val.replace(",", ".");
+                        } else if (val.includes(".") && val.split(".")[1].length > 2 && !val.includes(",")) {
+                            val = val.replace(/\./g, "");
                         }
                         return parseFloat(val);
                     });
 
                     if (prices.length > 0) {
-                        // En la mayoría de las listas de proveedores locales:
-                        // Si hay varios precios, el último suele ser el de la unidad menor (100g)
-                        // Si hay uno solo, es el de 100g.
-                        const precio100g = prices.length > 1 ? prices[prices.length - 1] : prices[0];
-                        const precio30g = prices.length > 1 ? prices[0] : null;
+                        // Mapeo inteligente basado en la detección de cabeceras
+                        const precio100g = prices[index100] !== undefined ? prices[index100] : prices[0];
+                        const precio30g = index30 !== -1 && prices[index30] !== undefined ? prices[index30] : null;
+
+                        let genero: "masculino" | "femenino" | "ambiente" | "otro" = "otro";
+                        let isSmartMatched = false;
+
+                        if (AMBIENTE_KEYWORDS.some(k => upperLine.includes(k))) {
+                            genero = "ambiente";
+                            isSmartMatched = true;
+                        } else if (FEMENINO_KEYWORDS.some(k => upperLine.includes(k))) {
+                            genero = "femenino";
+                            isSmartMatched = true;
+                        } else if (MASCULINO_KEYWORDS.some(k => upperLine.includes(k))) {
+                            genero = "masculino";
+                            isSmartMatched = true;
+                        }
+
+                        const normNombre = normalizeName(nombre);
+                        const existing = existingEsencias.find(e => normalizeName(e.nombre) === normNombre);
+
+                        const isUSD = currentCurrency === 'USD';
+                        // PRECIO ACTUAL: Si existe en su moneda, lo usamos. Si no, lo convertimos para poder comparar.
+                        let dbPriceInCurrentCurrency = null;
+                        if (existing) {
+                            if (isUSD) {
+                                dbPriceInCurrentCurrency = existing.precio_usd || (existing.precio_ars_100g ? existing.precio_ars_100g / arsRate : null);
+                            } else {
+                                dbPriceInCurrentCurrency = existing.precio_ars_100g || (existing.precio_usd ? existing.precio_usd * arsRate : null);
+                            }
+                        }
+
+                        // Solo marcar para actualizar si el precio es DIFERENTE y no nulo
+                        const needsUpdate = existing && dbPriceInCurrentCurrency !== null && Math.abs((dbPriceInCurrentCurrency || 0) - (precio100g || 0)) > 0.05;
+                        const alreadyExists = !!existing;
 
                         foundItems.push({
                             id: Math.random().toString(36).substr(2, 9),
                             nombre: nombre.split(" ").map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" "),
-                            precio_30g: precio30g === precio100g ? null : precio30g,
+                            precio_30g: precio30g,
                             precio_100g: precio100g,
-                            selected: true,
-                            genero: upperLine.includes("FEM") || upperLine.includes("MUJER") ? "femenino" :
-                                upperLine.includes("MASC") || upperLine.includes("HOMBRE") ? "masculino" : "masculino",
+                            selected: !alreadyExists || needsUpdate,
+                            genero,
+                            isSmartMatched,
+                            alreadyExists,
+                            needsUpdate,
+                            existingPrice: dbPriceInCurrentCurrency
                         });
                     }
                 }
             }
         });
 
+        console.log(`Extracción finalizada: ${foundItems.length} ítems encontrados.`);
         return foundItems;
     };
 
@@ -191,6 +306,7 @@ export function ImportScentsDialog({
         try {
             if (file.type === "application/pdf") {
                 const arrayBuffer = await file.arrayBuffer();
+                // Usamos unpkg que suele ser más compatible con Next.js que cdnjs para workers
                 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${PDFJS_VERSION}/build/pdf.worker.min.mjs`;
 
                 const loadingTask = pdfjsLib.getDocument({
@@ -206,17 +322,13 @@ export function ImportScentsDialog({
                     const page = await pdf.getPage(i);
                     const textContent = await page.getTextContent();
 
-                    // Agrupamos por Y con un margen de 5px para manejar desajustes en el PDF
                     const linesGroupByY: Record<number, any[]> = {};
                     const yTolerance = 5;
 
                     textContent.items.forEach((item: any) => {
                         if (!item.str && item.str !== "") return;
                         const originalY = item.transform[5];
-
-                        // Buscamos si ya existe una línea en este rango de Y
                         let foundY = Object.keys(linesGroupByY).find(y => Math.abs(Number(y) - originalY) < yTolerance);
-
                         if (foundY) {
                             linesGroupByY[Number(foundY)].push(item);
                         } else {
@@ -228,42 +340,39 @@ export function ImportScentsDialog({
                     sortedY.forEach(y => {
                         const lineItems = linesGroupByY[y].sort((a, b) => a.transform[4] - b.transform[4]);
                         const lineStr = lineItems.map(item => item.str).join(" ");
-                        if (lineStr.trim().length > 0) {
-                            fullText += lineStr + "\n";
-                        }
+                        if (lineStr.trim().length > 0) fullText += lineStr + "\n";
                     });
                 }
 
                 const parsed = parseTextToItems(fullText);
                 setItems(parsed);
-                if (parsed.length === 0) toast.warning("No se encontraron esencias. Asegúrate de que el PDF tenga texto copiable.");
+                if (parsed.length === 0) toast.warning("No se detectaron esencias. Verifica que el PDF tenga texto copiable.");
             }
             else if (file.type.startsWith("image/")) {
                 const processedImageUrl = await preprocessImage(file);
 
+                // Configuración más robusta para Tesseract
                 const worker = await Tesseract.createWorker('spa', 1, {
-                    logger: m => console.log(m.status === 'recognizing text' ? `Ocr: ${Math.round(m.progress * 100)}%` : m.status)
+                    logger: m => console.log(m.status === 'recognizing text' ? `OCR: ${Math.round(m.progress * 100)}%` : m.status)
                 });
 
-                const { data } = await worker.recognize(processedImageUrl, {
-                    // @ts-ignore
-                    preserve_interword_spaces: '1',
-                });
+                const { data } = await worker.recognize(processedImageUrl);
                 await worker.terminate();
 
                 const parsed = parseTextToItems(data.text);
                 setItems(parsed);
 
                 if (parsed.length === 0) {
-                    toast.warning("No se detectaron datos en la imagen. Intenta con una captura más clara.");
+                    toast.warning("No se detectaron datos claros. Intenta con una captura más nítida o PDF.");
                 }
             }
             else {
                 toast.error("Formato no soportado.");
             }
         } catch (error: any) {
-            console.error("Error processing file:", error);
-            toast.error(`Error al procesar: ${error.message || "Error desconocido"}`);
+            console.error("Error al procesar:", error);
+            const msg = error.message || "Error desconocido";
+            toast.error(`Error al procesar: ${msg.includes("Worker") ? "Error de libreria (PDF Worker)" : msg}`);
         } finally {
             setIsProcessing(false);
         }
@@ -276,332 +385,278 @@ export function ImportScentsDialog({
 
     const handleUrlImport = async () => {
         if (!url.trim()) return;
-
         setIsProcessing(true);
         try {
-            // Intentar descargar el contenido del link
             const response = await fetch(url);
-            if (!response.ok) throw new Error("No se pudo acceder a la URL");
-
-            const contentType = response.headers.get("content-type");
             const blob = await response.blob();
-            const file = new File([blob], "downloaded_file", { type: contentType || "" });
-
+            const file = new File([blob], "file", { type: blob.type });
             await processFile(file);
-        } catch (error: any) {
-            console.error("URL Import Error:", error);
-            toast.error("Error al importar desde URL. Puede deberse a restricciones de seguridad (CORS) del sitio origen.");
+        } catch (error) {
+            toast.error("Error en link");
         } finally {
             setIsProcessing(false);
         }
     };
 
     const handleDrag = useCallback((e: React.DragEvent) => {
-        e.preventDefault();
-        e.stopPropagation();
-        if (e.type === "dragenter" || e.type === "dragover") {
-            setDragActive(true);
-        } else if (e.type === "dragleave") {
-            setDragActive(false);
-        }
+        e.preventDefault(); e.stopPropagation();
+        setDragActive(e.type === "dragenter" || e.type === "dragover");
     }, []);
 
     const handleDrop = useCallback((e: React.DragEvent) => {
-        e.preventDefault();
-        e.stopPropagation();
+        e.preventDefault(); e.stopPropagation();
         setDragActive(false);
         const file = e.dataTransfer.files?.[0];
         if (file) processFile(file);
     }, []);
 
     const handleImport = async () => {
-        if (!selectedProveedorId) {
-            toast.error("Selecciona un proveedor para las nuevas esencias");
-            return;
-        }
-
-        const selectedItems = items.filter((i) => i.selected);
-        if (selectedItems.length === 0) {
-            toast.error("No hay productos seleccionados");
-            return;
-        }
+        if (!selectedProveedorId) return toast.error("Selecciona un proveedor");
+        const selectedItems = items.filter(i => i.selected);
+        if (selectedItems.length === 0) return toast.error("Nada seleccionado");
 
         setIsImporting(true);
         try {
             const { data: { session } } = await supabase.auth.getSession();
-            if (!session) throw new Error("No hay sesión activa");
+            const insertData = selectedItems.filter(it => !it.alreadyExists).map(it => {
+                const isUSD = detectedCurrency === 'USD';
+                const finalPriceArs = isUSD && it.precio_100g ? (it.precio_100g * arsRate) : it.precio_100g;
 
-            const insertData = selectedItems.map((it) => ({
-                nombre: it.nombre,
-                precio_ars_30g: it.precio_30g,
-                precio_ars_100g: it.precio_100g,
-                precio_ars: it.precio_30g || it.precio_100g,
-                cantidad_gramos: it.precio_30g ? 30 : 100,
-                proveedor_id: selectedProveedorId,
-                genero: it.genero,
-                created_by: session.user.id,
-            }));
+                return {
+                    nombre: it.nombre,
+                    precio_usd: isUSD ? it.precio_100g : null,
+                    precio_ars_100g: finalPriceArs,
+                    precio_ars_30g: it.precio_30g,
+                    precio_ars: finalPriceArs,
+                    cantidad_gramos: 100,
+                    proveedor_id: selectedProveedorId,
+                    genero: it.genero,
+                    created_by: session?.user.id,
+                    is_consultar: false
+                };
+            });
 
-            const { error } = await supabase.from("esencias").insert(insertData);
-            if (error) throw error;
+            // Lógica de Actualización para los que ya existen
+            const updateItems = selectedItems.filter(it => it.alreadyExists && it.needsUpdate);
+            for (const it of updateItems) {
+                const isUSD = detectedCurrency === 'USD';
+                const finalPriceArs = isUSD && it.precio_100g ? (it.precio_100g * arsRate) : it.precio_100g;
 
-            toast.success(`Se importaron ${selectedItems.length} esencias correctamente`);
+                // Buscamos el nombre real en la DB para el update exacto
+                const dbEntry = existingEsencias.find(e => normalizeName(e.nombre) === normalizeName(it.nombre));
+                if (dbEntry) {
+                    await supabase.from("esencias")
+                        .update({
+                            precio_usd: isUSD ? it.precio_100g : dbEntry.precio_usd,
+                            precio_ars_100g: finalPriceArs,
+                            precio_ars: finalPriceArs,
+                            precio_ars_30g: it.precio_30g
+                        })
+                        .eq("nombre", dbEntry.nombre);
+                }
+            }
+
+            if (insertData.length > 0) {
+                const { error } = await supabase.from("esencias").insert(insertData);
+                if (error) throw error;
+            }
+            toast.success("Importado!");
             onOpenChange(false);
             onSuccess?.();
         } catch (error: any) {
-            toast.error("Error al importar: " + error.message);
+            toast.error(error.message);
         } finally {
             setIsImporting(false);
         }
     };
 
     const updateItem = (id: string, updates: Partial<ParsedItem>) => {
-        setItems(items.map((i) => (i.id === id ? { ...i, ...updates } : i)));
+        setItems(items.map(i => i.id === id ? { ...i, ...updates } : i));
     };
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[1200px] w-[95vw] h-[90vh] flex flex-col p-0 gap-0 overflow-hidden bg-background border-none shadow-2xl">
-                <DialogHeader className="p-8 pb-6 bg-primary/5 border-b shrink-0">
-                    <div className="flex flex-col gap-1">
-                        <DialogTitle className="flex items-center gap-3 text-3xl font-black tracking-tight uppercase">
-                            <div className="bg-primary text-primary-foreground p-2.5 rounded-2xl shadow-xl shadow-primary/20">
-                                <FileUp className="w-7 h-7" />
+            <DialogContent className="sm:max-w-[850px] w-[95vw] h-[80vh] flex flex-col p-0 gap-0 overflow-hidden bg-background border shadow-2xl rounded-xl">
+                <DialogHeader className="px-5 py-4 border-b bg-muted/10 shrink-0">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2.5">
+                            <div className="bg-primary/10 text-primary p-1.5 rounded-lg">
+                                <FileUp className="w-5 h-5" />
                             </div>
-                            Importador de Listas
-                        </DialogTitle>
-                        <DialogDescription className="text-muted-foreground text-lg ml-1">
-                            Sube tu archivo y nosotros nos encargamos de extraer los datos por ti.
-                        </DialogDescription>
+                            <div>
+                                <DialogTitle className="text-lg font-bold tracking-tight">Importación Inteligente</DialogTitle>
+                                <DialogDescription className="text-[11px] leading-none">PDF • Imagen • URL</DialogDescription>
+                            </div>
+                        </div>
+                        {isProcessing && (
+                            <div className="flex items-center gap-2 text-primary animate-pulse">
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                <span className="text-[10px] font-bold uppercase tracking-widest">Analizando...</span>
+                            </div>
+                        )}
                     </div>
                 </DialogHeader>
 
-                <div className="flex-1 overflow-hidden flex flex-col">
-                    <div className="p-8 pb-4 shrink-0 bg-background/50 backdrop-blur-sm z-10">
-                        {/* Tabs Premium */}
-                        <div className="flex gap-4 p-1.5 bg-muted/30 rounded-2xl mb-8 w-fit border border-primary/5">
-                            <Button
-                                variant={activeTab === 'file' ? 'default' : 'ghost'}
-                                size="lg"
-                                onClick={() => setActiveTab('file')}
-                                className={`gap-3 rounded-xl px-8 font-bold transition-all ${activeTab === 'file' ? 'shadow-lg shadow-primary/30 scale-105' : 'text-muted-foreground'}`}
-                            >
-                                <Upload className="w-5 h-5" /> Subir Archivo
-                            </Button>
-                            <Button
-                                variant={activeTab === 'url' ? 'default' : 'ghost'}
-                                size="lg"
-                                onClick={() => setActiveTab('url')}
-                                className={`gap-3 rounded-xl px-8 font-bold transition-all ${activeTab === 'url' ? 'shadow-lg shadow-primary/30 scale-105' : 'text-muted-foreground'}`}
-                            >
-                                <Globe className="w-5 h-5" /> Desde Link
-                            </Button>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-[1fr_350px] gap-8 items-start mb-6">
-                            {activeTab === 'file' ? (
-                                <div
-                                    className={`relative border-4 border-dashed rounded-[3rem] p-12 transition-all flex flex-col items-center justify-center text-center cursor-pointer min-h-[220px]
-                                        ${dragActive ? 'border-primary bg-primary/10 shadow-2xl scale-[0.99]' : 'border-primary/10 hover:border-primary/40 hover:bg-primary/5'}
-                                    `}
-                                    onDragEnter={handleDrag}
-                                    onDragOver={handleDrag}
-                                    onDragLeave={handleDrag}
-                                    onDrop={handleDrop}
-                                    onClick={() => fileInputRef.current?.click()}
-                                >
-                                    <input
-                                        type="file"
-                                        ref={fileInputRef}
-                                        onChange={handleFileChange}
-                                        accept="application/pdf,image/*"
-                                        className="hidden"
-                                    />
-                                    <div className="bg-primary text-primary-foreground p-5 rounded-[2rem] mb-5 shadow-2xl ring-8 ring-primary/5">
-                                        {isProcessing ? <Loader2 className="w-8 h-8 animate-spin" /> : <Upload className="w-8 h-8" />}
-                                    </div>
-                                    <h4 className="font-black text-2xl tracking-tight">
-                                        {isProcessing ? 'Procesando...' : 'Haz click para subir'}
-                                    </h4>
-                                    <p className="text-muted-foreground mt-2 font-medium">PDF o Imágenes</p>
+                <div className="flex-1 flex flex-col min-h-0 overflow-hidden bg-background">
+                    <div className="p-5 flex flex-col gap-5 flex-1 min-h-0">
+                        {/* Seccion superior fija */}
+                        <div className="grid grid-cols-1 md:grid-cols-[1fr_280px] gap-4 shrink-0">
+                            <div className="space-y-3">
+                                <div className="flex gap-1.5 p-1 bg-muted/50 rounded-lg w-fit">
+                                    <Button size="sm" variant={activeTab === 'file' ? 'secondary' : 'ghost'} onClick={() => setActiveTab('file')} className="text-[10px] font-bold uppercase px-3 h-7">Archivo</Button>
+                                    <Button size="sm" variant={activeTab === 'url' ? 'secondary' : 'ghost'} onClick={() => setActiveTab('url')} className="text-[10px] font-bold uppercase px-3 h-7">Desde Link</Button>
                                 </div>
-                            ) : (
-                                <div className="flex gap-4 items-end bg-muted/20 p-8 rounded-[2.5rem] border border-primary/5 min-h-[220px]">
-                                    <div className="grid flex-1 gap-3">
-                                        <Label htmlFor="url" className="text-lg font-bold ml-2">Link del archivo</Label>
-                                        <div className="relative">
-                                            <LinkIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-primary/40" />
-                                            <Input
-                                                id="url"
-                                                placeholder="https://ejemplo.com/lista.pdf"
-                                                className="pl-12 h-14 rounded-2xl bg-background border-none shadow-sm text-lg font-medium"
-                                                value={url}
-                                                onChange={(e) => setUrl(e.target.value)}
-                                            />
+
+                                {activeTab === 'file' ? (
+                                    <div
+                                        className={`border-2 border-dashed rounded-xl p-5 transition-all flex flex-col items-center justify-center text-center cursor-pointer min-h-[100px] ${dragActive ? 'border-primary bg-primary/5' : 'border-muted-foreground/20 hover:border-primary/40'}`}
+                                        onDragEnter={handleDrag} onDragOver={handleDrag} onDragLeave={handleDrag} onDrop={handleDrop}
+                                        onClick={() => fileInputRef.current?.click()}
+                                    >
+                                        <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="application/pdf,image/*" className="hidden" />
+                                        <Upload className="w-5 h-5 text-muted-foreground/50 mb-1" />
+                                        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-tight">{isProcessing ? 'Procesando...' : 'Cargar Lista'}</p>
+                                    </div>
+                                ) : (
+                                    <div className="flex gap-2 items-end">
+                                        <div className="flex-1 space-y-1">
+                                            <Label className="text-[10px] font-black uppercase text-muted-foreground px-1">URL del Documento</Label>
+                                            <Input placeholder="https://..." value={url} onChange={(e) => setUrl(e.target.value)} className="h-9 text-xs" />
                                         </div>
+                                        <Button size="sm" onClick={handleUrlImport} disabled={!url || isProcessing} className="h-9 px-4 font-bold text-xs">TRAER</Button>
                                     </div>
-                                    <Button onClick={handleUrlImport} disabled={!url || isProcessing} className="h-14 rounded-2xl px-8 font-black text-lg shadow-xl shadow-primary/20">
-                                        {isProcessing ? <Loader2 className="w-6 h-6 animate-spin" /> : 'TRAER'}
-                                    </Button>
-                                </div>
-                            )}
+                                )}
+                            </div>
 
-                            {/* Panel de Proveedor - Limpio sin advertencia */}
-                            <div className="bg-primary/5 p-8 rounded-[2.5rem] flex flex-col gap-4 border border-primary/5 min-h-[220px]">
-                                <Label htmlFor="proveedor" className="text-lg font-black uppercase tracking-widest text-primary/60">Destino</Label>
+                            <div className="bg-muted/30 p-4 rounded-xl border border-muted-foreground/5 flex flex-col gap-2">
+                                <div className="flex justify-between items-center mb-1">
+                                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Proveedor Destino</Label>
+                                    {items.length > 0 && (
+                                        <div className="flex gap-1">
+                                            <Button
+                                                size="sm"
+                                                variant={detectedCurrency === 'ARS' ? 'default' : 'outline'}
+                                                onClick={() => setDetectedCurrency('ARS')}
+                                                className="h-5 text-[8px] font-bold px-1.5"
+                                            >ARS</Button>
+                                            <Button
+                                                size="sm"
+                                                variant={detectedCurrency === 'USD' ? 'default' : 'outline'}
+                                                onClick={() => setDetectedCurrency('USD')}
+                                                className="h-5 text-[8px] font-bold px-1.5"
+                                            >USD</Button>
+                                        </div>
+                                    )}
+                                </div>
                                 <Select value={selectedProveedorId} onValueChange={setSelectedProveedorId}>
-                                    <SelectTrigger id="proveedor" className="h-14 bg-background border-none rounded-2xl text-lg font-bold shadow-sm">
-                                        <SelectValue placeholder="Elegir Proveedor" />
+                                    <SelectTrigger className="bg-background border-none shadow-sm font-bold text-xs h-9">
+                                        <SelectValue placeholder="Elegir..." />
                                     </SelectTrigger>
-                                    <SelectContent className="rounded-2xl border-none shadow-2xl">
-                                        {proveedores.map((p) => (
-                                            <SelectItem key={p.id} value={p.id} className="font-bold text-base py-3">
-                                                {p.nombre}
-                                            </SelectItem>
-                                        ))}
+                                    <SelectContent>
+                                        {proveedores.map(p => <SelectItem key={p.id} value={p.id} className="text-xs font-semibold">{p.nombre}</SelectItem>)}
                                     </SelectContent>
                                 </Select>
-                                <div className="mt-auto flex items-center gap-3 text-primary/40 font-bold uppercase text-[10px] tracking-widest">
-                                    <div className="h-[1px] flex-1 bg-primary/10"></div>
-                                    Importación Directa
-                                    <div className="h-[1px] flex-1 bg-primary/10"></div>
+                                <div className="mt-auto flex items-center justify-between opacity-30 grayscale pt-2 border-t border-muted-foreground/10">
+                                    <span className="text-[9px] font-black uppercase tracking-widest">AI Extraction</span>
+                                    <CheckCircle2 className="w-3 h-3" />
                                 </div>
                             </div>
                         </div>
-                    </div>
 
-                    <div className="flex-1 overflow-hidden flex flex-col px-8">
-                        {items.length > 0 && (
-                            <div className="border rounded-[2.5rem] flex-1 flex flex-col overflow-hidden bg-muted/5 shadow-2xl mb-8 border-primary/5">
-                                <div className="grid grid-cols-[80px_1fr_140px_140px_200px_80px] gap-4 p-6 bg-primary/10 border-b text-[11px] font-black uppercase tracking-[0.2em] text-primary/80">
-                                    <div className="flex justify-center items-center">
-                                        <Checkbox
-                                            checked={items.every(i => i.selected)}
-                                            onCheckedChange={(checked) => setItems(items.map(i => ({ ...i, selected: !!checked })))}
-                                            className="w-6 h-6 rounded-lg border-2"
-                                        />
+                        {/* Contenedor de tabla flexible con scroll interno propio */}
+                        <div className="flex-1 flex flex-col border rounded-xl bg-muted/5 overflow-hidden shadow-sm min-h-0">
+                            {items.length > 0 ? (
+                                <>
+                                    <div className="grid grid-cols-[40px_1fr_80px_80px_130px_40px] gap-2 p-2.5 bg-muted/40 border-b text-[9px] font-black uppercase tracking-[0.1em] text-muted-foreground items-center shrink-0">
+                                        <div className="flex justify-center"><Checkbox checked={items.length > 0 && items.every(i => i.selected)} onCheckedChange={(checked) => setItems(items.map(i => ({ ...i, selected: !!checked })))} className="w-3.5 h-3.5" /></div>
+                                        <div>Esencia</div>
+                                        <div className="text-center">30g (opc)</div>
+                                        <div className="text-center font-bold text-primary/70">100g ({detectedCurrency})</div>
+                                        <div className="px-1 flex justify-center">
+                                            <Select onValueChange={(val: any) => setItems(items.map(i => i.selected ? { ...i, genero: val } : i))}>
+                                                <SelectTrigger className="h-6 text-[8px] border bg-background text-primary font-black px-2 uppercase tracking-tight hover:bg-muted transition-colors flex gap-1">
+                                                    <SelectValue placeholder="GÉNERO MASIVO" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="masculino">TODOS MASCULINO</SelectItem>
+                                                    <SelectItem value="femenino">TODOS FEMENINO</SelectItem>
+                                                    <SelectItem value="ambiente">TODOS AMBIENTE</SelectItem>
+                                                    <SelectItem value="otro">TODOS OTRO</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                        <div></div>
                                     </div>
-                                    <div className="flex items-center">Descripción de la Esencia</div>
-                                    <div className="flex items-center justify-center">30 Gramos</div>
-                                    <div className="flex items-center justify-center">100 Gramos</div>
-                                    <div className="flex items-center">Familia / Género</div>
-                                    <div className="text-center"></div>
-                                </div>
-                                <ScrollArea className="flex-1">
-                                    <div className="divide-y divide-primary/5">
-                                        {items.map((item) => (
-                                            <div
-                                                key={item.id}
-                                                className={`grid grid-cols-[80px_1fr_140px_140px_200px_80px] gap-4 p-4 items-center transition-all duration-300 ${item.selected ? 'bg-background hover:bg-primary/[0.02]' : 'bg-muted/10 opacity-40'}`}
-                                            >
-                                                <div className="flex justify-center">
-                                                    <Checkbox
-                                                        checked={item.selected}
-                                                        onCheckedChange={(checked) => updateItem(item.id, { selected: !!checked })}
-                                                        className="w-6 h-6 rounded-lg border-2"
-                                                    />
+
+                                    <div className="flex-1 overflow-y-auto divide-y bg-background/30 scrollbar-thin scrollbar-thumb-muted">
+                                        {items.map(item => (
+                                            <div key={item.id} className={`grid grid-cols-[40px_1fr_80px_80px_130px_40px] gap-2 p-1.5 items-center transition-all ${item.selected ? 'hover:bg-muted/10' : 'opacity-40 grayscale'} ${item.needsUpdate ? 'bg-blue-500/5' : item.alreadyExists ? 'bg-amber-500/5' : ''}`}>
+                                                <div className="flex justify-center"><Checkbox checked={item.selected} onCheckedChange={(checked) => updateItem(item.id, { selected: !!checked })} className="w-3.5 h-3.5" /></div>
+                                                <div className="flex flex-col min-w-0">
+                                                    <Input value={item.nombre} onChange={(e) => updateItem(item.id, { nombre: e.target.value })} className="h-7 text-xs font-bold border-none bg-transparent focus-visible:ring-0 px-0 truncate" />
+                                                    {item.needsUpdate ? (
+                                                        <div className="flex items-center gap-1.5 mt-0.5">
+                                                            <span className="text-[8px] font-black text-blue-500 uppercase leading-none">Actualizar Precio:</span>
+                                                            <span className="text-[8px] font-bold text-muted-foreground line-through decoration-blue-500/30">${item.existingPrice?.toFixed(2)}</span>
+                                                            <span className="text-[8px] font-black text-blue-600">→ ${item.precio_100g?.toFixed(2)}</span>
+                                                        </div>
+                                                    ) : item.alreadyExists ? (
+                                                        <span className="text-[8px] font-black text-amber-500 uppercase leading-none mt-0.5">Sin cambios (ya existe)</span>
+                                                    ) : (
+                                                        <span className="text-[8px] font-black text-emerald-500 uppercase leading-none mt-0.5 tracking-tighter">Nueva Esencia</span>
+                                                    )}
                                                 </div>
-                                                <Input
-                                                    value={item.nombre}
-                                                    onChange={(e) => updateItem(item.id, { nombre: e.target.value })}
-                                                    className="h-12 text-base font-bold bg-transparent border-none focus-visible:ring-0 px-0"
-                                                />
-                                                <div className="relative">
-                                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-black text-primary/30">$</span>
-                                                    <Input
-                                                        type="number"
-                                                        value={item.precio_30g || ""}
-                                                        onChange={(e) => updateItem(item.id, { precio_30g: parseFloat(e.target.value) || null })}
-                                                        className="h-11 text-center pl-6 bg-muted/20 border-none rounded-xl font-bold"
-                                                    />
-                                                </div>
-                                                <div className="relative">
-                                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-black text-primary/30">$</span>
-                                                    <Input
-                                                        type="number"
-                                                        value={item.precio_100g || ""}
-                                                        onChange={(e) => updateItem(item.id, { precio_100g: parseFloat(e.target.value) || null })}
-                                                        className="h-11 text-center pl-6 bg-primary/5 border-none rounded-xl font-black text-primary"
-                                                    />
-                                                </div>
-                                                <Select
-                                                    value={item.genero}
-                                                    onValueChange={(val: any) => updateItem(item.id, { genero: val })}
-                                                >
-                                                    <SelectTrigger className="h-11 font-bold border-none bg-muted/20 rounded-xl">
-                                                        <SelectValue />
-                                                    </SelectTrigger>
-                                                    <SelectContent className="rounded-2xl border-none shadow-2xl">
-                                                        <SelectItem value="masculino" className="font-bold">Masculino</SelectItem>
-                                                        <SelectItem value="femenino" className="font-bold">Femenino</SelectItem>
-                                                        <SelectItem value="ambiente" className="font-bold">Ambiente</SelectItem>
-                                                        <SelectItem value="otro" className="font-bold">Otro (Unisex)</SelectItem>
+                                                <Input type="number" placeholder="-" value={item.precio_30g || ""} onChange={(e) => updateItem(item.id, { precio_30g: parseFloat(e.target.value) || null })} className="h-7 text-[10px] text-center bg-muted/20 border-none rounded" />
+                                                <Input type="number" value={item.precio_100g || ""} step="0.01" onChange={(e) => updateItem(item.id, { precio_100g: parseFloat(e.target.value) || null })} className="h-7 text-[10px] text-center bg-primary/5 font-black border-none rounded text-primary" />
+                                                <Select value={item.genero} onValueChange={(val: any) => updateItem(item.id, { genero: val })}>
+                                                    <SelectTrigger className="h-7 text-[9px] font-bold border-none bg-muted/40 px-2 uppercase tracking-tighter"><SelectValue /></SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="masculino">MASCULINO</SelectItem>
+                                                        <SelectItem value="femenino">FEMENINO</SelectItem>
+                                                        <SelectItem value="ambiente">AMBIENTE</SelectItem>
+                                                        <SelectItem value="otro">OTRO (UNISEX)</SelectItem>
                                                     </SelectContent>
                                                 </Select>
-                                                <Button
-                                                    size="icon"
-                                                    variant="ghost"
-                                                    className="h-11 w-11 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-2xl transition-all"
-                                                    onClick={() => setItems(items.filter(i => i.id !== item.id))}
-                                                >
-                                                    <Trash2 className="w-5 h-5" />
-                                                </Button>
+                                                <Button size="icon" variant="ghost" onClick={() => setItems(items.filter(i => i.id !== item.id))} className="h-7 w-7 text-destructive/40 hover:text-destructive hover:bg-destructive/10 transition-colors"><Trash2 className="w-3.5 h-3.5" /></Button>
                                             </div>
                                         ))}
                                     </div>
-                                </ScrollArea>
-                                <div className="p-6 bg-primary/5 border-t flex justify-between items-center shrink-0">
-                                    <div className="flex gap-10">
-                                        <div className="flex flex-col">
-                                            <span className="text-[10px] text-primary/40 uppercase font-black tracking-widest">Encontrados</span>
-                                            <span className="text-2xl font-black">{items.length}</span>
+
+                                    <div className="p-2.5 bg-muted/20 border-t flex justify-between items-center text-[10px] shrink-0">
+                                        <div className="flex items-center gap-3">
+                                            <span className="font-bold text-muted-foreground uppercase tracking-widest">Encontrados: <b className="text-foreground">{items.length}</b></span>
+                                            <span className="font-bold text-primary uppercase tracking-widest">Seleccionados: <b>{items.filter(i => i.selected).length}</b></span>
                                         </div>
-                                        <div className="flex flex-col border-l pl-10 border-primary/10">
-                                            <span className="text-[10px] text-primary uppercase font-black tracking-widest">A Cargar</span>
-                                            <span className="text-2xl font-black text-primary">{items.filter(i => i.selected).length}</span>
+                                        <div className="flex gap-2">
+                                            {items.some(i => i.alreadyExists && !i.needsUpdate) && (
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() => setItems(items.filter(i => !i.alreadyExists || i.needsUpdate))}
+                                                    className="h-6 text-[9px] font-black text-amber-600 border-amber-200 uppercase tracking-widest hover:bg-amber-50 px-2"
+                                                >
+                                                    Ocultar {items.filter(i => i.alreadyExists && !i.needsUpdate).length} sin cambios
+                                                </Button>
+                                            )}
+                                            <Button variant="ghost" size="sm" onClick={() => setItems([])} className="h-6 text-[9px] font-black text-destructive uppercase tracking-widest hover:bg-destructive/10 px-2">Borrar Todo</Button>
                                         </div>
                                     </div>
-                                    <Button
-                                        variant="outline"
-                                        className="border-destructive/20 text-destructive hover:bg-destructive hover:text-white transition-all rounded-xl font-bold px-6"
-                                        onClick={() => setItems([])}
-                                    >
-                                        Descartar Todo
-                                    </Button>
+                                </>
+                            ) : (
+                                <div className="flex-1 flex flex-col items-center justify-center p-12 opacity-30 text-center">
+                                    <FileText className="w-10 h-10 mb-2" />
+                                    <p className="text-[11px] font-black uppercase tracking-[0.2em]">Esperando Datos...</p>
                                 </div>
-                            </div>
-                        )}
-
-                        {!items.length && !isProcessing && (
-                            <div className="flex-1 flex flex-col items-center justify-center border-4 border-dashed rounded-[3.5rem] p-12 bg-primary/[0.02] border-primary/10 transition-all mb-8">
-                                <div className="bg-primary text-primary-foreground p-10 rounded-[2.5rem] mb-8 shadow-2xl animate-pulse ring-[12px] ring-primary/5">
-                                    <FileText className="w-20 h-20" />
-                                </div>
-                                <h3 className="text-4xl font-black mb-4 tracking-tighter uppercase italic">Esperando Documento</h3>
-                                <p className="text-muted-foreground text-center max-w-sm text-xl font-medium leading-relaxed">
-                                    Sube una lista de precios en PDF o Imagen para empezar la extracción automática.
-                                </p>
-                            </div>
-                        )}
+                            )}
+                        </div>
                     </div>
                 </div>
 
-                <DialogFooter className="p-8 gap-4 bg-background border-t shrink-0">
-                    <Button
-                        variant="ghost"
-                        onClick={() => onOpenChange(false)}
-                        disabled={isImporting}
-                        className="font-bold text-muted-foreground px-10 h-14 rounded-2xl text-lg hover:bg-muted"
-                    >
-                        Cancelar
-                    </Button>
-                    <Button
-                        onClick={handleImport}
-                        disabled={isImporting || items.filter(i => i.selected).length === 0}
-                        className="gap-4 px-14 h-14 rounded-2xl font-black text-xl bg-primary hover:scale-[1.03] active:scale-95 transition-all shadow-2xl shadow-primary/30"
-                    >
-                        {isImporting ? <Loader2 className="w-7 h-7 animate-spin" /> : <CheckCircle2 className="w-7 h-7" />}
-                        {isImporting ? "IMPORTANDO..." : "FINALIZAR E IMPORTAR"}
+                <DialogFooter className="px-5 py-3 border-t bg-muted/5 shrink-0 flex gap-3">
+                    <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={isImporting} className="font-black text-[10px] uppercase px-4 h-9 tracking-widest">Cancelar</Button>
+                    <Button onClick={handleImport} disabled={isImporting || items.filter(i => i.selected).length === 0} className="font-black text-xs px-6 h-9 gap-2 shadow-lg shadow-primary/20 tracking-widest">
+                        {isImporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                        {isImporting ? "PROCESANDO..." : "IMPORTAR AHORA"}
                     </Button>
                 </DialogFooter>
             </DialogContent>
