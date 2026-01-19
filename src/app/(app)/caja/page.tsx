@@ -1,4 +1,5 @@
 "use client";
+// Deploy timestamp: 2026-01-18 22:58
 
 import { useState, useEffect } from "react";
 import { createClient } from "@/utils/supabase/client";
@@ -310,19 +311,7 @@ export default function CajaPage() {
     // Total ventas regulares (para widget Ganancias)
     const totalVentas = ventas.reduce((sum, v) => sum + v.precio_total, 0);
 
-    // Total TODAS las ventas (incluyendo ventas revendedores para cálculo Sanse)
-    const [totalAllVentas, setTotalAllVentas] = useState(0);
-
-    useEffect(() => {
-        const fetchAllVentas = async () => {
-            const { data } = await supabase.from("ventas").select("precio_total");
-            const total = (data || []).reduce((sum, v) => sum + v.precio_total, 0);
-            setTotalAllVentas(total);
-        };
-        if (!loading) fetchAllVentas();
-    }, [loading]);
-
-    const cajaSanse = totalAllVentas - gastosSanse;
+    const cajaSanse = totalVentas - gastosSanse;
 
     console.log("💰 Debug - Total Facundo:", totalFacundo);
     console.log("💰 Debug - Total Lukas:", totalLukas);
