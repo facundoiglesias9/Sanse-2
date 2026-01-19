@@ -117,7 +117,7 @@ export function NavigationBar({ maintenanceMode = false }: { maintenanceMode?: b
   const [realtimeStatus, setRealtimeStatus] = useState<'connecting' | 'connected' | 'error'>('connecting');
   const [permissionStatus, setPermissionStatus] = useState<string>('default');
   const [audioUnlocked, setAudioUnlocked] = useState(false);
-  const APP_VERSION = "2.1.6";
+  const APP_VERSION = "2.1.7";
 
 
   // Refs para que el listener de Realtime siempre tenga el valor actual
@@ -975,6 +975,19 @@ export function NavigationBar({ maintenanceMode = false }: { maintenanceMode?: b
                     Cerrar sesión
                   </div>
                 </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <div className="p-2 space-y-2">
+                  <p className="text-[9px] font-bold text-muted-foreground uppercase px-1">Debug Sistema</p>
+                  <Button variant="outline" size="sm" className="w-full text-[10px] h-7" onClick={testSound}>
+                    Probar Sonido
+                  </Button>
+                  <Button variant="secondary" size="sm" className="w-full text-[10px] h-7" onClick={testDelayedNotification}>
+                    Probar Cartel (5 seg)
+                  </Button>
+                  <Button variant="ghost" size="sm" className="w-full text-[10px] h-7 opacity-50" onClick={forceUpdate}>
+                    Actualizar (v{APP_VERSION})
+                  </Button>
+                </div>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -1332,20 +1345,71 @@ export function NavigationBar({ maintenanceMode = false }: { maintenanceMode?: b
                         Cerrar sesión
                       </Button>
 
-                      {/* Grupo: Sistema en Mobile (Status only) */}
-                      {permissionStatus !== 'granted' && (
-                        <div className="pt-4 border-t px-3">
+                      {/* Grupo: Sistema en Mobile */}
+                      <div className="pt-4 border-t space-y-3">
+                        <p className="text-[10px] font-semibold text-muted-foreground uppercase px-3">Estado del Sistema</p>
+
+                        <div className="px-3 flex flex-col gap-2">
+                          <div className="flex items-center justify-between text-[11px]">
+                            <span className="opacity-70 text-black dark:text-white">Base de Datos:</span>
+                            <div className="flex items-center gap-1.5">
+                              <div className={clsx("w-2 h-2 rounded-full", realtimeStatus === 'connected' ? "bg-green-500" : "bg-red-500")} />
+                              <span className="font-semibold">{realtimeStatus === 'connected' ? "Conectado" : "Error"}</span>
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-between text-[11px]">
+                            <span className="opacity-70 text-black dark:text-white">Avisos:</span>
+                            <span className={clsx("font-semibold", permissionStatus === 'granted' ? "text-green-500" : "text-amber-500")}>
+                              {permissionStatus === 'granted' ? "Habilitados" : "Bloqueados"}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="px-3 space-y-2">
+                          {permissionStatus !== 'granted' && (
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              className="w-full justify-start gap-2 h-9 text-xs font-bold animate-pulse"
+                              onClick={requestPermission}
+                            >
+                              <Bell className="w-3 h-3" />
+                              Habilitar Notificaciones
+                            </Button>
+                          )}
+
                           <Button
-                            variant="destructive"
+                            variant="outline"
                             size="sm"
-                            className="w-full justify-start gap-2 h-9 text-xs font-bold animate-pulse"
-                            onClick={requestPermission}
+                            className="w-full justify-start gap-2 h-9 text-xs"
+                            onClick={() => {
+                              setOpen(false);
+                              testSound();
+                            }}
                           >
                             <Bell className="w-3 h-3" />
-                            Habilitar Notificaciones
+                            Probar Sonido
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            className="w-full justify-start gap-2 h-9 text-xs"
+                            onClick={testDelayedNotification}
+                          >
+                            <Info className="w-3 h-3" />
+                            Probar Cartel Arriba (5s)
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="w-full justify-start gap-2 h-9 text-xs opacity-60"
+                            onClick={forceUpdate}
+                          >
+                            <RotateCcw className="w-3 h-3" />
+                            Actualizar App (v{APP_VERSION})
                           </Button>
                         </div>
-                      )}
+                      </div>
                     </div>
                   )}
                 </nav>
