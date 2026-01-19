@@ -35,7 +35,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { EsenciaDialog } from "./esencia-dialog";
-import { ImportPDFDialog } from "./import-pdf-dialog";
+import { ImportScentsDialog } from "./import-scents-dialog";
 
 interface DataTableProps<TData> {
   columns: ColumnDef<TData, any>[];
@@ -266,7 +266,7 @@ export function DataTable<TData>({
         generoPorDefault={generoPorDefault}
       />
 
-      <ImportPDFDialog
+      <ImportScentsDialog
         open={isImportDialogOpen}
         onOpenChange={setIsImportDialogOpen}
         onSuccess={onEsenciaCreated}
