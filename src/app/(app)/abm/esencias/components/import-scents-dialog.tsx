@@ -85,12 +85,18 @@ export function ImportScentsDialog({
                     const ctx = canvas.getContext("2d");
                     if (!ctx) return resolve(e.target?.result as string);
 
-                    canvas.width = img.width;
-                    canvas.height = img.height;
+                    // Aumentamos escala para mejor definición de letras pequeñas
+                    const scale = 2;
+                    canvas.width = img.width * scale;
+                    canvas.height = img.height * scale;
 
-                    // Filtros básicos para mejorar OCR
-                    ctx.filter = "contrast(1.5) brightness(1.1) grayscale(1)";
-                    ctx.drawImage(img, 0, 0);
+                    ctx.fillStyle = "white";
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+                    // Filtro simple de escala de grises
+                    ctx.filter = "grayscale(1)";
+                    ctx.drawImage(canvas, 0, 0);
 
                     resolve(canvas.toDataURL("image/jpeg", 0.9));
                 };
@@ -101,52 +107,52 @@ export function ImportScentsDialog({
     };
 
     const parseTextToItems = (text: string) => {
-        // Limpieza agresiva de caracteres raros que mete el OCR
-        const lines = text.split("\n").map(l => l.replace(/[|¦!¡]/g, "").trim());
+        const lines = text.split("\n").map(l => l.trim());
         const foundItems: ParsedItem[] = [];
 
+        // Palabras para ignorar (encabezados)
+        const blacklistedWords = ["GRAMOS", "PRODUCTOS", "PRECIOS", "FECHA", "LISTA", "ACEITES", "FRAGANCIAS"];
+
         lines.forEach(line => {
-            if (!line || line.length < 3) return;
+            if (!line || line.length < 5) return;
 
-            // Regex para detectar precios (soporta US$, $, números con decimales)
-            // Buscamos patrones como: 4.32, 10,50, $4.32, US$4.32
-            const priceRegex = /(?:US\$|\$)?\s*(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{2})?|\d+(?:[.,]\d{2})?)/g;
-            const matches = [...line.matchAll(priceRegex)];
+            // Ignorar si parece un encabezado
+            const upperLine = line.toUpperCase();
+            if (blacklistedWords.some(word => upperLine.includes(word))) return;
 
-            if (matches.length >= 1) {
-                // El nombre es lo que está antes del primer precio
-                const firstMatchIndex = line.search(priceRegex);
-                if (firstMatchIndex === -1) return;
+            // Regex para encontrar precios (soporta US$, $, y números con decimales)
+            const priceRegex = /(?:US\$|\$)?\s*\d+([.,]\d{2,3})?/g;
+            const matches = line.match(priceRegex);
 
-                const nombre = line.substring(0, firstMatchIndex)
-                    .replace(/[_]/g, "")
-                    .replace(/\s+/g, " ")
-                    .trim();
+            if (matches && matches.length >= 1) {
+                // Buscamos la posición del primer precio para separar el nombre
+                const firstPriceMatch = matches[0];
+                const priceIndex = line.indexOf(firstPriceMatch);
 
-                if (nombre.length > 2) {
-                    const prices = matches.map(m => {
-                        let val = m[1].replace(/\./g, "").replace(/,/g, ".");
-                        // Si tiene más de un punto (ej: 4.32.00 por error), nos quedamos con el último como decimal
-                        const parts = val.split(".");
-                        if (parts.length > 2) {
-                            const decimals = parts.pop();
-                            val = parts.join("") + "." + decimals;
+                if (priceIndex > 3) {
+                    const nombre = line.substring(0, priceIndex)
+                        .replace(/[|¦!¡_:.#-]/g, "")
+                        .replace(/\s+/g, " ")
+                        .trim();
+
+                    // Validar que el nombre no sea solo números o demasiado corto
+                    if (nombre.length > 2 && isNaN(Number(nombre.replace(/\s/g, "")))) {
+                        const prices = matches.map(m => {
+                            const cleaned = m.replace(/US\$|\$|\s/gi, "").replace(/\./g, "").replace(/,/g, ".");
+                            return parseFloat(cleaned);
+                        }).filter(p => !isNaN(p) && p > 0);
+
+                        if (prices.length > 0) {
+                            foundItems.push({
+                                id: Math.random().toString(36).substr(2, 9),
+                                nombre: nombre,
+                                precio_30g: null,
+                                // En la tabla del usuario, el primer precio suele ser 100g
+                                precio_100g: prices[0],
+                                selected: true,
+                                genero: "masculino",
+                            });
                         }
-                        return parseFloat(val);
-                    }).filter(p => !isNaN(p) && p > 0);
-
-                    if (prices.length > 0) {
-                        foundItems.push({
-                            id: Math.random().toString(36).substr(2, 9),
-                            nombre: nombre,
-                            // En tablas de proveedores (como la de la imagen), 
-                            // el primer precio suele ser 100g si no es 30g.
-                            // Mapeamos inteligentemente: si el nombre es corto o parece cabecera, ignoramos.
-                            precio_30g: null,
-                            precio_100g: prices[0],
-                            selected: true,
-                            genero: "masculino",
-                        });
                     }
                 }
             }
@@ -162,6 +168,9 @@ export function ImportScentsDialog({
         try {
             if (file.type === "application/pdf") {
                 const arrayBuffer = await file.arrayBuffer();
+                // Usamos la versión de unpkg que suele ser más confiable
+                pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${PDFJS_VERSION}/build/pdf.worker.min.mjs`;
+
                 const loadingTask = pdfjsLib.getDocument({
                     data: arrayBuffer,
                     useSystemFonts: true,
@@ -178,7 +187,6 @@ export function ImportScentsDialog({
                     const lines: Record<number, any[]> = {};
                     textContent.items.forEach((item: any) => {
                         if (!item.str && item.str !== "") return;
-                        // PDF.js a veces separa letras, intentamos agrupar por Y y X
                         const y = Math.round(item.transform[5]);
                         if (!lines[y]) lines[y] = [];
                         lines[y].push(item);
@@ -197,21 +205,19 @@ export function ImportScentsDialog({
             else if (file.type.startsWith("image/")) {
                 const processedImageUrl = await preprocessImage(file);
 
-                // Usamos Tesseract con reconocimiento de líneas
                 const { data } = await Tesseract.recognize(processedImageUrl, 'spa', {
-                    logger: m => console.log(m.status, Math.round(m.progress * 100) + "%")
+                    logger: m => console.log(m.status, Math.round(m.progress * 100) + "%"),
                 });
 
-                // Intentamos reconstruir la tabla basándonos en la estructura de bloques/líneas
                 const parsed = parseTextToItems(data.text);
                 setItems(parsed);
 
                 if (parsed.length === 0) {
-                    toast.warning("No se detectaron datos. Intenta con una imagen más nítida o PDF.");
+                    toast.warning("No se detectaron datos. Asegurate de que la imagen sea nítida.");
                 }
             }
             else {
-                toast.error("Formato no soportado. Usa PDF o imágenes.");
+                toast.error("Formato no soportado.");
             }
         } catch (error: any) {
             console.error("Error processing file:", error);
