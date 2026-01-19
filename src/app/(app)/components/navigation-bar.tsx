@@ -113,7 +113,9 @@ export function NavigationBar({ maintenanceMode = false }: { maintenanceMode?: b
   const [solicitudNotifications, setSolicitudNotifications] = useState<any[]>([]);
   const [userName, setUserName] = useState<string | null>(null);
   const [dismissedIds, setDismissedIds] = useState<string[]>([]);
-  const APP_VERSION = "2.0.8";
+  const [realtimeStatus, setRealtimeStatus] = useState<'connecting' | 'connected' | 'error'>('connecting');
+  const [permissionStatus, setPermissionStatus] = useState<string>('default');
+  const APP_VERSION = "2.0.9";
 
 
   // Refs para que el listener de Realtime siempre tenga el valor actual
@@ -125,6 +127,28 @@ export function NavigationBar({ maintenanceMode = false }: { maintenanceMode?: b
     userNameRef.current = userName;
   }, [userRole, userName]);
 
+  // Seguimiento de notificaciones previas para sonido por comparación (Polling backup)
+  const prevNotificationsRef = useRef<string[]>([]);
+
+  useEffect(() => {
+    if (solicitudNotifications.length > 0) {
+      const currentIds = solicitudNotifications.map(n => n.id);
+      const lastIds = prevNotificationsRef.current;
+
+      // Si hay un ID nuevo que es 'pendiente' (venta nueva) -> Suena
+      const hasNewRequest = solicitudNotifications.some(n =>
+        n.estado === 'pendiente' && !lastIds.includes(n.id)
+      );
+
+      if (hasNewRequest && lastIds.length > 0) { // Solo si no es la primera carga
+        console.log("New notification detected via polling diff!");
+        playNotificationSound();
+      }
+
+      prevNotificationsRef.current = currentIds;
+    }
+  }, [solicitudNotifications]);
+
   // Pre-load audio
   const [notificationAudio, setNotificationAudio] = useState<HTMLAudioElement | null>(null);
 
@@ -133,11 +157,23 @@ export function NavigationBar({ maintenanceMode = false }: { maintenanceMode?: b
     audio.load();
     setNotificationAudio(audio);
 
-    // Pedir permisos de notificación al cargar
-    if ("Notification" in window && Notification.permission === "default") {
-      Notification.requestPermission();
+    if ("Notification" in window) {
+      setPermissionStatus(Notification.permission);
     }
   }, []);
+
+  const requestPermission = async () => {
+    if ("Notification" in window) {
+      const permission = await Notification.requestPermission();
+      setPermissionStatus(permission);
+      if (permission === 'granted') {
+        toast.success("Notificaciones activadas");
+        sendSystemNotification("Sanse Perfumes", "¡Las notificaciones están funcionando!");
+      } else {
+        toast.error("Permiso denegado");
+      }
+    }
+  };
 
   const playNotificationSound = () => {
     if (notificationAudio) {
@@ -388,8 +424,13 @@ export function NavigationBar({ maintenanceMode = false }: { maintenanceMode?: b
           playNotificationSound();
         }
         fetchNotifications();
-      })
-      .subscribe();
+      });
+
+    channel.subscribe((status: string) => {
+      console.log("Realtime status:", status);
+      if (status === 'SUBSCRIBED') setRealtimeStatus('connected');
+      if (status === 'CLOSED' || status === 'CHANNEL_ERROR') setRealtimeStatus('error');
+    });
 
     return () => {
       clearInterval(interval);
@@ -1267,7 +1308,36 @@ export function NavigationBar({ maintenanceMode = false }: { maintenanceMode?: b
 
                       {/* Grupo: Sistema (Debug/Update) en Mobile */}
                       <div className="pt-4 border-t space-y-2">
-                        <p className="text-[10px] font-semibold text-muted-foreground uppercase px-3">Mantenimiento (v{APP_VERSION})</p>
+                        <p className="text-[10px] font-semibold text-muted-foreground uppercase px-3">Estado del Sistema</p>
+
+                        <div className="px-3 flex flex-col gap-2 mb-2">
+                          <div className="flex items-center justify-between text-[11px]">
+                            <span className="opacity-70 text-black dark:text-white">Base de Datos:</span>
+                            <div className="flex items-center gap-1.5">
+                              <div className={clsx("w-2 h-2 rounded-full", realtimeStatus === 'connected' ? "bg-green-500" : "bg-red-500")} />
+                              <span className="font-semibold">{realtimeStatus === 'connected' ? "Conectado" : "Error de Conexión"}</span>
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-between text-[11px]">
+                            <span className="opacity-70 text-black dark:text-white">Avisos Navegador:</span>
+                            <span className={clsx("font-semibold", permissionStatus === 'granted' ? "text-green-500" : "text-amber-500")}>
+                              {permissionStatus === 'granted' ? "Habilitados" : "Bloqueados"}
+                            </span>
+                          </div>
+                        </div>
+
+                        {permissionStatus !== 'granted' && (
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            className="w-full justify-start gap-2 h-9 text-xs font-bold animate-pulse"
+                            onClick={requestPermission}
+                          >
+                            <Bell className="w-3 h-3" />
+                            Habilitar Notificaciones
+                          </Button>
+                        )}
+
                         <Button
                           variant="outline"
                           size="sm"
@@ -1278,7 +1348,7 @@ export function NavigationBar({ maintenanceMode = false }: { maintenanceMode?: b
                           }}
                         >
                           <Bell className="w-3 h-3" />
-                          Probar Notificaciones
+                          Probar Sonido e INFO
                         </Button>
                         <Button
                           variant="ghost"
@@ -1287,7 +1357,7 @@ export function NavigationBar({ maintenanceMode = false }: { maintenanceMode?: b
                           onClick={forceUpdate}
                         >
                           <RotateCcw className="w-3 h-3" />
-                          Limpiar Cache y Actualizar
+                          Actualizar App (v{APP_VERSION})
                         </Button>
                       </div>
                     </div>
