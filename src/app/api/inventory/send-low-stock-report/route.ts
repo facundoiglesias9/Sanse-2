@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { Resend } from "resend";
+import nodemailer from "nodemailer";
 import { getLowStockMeta } from "@/app/helpers/stock-logic";
 
 export const dynamic = "force-dynamic";
@@ -9,14 +9,17 @@ export async function POST() {
     try {
         const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
         const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-        const resendApiKey = process.env.RESEND_API_KEY;
+
+        // SMTP Credentials from .env
+        const smtpEmail = process.env.SMTP_EMAIL;
+        const smtpPassword = process.env.SMTP_PASSWORD;
 
         if (!supabaseUrl || !supabaseKey) {
             return NextResponse.json({ error: "Missing Supabase configuration" }, { status: 500 });
         }
 
-        if (!resendApiKey) {
-            return NextResponse.json({ error: "Missing RESEND_API_KEY" }, { status: 500 });
+        if (!smtpEmail || !smtpPassword) {
+            return NextResponse.json({ error: "Faltan las credenciales SMTP (SMTP_EMAIL y SMTP_PASSWORD) en el archivo .env" }, { status: 500 });
         }
 
         const supabase = createClient(supabaseUrl, supabaseKey);
@@ -37,7 +40,7 @@ export async function POST() {
 
         // Filtrar por stock bajo
         const lowStockItems = inventario.filter((item) => {
-            // Asegurar que la cantidad se maneje como número (por defecto 0 si es null/undefined)
+            // Asegurar que la cantidad se maneje como número
             const quantity = typeof item.cantidad === 'number' ? item.cantidad : 0;
             const mappedItem = {
                 ...item,
@@ -53,7 +56,14 @@ export async function POST() {
             return NextResponse.json({ message: "No hay items con stock bajo para reportar.", count: 0 });
         }
 
-        const resend = new Resend(resendApiKey);
+        // Configurar Nodemailer
+        const transporter = nodemailer.createTransport({
+            service: "gmail",
+            auth: {
+                user: smtpEmail,
+                pass: smtpPassword,
+            },
+        });
 
         // Crear lista HTML
         const itemsRows = lowStockItems
@@ -70,9 +80,9 @@ export async function POST() {
             .join("");
 
         // Enviar Email
-        const { data: emailData, error: emailError } = await resend.emails.send({
-            from: "Sanse Perfumes <onboarding@resend.dev>",
-            to: ["sanseperfumes@gmail.com"],
+        const info = await transporter.sendMail({
+            from: `"Sanse Perfumes" <${smtpEmail}>`,
+            to: "sanseperfumes@gmail.com",
             subject: `📉 Reporte Manual de Stock Bajo - ${new Date().toLocaleDateString('es-AR')}`,
             html: `
         <!DOCTYPE html>
@@ -123,16 +133,11 @@ export async function POST() {
       `,
         });
 
-        if (emailError) {
-            console.error("Error sending email:", emailError);
-            return NextResponse.json({ error: emailError.message }, { status: 500 });
-        }
-
         return NextResponse.json({
             success: true,
             message: `Email enviado correctamente con ${lowStockItems.length} items.`,
             count: lowStockItems.length,
-            data: emailData
+            messageId: info.messageId
         });
 
     } catch (error: any) {

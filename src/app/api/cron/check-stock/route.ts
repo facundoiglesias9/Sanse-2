@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { Resend } from "resend";
+import nodemailer from "nodemailer";
 import { getLowStockMeta } from "@/app/helpers/stock-logic";
 
 export const dynamic = "force-dynamic";
@@ -9,14 +9,15 @@ export async function GET() {
     try {
         const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
         const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-        const resendApiKey = process.env.RESEND_API_KEY;
+        const smtpEmail = process.env.SMTP_EMAIL;
+        const smtpPassword = process.env.SMTP_PASSWORD;
 
         if (!supabaseUrl || !supabaseKey) {
             return NextResponse.json({ error: "Missing Supabase configuration" }, { status: 500 });
         }
 
-        if (!resendApiKey) {
-            return NextResponse.json({ error: "Missing RESEND_API_KEY" }, { status: 500 });
+        if (!smtpEmail || !smtpPassword) {
+            return NextResponse.json({ error: "Missing SMTP configuration" }, { status: 500 });
         }
 
         const supabase = createClient(supabaseUrl, supabaseKey);
@@ -53,7 +54,13 @@ export async function GET() {
             return NextResponse.json({ message: "No low stock items found" });
         }
 
-        const resend = new Resend(resendApiKey);
+        const transporter = nodemailer.createTransport({
+            service: "gmail",
+            auth: {
+                user: smtpEmail,
+                pass: smtpPassword,
+            },
+        });
 
         // Crear lista HTML
         const itemsRows = lowStockItems
@@ -70,9 +77,9 @@ export async function GET() {
             .join("");
 
         // Enviar Email
-        const { data: emailData, error: emailError } = await resend.emails.send({
-            from: "Sanse Perfumes <onboarding@resend.dev>",
-            to: ["sanseperfumes@gmail.com"],
+        const info = await transporter.sendMail({
+            from: `"Sanse Perfumes" <${smtpEmail}>`,
+            to: "sanseperfumes@gmail.com",
             subject: `📉 Reporte de Stock Bajo - ${new Date().toLocaleDateString('es-AR')}`,
             html: `
         <!DOCTYPE html>
@@ -123,15 +130,10 @@ export async function GET() {
       `,
         });
 
-        if (emailError) {
-            console.error("Error sending email:", emailError);
-            return NextResponse.json({ error: emailError.message }, { status: 500 });
-        }
-
         return NextResponse.json({
             success: true,
             message: `Email sent to sanseperfumes@gmail.com with ${lowStockItems.length} items.`,
-            data: emailData
+            messageId: info.messageId
         });
 
     } catch (error: any) {
