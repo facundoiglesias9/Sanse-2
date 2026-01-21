@@ -539,718 +539,408 @@ export function NavigationBar({ maintenanceMode = false }: { maintenanceMode?: b
   return (
     // ... Renderizar con listas filtradas ...
     // (Reconstruiré el componente usando estas variables filtradas)
-    <header
-      className={clsx(
-        "sticky top-0 z-50 flex items-center justify-between w-full backdrop-blur-lg bg-background/70 py-3 xl:py-4 shadow-sm transition-all",
-      )}
-    >
-      {/* Logo */}
-      <div className="flex flex-1 justify-center xl:justify-start px-3 xl:pl-6">
-        <Link
-          href="/"
-          className="text-xl xl:text-2xl font-semibold tracking-tight text-center xl:text-left whitespace-nowrap"
-        >
-          Sanse perfumes
-        </Link>
-      </div>
+    <>
+      <header
+        className={clsx(
+          "sticky top-0 z-50 flex items-center justify-between w-full backdrop-blur-lg bg-background/70 py-3 xl:py-4 shadow-sm transition-all",
+        )}
+      >
+        {/* Logo */}
+        <div className="flex flex-1 justify-center xl:justify-start px-3 xl:pl-6">
+          <Link
+            href="/"
+            className="text-xl xl:text-2xl font-semibold tracking-tight text-center xl:text-left whitespace-nowrap"
+          >
+            Sanse perfumes
+          </Link>
+        </div>
 
-      {/* Navegación Desktop */}
-      <NavigationMenu viewport={false} className="hidden xl:flex mx-auto">
-        <NavigationMenuList>
-          {!maintenanceMode && filteredNavbar.map((link) => {
-            // Admin obtiene desplegable para "Lista de precios", Revendedor obtiene enlace simple
-            if (link.href === "/" && isAdmin) {
+        {/* Navegación Desktop */}
+        <NavigationMenu viewport={false} className="hidden xl:flex mx-auto">
+          <NavigationMenuList>
+            {!maintenanceMode && filteredNavbar.map((link) => {
+              // Admin obtiene desplegable para "Lista de precios", Revendedor obtiene enlace simple
+              if (link.href === "/" && isAdmin) {
+                return (
+                  <NavigationMenuItem key={link.href}>
+                    <NavigationMenuTrigger className={pathname === "/" ? "bg-accent text-accent-foreground" : ""}>Lista de precios</NavigationMenuTrigger>
+                    <NavigationMenuContent>
+                      <ul className="grid w-[200px] gap-2 p-2">
+                        <li>
+                          <NavigationMenuLink asChild>
+                            <Link
+                              href="/"
+                              className={clsx(
+                                navigationMenuTriggerStyle(),
+                                pathname === "/" && (!searchParams.get("view") || searchParams.get("view") === "minorista") && "bg-accent text-accent-foreground"
+                              )}
+                            >
+                              Minorista
+                            </Link>
+                          </NavigationMenuLink>
+                        </li>
+                        <li>
+                          <NavigationMenuLink asChild>
+                            <Link
+                              href="/?view=mayorista"
+                              className={clsx(
+                                navigationMenuTriggerStyle(),
+                                pathname === "/" && searchParams.get("view") === "mayorista" && "bg-accent text-accent-foreground"
+                              )}
+                            >
+                              Mayorista
+                            </Link>
+                          </NavigationMenuLink>
+                        </li>
+                      </ul>
+                    </NavigationMenuContent>
+                  </NavigationMenuItem>
+                );
+              } else if (link.href === "/" && !isAdmin) {
+                // Revendedor: Enlace simple solo a mayorista
+                return (
+                  <NavigationMenuItem key={link.href}>
+                    <NavigationMenuLink asChild>
+                      <Link
+                        href={userRole === "comprador" ? "/?view=minorista" : "/?view=mayorista"}
+                        className={clsx(
+                          navigationMenuTriggerStyle(),
+                          pathname === "/" && "bg-accent text-accent-foreground"
+                        )}
+                      >
+                        Lista de precios
+                      </Link>
+                    </NavigationMenuLink>
+                  </NavigationMenuItem>
+                );
+              }
               return (
                 <NavigationMenuItem key={link.href}>
-                  <NavigationMenuTrigger className={pathname === "/" ? "bg-accent text-accent-foreground" : ""}>Lista de precios</NavigationMenuTrigger>
+                  <NavigationMenuLink asChild>
+                    <Link
+                      href={link.href}
+                      className={clsx(
+                        navigationMenuTriggerStyle(),
+                        pathname === link.href && "bg-accent text-accent-foreground"
+                      )}
+                    >
+                      {link.label}
+                    </Link>
+                  </NavigationMenuLink>
+                </NavigationMenuItem>
+              );
+            })}
+          </NavigationMenuList>
+
+          {isAdmin && (
+            <NavigationMenuList>
+              <NavigationMenuItem>
+                <NavigationMenuTrigger className={pathname.startsWith("/abm/inventario") || pathname === "/pedido-mayorista" ? "bg-accent text-accent-foreground" : ""}>
+                  Stock
+                </NavigationMenuTrigger>
+                <NavigationMenuContent>
+                  <ul className="grid w-[200px] gap-2 p-2">
+                    {stockLinks.map((link) => (
+                      <li key={link.href}>
+                        <NavigationMenuLink asChild>
+                          <Link
+                            href={link.href}
+                            className={clsx(
+                              navigationMenuTriggerStyle(),
+                              pathname === link.href && "bg-accent text-accent-foreground"
+                            )}
+                          >
+                            {link.label}
+                          </Link>
+                        </NavigationMenuLink>
+                      </li>
+                    ))}
+                  </ul>
+                </NavigationMenuContent>
+              </NavigationMenuItem>
+            </NavigationMenuList>
+          )}
+          {/* Enlace "Mis pedidos" para No-Admins (Revendedores/Compradores) */}
+          {!isAdmin && !maintenanceMode && (
+            <NavigationMenuList>
+              <NavigationMenuItem>
+                <NavigationMenuLink asChild>
+                  <Link
+                    href="/caja/solicitudes"
+                    className={clsx(
+                      navigationMenuTriggerStyle(),
+                      pathname === "/caja/solicitudes" && "bg-accent text-accent-foreground"
+                    )}
+                  >
+                    Mis pedidos
+                  </Link>
+                </NavigationMenuLink>
+              </NavigationMenuItem>
+            </NavigationMenuList>
+          )}
+
+          {(filteredABM.length > 0 || showCaja || filteredHerramientas.length > 0) && (
+            <NavigationMenuList>
+              {filteredABM.length > 0 && (
+                <NavigationMenuItem>
+                  <NavigationMenuTrigger className={pathname.startsWith("/abm") && !pathname.startsWith("/abm/inventario") ? "bg-accent text-accent-foreground" : ""}>ABMs</NavigationMenuTrigger>
                   <NavigationMenuContent>
-                    <ul className="grid w-[200px] gap-2 p-2">
+                    <ul className="grid w-[200px] gap-2">
+                      {filteredABM.map((link) => {
+                        return (
+                          <li key={link.href}>
+                            <NavigationMenuLink asChild>
+                              <Link
+                                href={link.href}
+                                className="flex-row items-center gap-x-3"
+                              >
+                                {link.icon}
+                                {link.label}
+                              </Link>
+                            </NavigationMenuLink>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </NavigationMenuContent>
+                </NavigationMenuItem>
+              )}
+
+              {showCaja && (
+                <NavigationMenuItem>
+                  <NavigationMenuTrigger className={pathname.startsWith("/caja") ? "bg-accent text-accent-foreground" : ""}>Caja</NavigationMenuTrigger>
+                  <NavigationMenuContent>
+                    <ul className="grid w-[300px] gap-2">
                       <li>
                         <NavigationMenuLink asChild>
                           <Link
-                            href="/"
+                            href="/caja"
                             className={clsx(
-                              navigationMenuTriggerStyle(),
-                              pathname === "/" && (!searchParams.get("view") || searchParams.get("view") === "minorista") && "bg-accent text-accent-foreground"
+                              "block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground",
+                              pathname === "/caja" && "bg-accent text-accent-foreground"
                             )}
                           >
-                            Minorista
+                            <div className="text-sm font-medium leading-none">Caja Unificada</div>
+                            <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
+                              Ver ganancias, gastos y deudas
+                            </p>
                           </Link>
                         </NavigationMenuLink>
                       </li>
                       <li>
                         <NavigationMenuLink asChild>
                           <Link
-                            href="/?view=mayorista"
+                            href="/caja/solicitudes"
                             className={clsx(
-                              navigationMenuTriggerStyle(),
-                              pathname === "/" && searchParams.get("view") === "mayorista" && "bg-accent text-accent-foreground"
+                              "block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground",
+                              pathname === "/caja/solicitudes" && "bg-accent text-accent-foreground"
                             )}
                           >
-                            Mayorista
+                            <div className="text-sm font-medium leading-none">Solicitudes de Compra</div>
+                            <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
+                              Gestionar pedidos de compradores
+                            </p>
+                          </Link>
+                        </NavigationMenuLink>
+                      </li>
+                      <li>
+                        <NavigationMenuLink asChild>
+                          <Link
+                            href="/caja/ventas-revendedores"
+                            className={clsx(
+                              "block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground",
+                              pathname === "/caja/ventas-revendedores" && "bg-accent text-accent-foreground"
+                            )}
+                          >
+                            <div className="text-sm font-medium leading-none">Ventas Revendedores</div>
+                            <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
+                              Historial de ventas por revendedor
+                            </p>
                           </Link>
                         </NavigationMenuLink>
                       </li>
                     </ul>
                   </NavigationMenuContent>
                 </NavigationMenuItem>
-              );
-            } else if (link.href === "/" && !isAdmin) {
-              // Revendedor: Enlace simple solo a mayorista
-              return (
-                <NavigationMenuItem key={link.href}>
-                  <NavigationMenuLink asChild>
-                    <Link
-                      href={userRole === "comprador" ? "/?view=minorista" : "/?view=mayorista"}
-                      className={clsx(
-                        navigationMenuTriggerStyle(),
-                        pathname === "/" && "bg-accent text-accent-foreground"
-                      )}
-                    >
-                      Lista de precios
-                    </Link>
-                  </NavigationMenuLink>
-                </NavigationMenuItem>
-              );
-            }
-            return (
-              <NavigationMenuItem key={link.href}>
-                <NavigationMenuLink asChild>
-                  <Link
-                    href={link.href}
-                    className={clsx(
-                      navigationMenuTriggerStyle(),
-                      pathname === link.href && "bg-accent text-accent-foreground"
-                    )}
-                  >
-                    {link.label}
-                  </Link>
-                </NavigationMenuLink>
-              </NavigationMenuItem>
-            );
-          })}
-        </NavigationMenuList>
-
-        {isAdmin && (
-          <NavigationMenuList>
-            <NavigationMenuItem>
-              <NavigationMenuTrigger className={pathname.startsWith("/abm/inventario") || pathname === "/pedido-mayorista" ? "bg-accent text-accent-foreground" : ""}>
-                Stock
-              </NavigationMenuTrigger>
-              <NavigationMenuContent>
-                <ul className="grid w-[200px] gap-2 p-2">
-                  {stockLinks.map((link) => (
-                    <li key={link.href}>
-                      <NavigationMenuLink asChild>
-                        <Link
-                          href={link.href}
-                          className={clsx(
-                            navigationMenuTriggerStyle(),
-                            pathname === link.href && "bg-accent text-accent-foreground"
-                          )}
-                        >
-                          {link.label}
-                        </Link>
-                      </NavigationMenuLink>
-                    </li>
-                  ))}
-                </ul>
-              </NavigationMenuContent>
-            </NavigationMenuItem>
-          </NavigationMenuList>
-        )}
-        {/* Enlace "Mis pedidos" para No-Admins (Revendedores/Compradores) */}
-        {!isAdmin && !maintenanceMode && (
-          <NavigationMenuList>
-            <NavigationMenuItem>
-              <NavigationMenuLink asChild>
-                <Link
-                  href="/caja/solicitudes"
-                  className={clsx(
-                    navigationMenuTriggerStyle(),
-                    pathname === "/caja/solicitudes" && "bg-accent text-accent-foreground"
-                  )}
-                >
-                  Mis pedidos
-                </Link>
-              </NavigationMenuLink>
-            </NavigationMenuItem>
-          </NavigationMenuList>
-        )}
-
-        {(filteredABM.length > 0 || showCaja || filteredHerramientas.length > 0) && (
-          <NavigationMenuList>
-            {filteredABM.length > 0 && (
-              <NavigationMenuItem>
-                <NavigationMenuTrigger className={pathname.startsWith("/abm") && !pathname.startsWith("/abm/inventario") ? "bg-accent text-accent-foreground" : ""}>ABMs</NavigationMenuTrigger>
-                <NavigationMenuContent>
-                  <ul className="grid w-[200px] gap-2">
-                    {filteredABM.map((link) => {
-                      return (
-                        <li key={link.href}>
-                          <NavigationMenuLink asChild>
-                            <Link
-                              href={link.href}
-                              className="flex-row items-center gap-x-3"
-                            >
-                              {link.icon}
-                              {link.label}
-                            </Link>
-                          </NavigationMenuLink>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </NavigationMenuContent>
-              </NavigationMenuItem>
-            )}
-
-            {showCaja && (
-              <NavigationMenuItem>
-                <NavigationMenuTrigger className={pathname.startsWith("/caja") ? "bg-accent text-accent-foreground" : ""}>Caja</NavigationMenuTrigger>
-                <NavigationMenuContent>
-                  <ul className="grid w-[300px] gap-2">
-                    <li>
-                      <NavigationMenuLink asChild>
-                        <Link
-                          href="/caja"
-                          className={clsx(
-                            "block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground",
-                            pathname === "/caja" && "bg-accent text-accent-foreground"
-                          )}
-                        >
-                          <div className="text-sm font-medium leading-none">Caja Unificada</div>
-                          <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
-                            Ver ganancias, gastos y deudas
-                          </p>
-                        </Link>
-                      </NavigationMenuLink>
-                    </li>
-                    <li>
-                      <NavigationMenuLink asChild>
-                        <Link
-                          href="/caja/solicitudes"
-                          className={clsx(
-                            "block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground",
-                            pathname === "/caja/solicitudes" && "bg-accent text-accent-foreground"
-                          )}
-                        >
-                          <div className="text-sm font-medium leading-none">Solicitudes de Compra</div>
-                          <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
-                            Gestionar pedidos de compradores
-                          </p>
-                        </Link>
-                      </NavigationMenuLink>
-                    </li>
-                    <li>
-                      <NavigationMenuLink asChild>
-                        <Link
-                          href="/caja/ventas-revendedores"
-                          className={clsx(
-                            "block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground",
-                            pathname === "/caja/ventas-revendedores" && "bg-accent text-accent-foreground"
-                          )}
-                        >
-                          <div className="text-sm font-medium leading-none">Ventas Revendedores</div>
-                          <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
-                            Historial de ventas por revendedor
-                          </p>
-                        </Link>
-                      </NavigationMenuLink>
-                    </li>
-                  </ul>
-                </NavigationMenuContent>
-              </NavigationMenuItem>
-            )}
-
-            {filteredHerramientas.length > 0 && (
-              <NavigationMenuItem>
-                <NavigationMenuTrigger className={pathname.startsWith("/herramientas") ? "bg-accent text-accent-foreground" : ""}>Herramientas</NavigationMenuTrigger>
-                <NavigationMenuContent>
-                  <ul className="grid w-[300px] gap-2">
-                    {filteredHerramientas.map((link) => {
-                      return (
-                        <li key={link.href}>
-                          <NavigationMenuLink asChild>
-                            <Link href={link.href}>
-                              <div className="font-medium">{link.label}</div>
-                              <div className="text-muted-foreground">
-                                {link.description}
-                              </div>
-                            </Link>
-                          </NavigationMenuLink>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </NavigationMenuContent>
-              </NavigationMenuItem>
-            )}
-          </NavigationMenuList>
-        )}
-
-      </NavigationMenu>
-
-      {/* Sección derecha */}
-      <div className="flex flex-1 justify-end items-center gap-2 xl:gap-4 pr-3 xl:pr-6">
-        {/* Cotización del dólar SOLO visible en desktop y para ADMINS */}
-        {isAdmin && (
-          <div className="hidden xl:flex items-center gap-2 text-sm font-bold px-3 py-1 rounded-md border border-muted-foreground/20 bg-muted-foreground/5">
-            <DollarSign className="w-4 h-4 text-success" />
-            <span>
-              Dólar:{" "}
-              {!loadingCurrencies && currencies["ARS"] ? (
-                `$${currencies["ARS"].toLocaleString("es-AR", { maximumFractionDigits: 2 })} `
-              ) : (
-                <span className="opacity-50">—</span>
               )}
-            </span>
-          </div>
-        )}
 
-        {session && (
-          // Avatar y menú de usuario
-          <div className="flex items-center gap-2">
+              {filteredHerramientas.length > 0 && (
+                <NavigationMenuItem>
+                  <NavigationMenuTrigger className={pathname.startsWith("/herramientas") ? "bg-accent text-accent-foreground" : ""}>Herramientas</NavigationMenuTrigger>
+                  <NavigationMenuContent>
+                    <ul className="grid w-[300px] gap-2">
+                      {filteredHerramientas.map((link) => {
+                        return (
+                          <li key={link.href}>
+                            <NavigationMenuLink asChild>
+                              <Link href={link.href}>
+                                <div className="font-medium">{link.label}</div>
+                                <div className="text-muted-foreground">
+                                  {link.description}
+                                </div>
+                              </Link>
+                            </NavigationMenuLink>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </NavigationMenuContent>
+                </NavigationMenuItem>
+              )}
+            </NavigationMenuList>
+          )}
 
-            {/* Notificaciones */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="relative">
-                  <Bell className="w-5 h-5 text-muted-foreground" />
-                  {(pendingPrizes.length > 0 || solicitudNotifications.length > 0) && (
-                    <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-                  )}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-72">
-                <DropdownMenuLabel>Notificaciones</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                {pendingPrizes.length === 0 && solicitudNotifications.length === 0 ? (
-                  <div className="p-4 text-center text-sm text-muted-foreground">
-                    No tienes nuevas notificaciones
-                  </div>
+        </NavigationMenu>
+
+        {/* Sección derecha */}
+        <div className="flex flex-1 justify-end items-center gap-2 xl:gap-4 pr-3 xl:pr-6">
+          {/* Cotización del dólar SOLO visible en desktop y para ADMINS */}
+          {isAdmin && (
+            <div className="hidden xl:flex items-center gap-2 text-sm font-bold px-3 py-1 rounded-md border border-muted-foreground/20 bg-muted-foreground/5">
+              <DollarSign className="w-4 h-4 text-success" />
+              <span>
+                Dólar:{" "}
+                {!loadingCurrencies && currencies["ARS"] ? (
+                  `$${currencies["ARS"].toLocaleString("es-AR", { maximumFractionDigits: 2 })} `
                 ) : (
-                  <div className="max-h-[300px] overflow-y-auto">
-                    {/* Premios */}
-                    {pendingPrizes.map((prize) => (
-                      <div key={prize.id} className="p-3 border-b last:border-0 hover:bg-muted/50 transition-colors">
-                        <div className="flex items-start gap-3">
-                          <div className="bg-primary/10 p-2 rounded-full shrink-0">
-                            <Gift className="w-4 h-4 text-primary" />
-                          </div>
-                          <div className="flex-1">
-                            <p className="text-sm font-medium text-foreground leading-none">¡Premio Recibido!</p>
-                            <p className="text-xs text-muted-foreground mt-1 text-wrap break-words">{prize.premio}</p>
-                            <p className="text-[10px] text-muted-foreground mt-2 text-right">
-                              {new Date(prize.created_at).toLocaleDateString()}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
+                  <span className="opacity-50">—</span>
+                )}
+              </span>
+            </div>
+          )}
 
-                    {/* Solicitudes Updates */}
-                    {solicitudNotifications.map((req) => {
-                      let icon = <Info className="w-4 h-4 text-blue-500" />;
-                      let bgClass = "bg-blue-100";
-                      let title = "Actualización de pedido";
+          {session && (
+            // Avatar y menú de usuario
+            <div className="flex items-center gap-2">
 
-                      switch (req.estado) {
-                        case 'pendiente':
-                          icon = <PlusCircle className="w-4 h-4 text-primary" />;
-                          bgClass = "bg-primary/10";
-                          title = "Nueva Solicitud";
-                          break;
-                        case 'rechazado':
-                          icon = <X className="w-4 h-4 text-red-500" />;
-                          bgClass = "bg-red-100";
-                          title = "Pedido Rechazado";
-                          break;
-                        case 'cancelado':
-                          icon = <Trash2 className="w-4 h-4 text-gray-500" />;
-                          bgClass = "bg-gray-100";
-                          title = "Pedido Cancelado";
-                          break;
-                        case 'en_preparacion':
-                          icon = <Package className="w-4 h-4 text-amber-500" />;
-                          bgClass = "bg-amber-100";
-                          title = "Pedido en Preparación";
-                          break;
-                        case 'preparado':
-                          icon = <Check className="w-4 h-4 text-green-500" />;
-                          bgClass = "bg-green-100";
-                          title = "¡Pedido Listo para Retirar!";
-                          break;
-                      }
-
-                      return (
-                        <div key={req.id} className="p-3 border-b last:border-0 hover:bg-muted/50 transition-colors group relative">
+              {/* Notificaciones */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="relative">
+                    <Bell className="w-5 h-5 text-muted-foreground" />
+                    {(pendingPrizes.length > 0 || solicitudNotifications.length > 0) && (
+                      <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                    )}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-72">
+                  <DropdownMenuLabel>Notificaciones</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {pendingPrizes.length === 0 && solicitudNotifications.length === 0 ? (
+                    <div className="p-4 text-center text-sm text-muted-foreground">
+                      No tienes nuevas notificaciones
+                    </div>
+                  ) : (
+                    <div className="max-h-[300px] overflow-y-auto">
+                      {/* Premios */}
+                      {pendingPrizes.map((prize) => (
+                        <div key={prize.id} className="p-3 border-b last:border-0 hover:bg-muted/50 transition-colors">
                           <div className="flex items-start gap-3">
-                            <div className={`${bgClass} p-2 rounded-full shrink-0`}>
-                              {icon}
+                            <div className="bg-primary/10 p-2 rounded-full shrink-0">
+                              <Gift className="w-4 h-4 text-primary" />
                             </div>
                             <div className="flex-1">
-                              <div className="flex justify-between items-start">
-                                <p className="text-sm font-medium text-foreground leading-none">{title}</p>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-5 w-5 text-muted-foreground hover:text-destructive -mt-1 -mr-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDismiss(req.id);
-                                  }}
-                                  title="Eliminar notificación"
-                                >
-                                  <Trash2 className="w-3 h-3" />
-                                </Button>
-                              </div>
-                              <p className="text-xs text-muted-foreground mt-1 pr-4">
-                                {req.estado === 'rechazado' ? "Tu pedido no pudo ser procesado." :
-                                  req.estado === 'en_preparacion' ? "Estamos armando tu pedido." :
-                                    req.estado === 'preparado' ? "Pasa a buscarlo por el local." :
-                                      req.estado === 'cancelado' ? "El pedido ha sido cancelado." :
-                                        req.estado === 'pendiente' ? `${req.cliente} ha enviado un nuevo pedido.` : ""}
-                                <span className="block font-semibold mt-0.5">{formatCurrency(req.total, "ARS", 0)}</span>
-                              </p>
+                              <p className="text-sm font-medium text-foreground leading-none">¡Premio Recibido!</p>
+                              <p className="text-xs text-muted-foreground mt-1 text-wrap break-words">{prize.premio}</p>
                               <p className="text-[10px] text-muted-foreground mt-2 text-right">
-                                {new Date(req.created_at).toLocaleDateString()} {new Date(req.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                {new Date(prize.created_at).toLocaleDateString()}
                               </p>
                             </div>
                           </div>
                         </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
+                      ))}
 
-            <DropdownMenu>
-              <DropdownMenuTrigger>
-                <Avatar>
-                  <AvatarFallback>
-                    {session.user?.email?.charAt(0).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                <DropdownMenuLabel>Mi cuenta ({userRole === 'admin' ? 'Admin' : userRole.charAt(0).toUpperCase() + userRole.slice(1)})</DropdownMenuLabel>
-                <DropdownMenuSub>
-                  <DropdownMenuSubTrigger>Modo de color</DropdownMenuSubTrigger>
-                  <DropdownMenuPortal>
-                    <DropdownMenuSubContent>
-                      <DropdownMenuItem onClick={() => setTheme("dark")}>
-                        <Moon className="w-4 h-4 mr-2" /> Oscuro
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setTheme("light")}>
-                        <Sun className="w-4 h-4 mr-2" /> Claro
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setTheme("system")}>
-                        <Monitor className="w-4 h-4 mr-2" /> Sistema
-                      </DropdownMenuItem>
-                    </DropdownMenuSubContent>
-                  </DropdownMenuPortal>
-                </DropdownMenuSub>
-                <DropdownMenuSeparator />
-                {filteredUserbar.map((link) => {
-                  return (
-                    <DropdownMenuItem key={link.href} asChild>
-                      <Link href={link.href}>{link.label}</Link>
-                    </DropdownMenuItem>
-                  );
-                })}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleInstallApp} className="text-primary font-bold">
-                  <Download className="w-4 h-4 mr-2" />
-                  Instalar App
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleLogout}>
-                  <div className="flex items-center gap-2">
-                    <LogOut width={24} className="text-destructive" />
-                    Cerrar sesión
-                  </div>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        )}
+                      {/* Solicitudes Updates */}
+                      {solicitudNotifications.map((req) => {
+                        let icon = <Info className="w-4 h-4 text-blue-500" />;
+                        let bgClass = "bg-blue-100";
+                        let title = "Actualización de pedido";
 
-        {/* Menú Mobile */}
-        <div className="xl:hidden">
-          <Sheet open={open} onOpenChange={setOpen}>
-            <SheetTrigger asChild>
-              <Button aria-label="Abrir menú" variant="ghost" size="icon">
-                <Menu width={24} />
-              </Button>
-            </SheetTrigger>
-            <SheetContent
-              side="left"
-              aria-describedby={undefined}
-              className="flex flex-col h-full w-[85vw] sm:w-[350px] p-0 gap-0 border-r-0 bg-background"
-            >
-              <SheetHeader className="p-6 pb-2 text-left border-b bg-muted/10">
-                <SheetTitle className="text-xl font-bold flex items-center gap-2">
-                  <Menu className="w-5 h-5" /> Menú
-                </SheetTitle>
-              </SheetHeader>
-
-              {/* Scrollable Area */}
-              <div className="flex-1 overflow-y-auto py-4 px-4 min-h-0">
-                {/* Cotización - Mobile Only */}
-                {isAdmin && (
-                  <div className="mb-6 p-4 rounded-xl bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border border-emerald-500/20 shadow-sm">
-                    <div className="flex items-center gap-3">
-                      <div className="bg-emerald-500/20 p-2 rounded-full">
-                        <DollarSign className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-                      </div>
-                      <div>
-                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Dólar Oficial</p>
-                        <p className="text-lg font-bold text-foreground">
-                          {!loadingCurrencies && currencies["ARS"] ? (
-                            `$${currencies["ARS"].toLocaleString("es-AR", { maximumFractionDigits: 2 })}`
-                          ) : (
-                            "Cargando..."
-                          )}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                <nav className="flex flex-col gap-6 pb-10">
-
-                  {/* Grupo: Lista de precios (Admin & User) */}
-                  <div className="space-y-1">
-                    <p className="text-xs font-semibold text-muted-foreground ml-3 mb-2 uppercase tracking-wide">Lista de precios</p>
-
-                    {/* Botones de Lista (Minorista/Mayorista) */}
-                    {isAdmin ? (
-                      <>
-                        <Button
-                          variant={pathname === "/" && (!searchParams.get("view") || searchParams.get("view") === "minorista") ? "secondary" : "ghost"}
-                          className={clsx("w-full justify-start items-center gap-3 h-10 text-sm font-medium", pathname === "/" && (!searchParams.get("view") || searchParams.get("view") === "minorista") && "bg-secondary/50 font-semibold")}
-                          asChild
-                          onClick={() => setOpen(false)}
-                        >
-                          <Link href="/">
-                            <ClipboardList className="w-4 h-4 opacity-70" />
-                            Lista Minorista
-                          </Link>
-                        </Button>
-                        <Button
-                          variant={searchParams.get("view") === "mayorista" ? "secondary" : "ghost"}
-                          className={clsx("w-full justify-start items-center gap-3 h-10 text-sm font-medium", searchParams.get("view") === "mayorista" && "bg-secondary/50 font-semibold")}
-                          asChild
-                          onClick={() => setOpen(false)}
-                        >
-                          <Link href="/?view=mayorista">
-                            <ClipboardList className="w-4 h-4 opacity-70" />
-                            Lista Mayorista
-                          </Link>
-                        </Button>
-                      </>
-                    ) : (
-                      !maintenanceMode && (
-                        <Button
-                          variant={pathname === "/" ? "secondary" : "ghost"}
-                          className={clsx("w-full justify-start items-center gap-3 h-10 text-sm font-medium", pathname === "/" && "bg-secondary/50 font-semibold")}
-                          asChild
-                          onClick={() => setOpen(false)}
-                        >
-                          <Link href={userRole === "comprador" ? "/?view=minorista" : "/?view=mayorista"}>
-                            <ClipboardList className="w-4 h-4 opacity-70" />
-                            Lista de precios
-                          </Link>
-                        </Button>
-                      )
-                    )}
-
-                    {/* Botón Agregar Producto */}
-                    {!maintenanceMode && filteredNavbar.find(l => l.href === "/agregar-producto") && (
-                      <Button
-                        variant={pathname === "/agregar-producto" ? "secondary" : "ghost"}
-                        className={clsx("w-full justify-start items-center gap-3 h-10 text-sm font-medium", pathname === "/agregar-producto" && "bg-secondary/50 font-semibold")}
-                        asChild
-                        onClick={() => setOpen(false)}
-                      >
-                        <Link href="/agregar-producto">
-                          <PlusCircle className="w-4 h-4 opacity-70" />
-                          Agregar producto
-                        </Link>
-                      </Button>
-                    )}
-
-                    {/* Revendedor: Mis Pedidos (Si no es admin, agregarlo aquí o en un grupo "Mis cosas") */}
-                    {!isAdmin && !maintenanceMode && (
-                      <Button
-                        variant={pathname === "/caja/solicitudes" ? "secondary" : "ghost"}
-                        className={clsx("w-full justify-start items-center gap-3 h-10 text-sm font-medium", pathname === "/caja/solicitudes" && "bg-secondary/50 font-semibold")}
-                        asChild
-                        onClick={() => setOpen(false)}
-                      >
-                        <Link href="/caja/solicitudes">
-                          <ShoppingBag className="w-4 h-4 opacity-70" />
-                          Mis pedidos
-                        </Link>
-                      </Button>
-                    )}
-                  </div>
-
-                  {/* Grupo: Stock (Admin Only) */}
-                  {isAdmin && (
-                    <div className="space-y-1">
-                      <p className="text-xs font-semibold text-muted-foreground ml-3 mb-2 uppercase tracking-wide">Stock</p>
-                      {stockLinks.map((link) => {
-                        const isActive = pathname === link.href;
-                        let Icon = Boxes;
-                        if (link.href.includes("inventario")) Icon = Boxes;
-                        if (link.href.includes("pedido-mayorista")) Icon = Truck;
+                        switch (req.estado) {
+                          case 'pendiente':
+                            icon = <PlusCircle className="w-4 h-4 text-primary" />;
+                            bgClass = "bg-primary/10";
+                            title = "Nueva Solicitud";
+                            break;
+                          case 'rechazado':
+                            icon = <X className="w-4 h-4 text-red-500" />;
+                            bgClass = "bg-red-100";
+                            title = "Pedido Rechazado";
+                            break;
+                          case 'cancelado':
+                            icon = <Trash2 className="w-4 h-4 text-gray-500" />;
+                            bgClass = "bg-gray-100";
+                            title = "Pedido Cancelado";
+                            break;
+                          case 'en_preparacion':
+                            icon = <Package className="w-4 h-4 text-amber-500" />;
+                            bgClass = "bg-amber-100";
+                            title = "Pedido en Preparación";
+                            break;
+                          case 'preparado':
+                            icon = <Check className="w-4 h-4 text-green-500" />;
+                            bgClass = "bg-green-100";
+                            title = "¡Pedido Listo para Retirar!";
+                            break;
+                        }
 
                         return (
-                          <Button
-                            key={link.href}
-                            variant={isActive ? "secondary" : "ghost"}
-                            className={clsx("w-full justify-start items-center gap-3 h-10 text-sm font-medium", isActive && "bg-secondary/50 font-semibold")}
-                            asChild
-                            onClick={() => setOpen(false)}
-                          >
-                            <Link href={link.href}>
-                              <Icon className="w-4 h-4 opacity-70" />
-                              {link.label}
-                            </Link>
-                          </Button>
+                          <div key={req.id} className="p-3 border-b last:border-0 hover:bg-muted/50 transition-colors group relative">
+                            <div className="flex items-start gap-3">
+                              <div className={`${bgClass} p-2 rounded-full shrink-0`}>
+                                {icon}
+                              </div>
+                              <div className="flex-1">
+                                <div className="flex justify-between items-start">
+                                  <p className="text-sm font-medium text-foreground leading-none">{title}</p>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-5 w-5 text-muted-foreground hover:text-destructive -mt-1 -mr-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDismiss(req.id);
+                                    }}
+                                    title="Eliminar notificación"
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                  </Button>
+                                </div>
+                                <p className="text-xs text-muted-foreground mt-1 pr-4">
+                                  {req.estado === 'rechazado' ? "Tu pedido no pudo ser procesado." :
+                                    req.estado === 'en_preparacion' ? "Estamos armando tu pedido." :
+                                      req.estado === 'preparado' ? "Pasa a buscarlo por el local." :
+                                        req.estado === 'cancelado' ? "El pedido ha sido cancelado." :
+                                          req.estado === 'pendiente' ? `${req.cliente} ha enviado un nuevo pedido.` : ""}
+                                  <span className="block font-semibold mt-0.5">{formatCurrency(req.total, "ARS", 0)}</span>
+                                </p>
+                                <p className="text-[10px] text-muted-foreground mt-2 text-right">
+                                  {new Date(req.created_at).toLocaleDateString()} {new Date(req.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
                         );
                       })}
                     </div>
                   )}
+                </DropdownMenuContent>
+              </DropdownMenu>
 
-                  {/* Grupo: ABMs (Admin Only) */}
-                  {isAdmin && filteredABM.length > 0 && (
-                    <div className="space-y-1">
-                      <p className="text-xs font-semibold text-muted-foreground ml-3 mb-2 uppercase tracking-wide">ABMs</p>
-                      {filteredABM.map((link) => {
-                        const isActive = pathname === link.href;
-                        return (
-                          <Button
-                            key={link.href}
-                            variant={isActive ? "secondary" : "ghost"}
-                            className={clsx("w-full justify-start items-center gap-3 h-10 text-sm font-medium", isActive && "bg-secondary/50 font-semibold")}
-                            asChild
-                            onClick={() => setOpen(false)}
-                          >
-                            <Link href={link.href}>
-                              <span className="opacity-70 text-base flex items-center justify-center w-4 h-4 [&_svg]:w-4 [&_svg]:h-4">{link.icon}</span>
-                              {link.label}
-                            </Link>
-                          </Button>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  {/* Grupo: Caja (Admin Only) */}
-                  {isAdmin && showCaja && (
-                    <div className="space-y-1">
-                      <p className="text-xs font-semibold text-muted-foreground ml-3 mb-2 uppercase tracking-wide">Caja</p>
-                      {/* Caja Unificada */}
-                      <Button
-                        variant={pathname === "/caja" ? "secondary" : "ghost"}
-                        className={clsx("w-full justify-start items-center gap-3 h-10 text-sm font-medium", pathname === "/caja" && "bg-secondary/50 font-semibold")}
-                        asChild
-                        onClick={() => setOpen(false)}
-                      >
-                        <Link href="/caja">
-                          <DollarSign className="w-4 h-4 opacity-70" />
-                          Caja Unificada
-                        </Link>
-                      </Button>
-
-                      {/* Solicitudes de Compra */}
-                      <Button
-                        variant={pathname === "/caja/solicitudes" ? "secondary" : "ghost"}
-                        className={clsx("w-full justify-start items-center gap-3 h-10 text-sm font-medium", pathname === "/caja/solicitudes" && "bg-secondary/50 font-semibold")}
-                        asChild
-                        onClick={() => setOpen(false)}
-                      >
-                        <Link href="/caja/solicitudes">
-                          <ShoppingBag className="w-4 h-4 opacity-70" />
-                          Solicitudes de Compra
-                        </Link>
-                      </Button>
-
-                      {/* Ventas Revendedores */}
-                      <Button
-                        variant={pathname === "/caja/ventas-revendedores" ? "secondary" : "ghost"}
-                        className={clsx("w-full justify-start items-center gap-3 h-10 text-sm font-medium", pathname === "/caja/ventas-revendedores" && "bg-secondary/50 font-semibold")}
-                        asChild
-                        onClick={() => setOpen(false)}
-                      >
-                        <Link href="/caja/ventas-revendedores">
-                          <Users className="w-4 h-4 opacity-70" />
-                          Ventas Revendedores
-                        </Link>
-                      </Button>
-                    </div>
-                  )}
-
-                  {/* Grupo: Herramientas (Admin Only) */}
-                  {isAdmin && filteredHerramientas.length > 0 && (
-                    <div className="space-y-1">
-                      <p className="text-xs font-semibold text-muted-foreground ml-3 mb-2 uppercase tracking-wide">Herramientas</p>
-                      {filteredHerramientas.map((link) => {
-                        const isActive = pathname === link.href;
-                        let Icon = Calculator;
-                        if (link.label.includes("Notas")) Icon = FileText;
-
-                        return (
-                          <Button
-                            key={link.href}
-                            variant={isActive ? "secondary" : "ghost"}
-                            className={clsx("w-full justify-start items-center gap-3 h-10 text-sm font-medium", isActive && "bg-secondary/50 font-semibold")}
-                            asChild
-                            onClick={() => setOpen(false)}
-                          >
-                            <Link href={link.href}>
-                              <Icon className="w-4 h-4 opacity-70" />
-                              {link.label}
-                            </Link>
-                          </Button>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  {/* Grupo: Configuraciones (Para todos) */}
-                  <div className="space-y-1">
-                    <p className="text-xs font-semibold text-muted-foreground ml-3 mb-2 uppercase tracking-wide">Configuraciones</p>
-
-                    {/* Perfil */}
-                    <Button
-                      variant={pathname === "/perfil" ? "secondary" : "ghost"}
-                      className={clsx("w-full justify-start items-center gap-3 h-10 text-sm font-medium", pathname === "/perfil" && "bg-secondary/50 font-semibold")}
-                      asChild
-                      onClick={() => setOpen(false)}
-                    >
-                      <Link href="/perfil">
-                        <Users className="w-4 h-4 opacity-70" />
-                        Perfil
-                      </Link>
-                    </Button>
-
-                    {/* Modo de color */}
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          className="w-full justify-start items-center gap-3 h-10 text-sm font-medium"
-                        >
-                          <Moon className="w-4 h-4 opacity-70" />
-                          Modo de color
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent className="w-56" align="start">
+              <DropdownMenu>
+                <DropdownMenuTrigger>
+                  <Avatar>
+                    <AvatarFallback>
+                      {session.user?.email?.charAt(0).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  <DropdownMenuLabel>Mi cuenta ({userRole === 'admin' ? 'Admin' : userRole.charAt(0).toUpperCase() + userRole.slice(1)})</DropdownMenuLabel>
+                  <DropdownMenuSub>
+                    <DropdownMenuSubTrigger>Modo de color</DropdownMenuSubTrigger>
+                    <DropdownMenuPortal>
+                      <DropdownMenuSubContent>
                         <DropdownMenuItem onClick={() => setTheme("dark")}>
                           <Moon className="w-4 h-4 mr-2" /> Oscuro
                         </DropdownMenuItem>
@@ -1260,111 +950,462 @@ export function NavigationBar({ maintenanceMode = false }: { maintenanceMode?: b
                         <DropdownMenuItem onClick={() => setTheme("system")}>
                           <Monitor className="w-4 h-4 mr-2" /> Sistema
                         </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                      </DropdownMenuSubContent>
+                    </DropdownMenuPortal>
+                  </DropdownMenuSub>
+                  <DropdownMenuSeparator />
+                  {filteredUserbar.map((link) => {
+                    return (
+                      <DropdownMenuItem key={link.href} asChild>
+                        <Link href={link.href}>{link.label}</Link>
+                      </DropdownMenuItem>
+                    );
+                  })}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleInstallApp} className="text-primary font-bold">
+                    <Download className="w-4 h-4 mr-2" />
+                    Instalar App
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleLogout}>
+                    <div className="flex items-center gap-2">
+                      <LogOut width={24} className="text-destructive" />
+                      Cerrar sesión
+                    </div>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          )}
 
-                    {/* Instalar App (PWA) */}
-                    <Button
-                      variant="ghost"
-                      className="w-full justify-start items-center gap-3 h-10 text-sm font-bold text-primary"
-                      onClick={handleInstallApp}
-                    >
-                      <Download className="w-4 h-4" />
-                      Instalar App
-                    </Button>
-                  </div>
+          {/* Menú Mobile */}
+          <div className="xl:hidden">
+            <Sheet open={open} onOpenChange={setOpen}>
+              <SheetTrigger asChild>
+                <Button aria-label="Abrir menú" variant="ghost" size="icon">
+                  <Menu width={24} />
+                </Button>
+              </SheetTrigger>
+              <SheetContent
+                side="left"
+                aria-describedby={undefined}
+                className="flex flex-col h-full w-[85vw] sm:w-[350px] p-0 gap-0 border-r-0 bg-background"
+              >
+                <SheetHeader className="p-6 pb-2 text-left border-b bg-muted/10">
+                  <SheetTitle className="text-xl font-bold flex items-center gap-2">
+                    <Menu className="w-5 h-5" /> Menú
+                  </SheetTitle>
+                </SheetHeader>
 
-
-                  {/* Grupo: Administración (Admin Only) - Resto de items de Userbar */}
+                {/* Scrollable Area */}
+                <div className="flex-1 overflow-y-auto py-4 px-4 min-h-0">
+                  {/* Cotización - Mobile Only */}
                   {isAdmin && (
-                    <div className="space-y-1">
-                      <p className="text-xs font-semibold text-muted-foreground ml-3 mb-2 uppercase tracking-wide">Administración</p>
-
-                      <Button
-                        variant={pathname === "/registro_de_actividad" ? "secondary" : "ghost"}
-                        className={clsx("w-full justify-start items-center gap-3 h-10 text-sm font-medium", pathname === "/registro_de_actividad" && "bg-secondary/50 font-semibold")}
-                        asChild
-                        onClick={() => setOpen(false)}
-                      >
-                        <Link href="/registro_de_actividad">
-                          <ClipboardList className="w-4 h-4 opacity-70" />
-                          Registro de actividad
-                        </Link>
-                      </Button>
-
-                      <Button
-                        variant={pathname === "/accept-orphans" ? "secondary" : "ghost"}
-                        className={clsx("w-full justify-start items-center gap-3 h-10 text-sm font-medium", pathname === "/accept-orphans" && "bg-secondary/50 font-semibold")}
-                        asChild
-                        onClick={() => setOpen(false)}
-                      >
-                        <Link href="/accept-orphans">
-                          <Users className="w-4 h-4 opacity-70" />
-                          Aceptar Huérfanos
-                        </Link>
-                      </Button>
-
-                      <Button
-                        variant={pathname === "/gestion-usuarios" ? "secondary" : "ghost"}
-                        className={clsx("w-full justify-start items-center gap-3 h-10 text-sm font-medium", pathname === "/gestion-usuarios" && "bg-secondary/50 font-semibold")}
-                        asChild
-                        onClick={() => setOpen(false)}
-                      >
-                        <Link href="/gestion-usuarios">
-                          <Users className="w-4 h-4 opacity-70" />
-                          Gestión de usuarios
-                        </Link>
-                      </Button>
+                    <div className="mb-6 p-4 rounded-xl bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border border-emerald-500/20 shadow-sm">
+                      <div className="flex items-center gap-3">
+                        <div className="bg-emerald-500/20 p-2 rounded-full">
+                          <DollarSign className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Dólar Oficial</p>
+                          <p className="text-lg font-bold text-foreground">
+                            {!loadingCurrencies && currencies["ARS"] ? (
+                              `$${currencies["ARS"].toLocaleString("es-AR", { maximumFractionDigits: 2 })}`
+                            ) : (
+                              "Cargando..."
+                            )}
+                          </p>
+                        </div>
+                      </div>
                     </div>
                   )}
 
-                  {session && (
-                    <div className="space-y-4">
-                      <div className="pt-2">
+                  <nav className="flex flex-col gap-6 pb-10">
+
+                    {/* Grupo: Lista de precios (Admin & User) */}
+                    <div className="space-y-1">
+                      <p className="text-xs font-semibold text-muted-foreground ml-3 mb-2 uppercase tracking-wide">Lista de precios</p>
+
+                      {/* Botones de Lista (Minorista/Mayorista) */}
+                      {isAdmin ? (
+                        <>
+                          <Button
+                            variant={pathname === "/" && (!searchParams.get("view") || searchParams.get("view") === "minorista") ? "secondary" : "ghost"}
+                            className={clsx("w-full justify-start items-center gap-3 h-10 text-sm font-medium", pathname === "/" && (!searchParams.get("view") || searchParams.get("view") === "minorista") && "bg-secondary/50 font-semibold")}
+                            asChild
+                            onClick={() => setOpen(false)}
+                          >
+                            <Link href="/">
+                              <ClipboardList className="w-4 h-4 opacity-70" />
+                              Lista Minorista
+                            </Link>
+                          </Button>
+                          <Button
+                            variant={searchParams.get("view") === "mayorista" ? "secondary" : "ghost"}
+                            className={clsx("w-full justify-start items-center gap-3 h-10 text-sm font-medium", searchParams.get("view") === "mayorista" && "bg-secondary/50 font-semibold")}
+                            asChild
+                            onClick={() => setOpen(false)}
+                          >
+                            <Link href="/?view=mayorista">
+                              <ClipboardList className="w-4 h-4 opacity-70" />
+                              Lista Mayorista
+                            </Link>
+                          </Button>
+                        </>
+                      ) : (
+                        !maintenanceMode && (
+                          <Button
+                            variant={pathname === "/" ? "secondary" : "ghost"}
+                            className={clsx("w-full justify-start items-center gap-3 h-10 text-sm font-medium", pathname === "/" && "bg-secondary/50 font-semibold")}
+                            asChild
+                            onClick={() => setOpen(false)}
+                          >
+                            <Link href={userRole === "comprador" ? "/?view=minorista" : "/?view=mayorista"}>
+                              <ClipboardList className="w-4 h-4 opacity-70" />
+                              Lista de precios
+                            </Link>
+                          </Button>
+                        )
+                      )}
+
+                      {/* Botón Agregar Producto */}
+                      {!maintenanceMode && filteredNavbar.find(l => l.href === "/agregar-producto") && (
                         <Button
-                          variant="ghost"
-                          className="w-full justify-start items-center gap-3 h-10 text-sm font-medium text-destructive hover:bg-destructive/10 hover:text-destructive"
-                          onClick={() => {
-                            setOpen(false);
-                            handleLogout();
-                          }}
+                          variant={pathname === "/agregar-producto" ? "secondary" : "ghost"}
+                          className={clsx("w-full justify-start items-center gap-3 h-10 text-sm font-medium", pathname === "/agregar-producto" && "bg-secondary/50 font-semibold")}
+                          asChild
+                          onClick={() => setOpen(false)}
                         >
-                          <LogOut className="w-4 h-4 opacity-70" />
-                          Cerrar sesión
+                          <Link href="/agregar-producto">
+                            <PlusCircle className="w-4 h-4 opacity-70" />
+                            Agregar producto
+                          </Link>
+                        </Button>
+                      )}
+
+                      {/* Revendedor: Mis Pedidos (Si no es admin, agregarlo aquí o en un grupo "Mis cosas") */}
+                      {!isAdmin && !maintenanceMode && (
+                        <Button
+                          variant={pathname === "/caja/solicitudes" ? "secondary" : "ghost"}
+                          className={clsx("w-full justify-start items-center gap-3 h-10 text-sm font-medium", pathname === "/caja/solicitudes" && "bg-secondary/50 font-semibold")}
+                          asChild
+                          onClick={() => setOpen(false)}
+                        >
+                          <Link href="/caja/solicitudes">
+                            <ShoppingBag className="w-4 h-4 opacity-70" />
+                            Mis pedidos
+                          </Link>
+                        </Button>
+                      )}
+                    </div>
+
+                    {/* Grupo: Stock (Admin Only) */}
+                    {isAdmin && (
+                      <div className="space-y-1">
+                        <p className="text-xs font-semibold text-muted-foreground ml-3 mb-2 uppercase tracking-wide">Stock</p>
+                        {stockLinks.map((link) => {
+                          const isActive = pathname === link.href;
+                          let Icon = Boxes;
+                          if (link.href.includes("inventario")) Icon = Boxes;
+                          if (link.href.includes("pedido-mayorista")) Icon = Truck;
+
+                          return (
+                            <Button
+                              key={link.href}
+                              variant={isActive ? "secondary" : "ghost"}
+                              className={clsx("w-full justify-start items-center gap-3 h-10 text-sm font-medium", isActive && "bg-secondary/50 font-semibold")}
+                              asChild
+                              onClick={() => setOpen(false)}
+                            >
+                              <Link href={link.href}>
+                                <Icon className="w-4 h-4 opacity-70" />
+                                {link.label}
+                              </Link>
+                            </Button>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* Grupo: ABMs (Admin Only) */}
+                    {isAdmin && filteredABM.length > 0 && (
+                      <div className="space-y-1">
+                        <p className="text-xs font-semibold text-muted-foreground ml-3 mb-2 uppercase tracking-wide">ABMs</p>
+                        {filteredABM.map((link) => {
+                          const isActive = pathname === link.href;
+                          return (
+                            <Button
+                              key={link.href}
+                              variant={isActive ? "secondary" : "ghost"}
+                              className={clsx("w-full justify-start items-center gap-3 h-10 text-sm font-medium", isActive && "bg-secondary/50 font-semibold")}
+                              asChild
+                              onClick={() => setOpen(false)}
+                            >
+                              <Link href={link.href}>
+                                <span className="opacity-70 text-base flex items-center justify-center w-4 h-4 [&_svg]:w-4 [&_svg]:h-4">{link.icon}</span>
+                                {link.label}
+                              </Link>
+                            </Button>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* Grupo: Caja (Admin Only) */}
+                    {isAdmin && showCaja && (
+                      <div className="space-y-1">
+                        <p className="text-xs font-semibold text-muted-foreground ml-3 mb-2 uppercase tracking-wide">Caja</p>
+
+                        {/* Caja Unificada */}
+                        <Button
+                          variant={pathname === "/caja" ? "secondary" : "ghost"}
+                          className={clsx("w-full justify-start items-center gap-3 h-10 text-sm font-medium", pathname === "/caja" && "bg-secondary/50 font-semibold")}
+                          asChild
+                          onClick={() => setOpen(false)}
+                        >
+                          <Link href="/caja">
+                            <DollarSign className="w-4 h-4 opacity-70" />
+                            Caja Unificada
+                          </Link>
+                        </Button>
+
+                        {/* Solicitudes de Compra */}
+                        <Button
+                          variant={pathname === "/caja/solicitudes" ? "secondary" : "ghost"}
+                          className={clsx("w-full justify-start items-center gap-3 h-10 text-sm font-medium", pathname === "/caja/solicitudes" && "bg-secondary/50 font-semibold")}
+                          asChild
+                          onClick={() => setOpen(false)}
+                        >
+                          <Link href="/caja/solicitudes">
+                            <ShoppingBag className="w-4 h-4 opacity-70" />
+                            Solicitudes de Compra
+                          </Link>
+                        </Button>
+
+                        {/* Ventas Revendedores */}
+                        <Button
+                          variant={pathname === "/caja/ventas-revendedores" ? "secondary" : "ghost"}
+                          className={clsx("w-full justify-start items-center gap-3 h-10 text-sm font-medium", pathname === "/caja/ventas-revendedores" && "bg-secondary/50 font-semibold")}
+                          asChild
+                          onClick={() => setOpen(false)}
+                        >
+                          <Link href="/caja/ventas-revendedores">
+                            <Users className="w-4 h-4 opacity-70" />
+                            Ventas Revendedores
+                          </Link>
                         </Button>
                       </div>
+                    )}
 
-                      <div className="pt-4 border-t">
-                        <div className="px-3 flex items-center justify-between text-[10px] opacity-60">
-                          <span>Estado del Sistema</span>
-                          <div className="flex items-center gap-2">
-                            <div className={clsx("w-1.5 h-1.5 rounded-full", realtimeStatus === 'connected' ? "bg-green-500" : "bg-red-500")} title="Base de Datos" />
-                            <div className={clsx("w-1.5 h-1.5 rounded-full", permissionStatus === 'granted' ? "bg-green-500" : "bg-amber-500")} title="Notificaciones" />
-                          </div>
+                    {/* Grupo: Herramientas (Admin Only) */}
+                    {isAdmin && filteredHerramientas.length > 0 && (
+                      <div className="space-y-1">
+                        <p className="text-xs font-semibold text-muted-foreground ml-3 mb-2 uppercase tracking-wide">Herramientas</p>
+                        {filteredHerramientas.map((link) => {
+                          const isActive = pathname === link.href;
+                          let Icon = Calculator;
+                          if (link.label.includes("Notas")) Icon = FileText;
+
+                          return (
+                            <Button
+                              key={link.href}
+                              variant={isActive ? "secondary" : "ghost"}
+                              className={clsx("w-full justify-start items-center gap-3 h-10 text-sm font-medium", isActive && "bg-secondary/50 font-semibold")}
+                              asChild
+                              onClick={() => setOpen(false)}
+                            >
+                              <Link href={link.href}>
+                                <Icon className="w-4 h-4 opacity-70" />
+                                {link.label}
+                              </Link>
+                            </Button>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* Grupo: Configuraciones (Para todos) */}
+                    <div className="space-y-1">
+                      <p className="text-xs font-semibold text-muted-foreground ml-3 mb-2 uppercase tracking-wide">Configuraciones</p>
+
+                      {/* Perfil */}
+                      <Button
+                        variant={pathname === "/perfil" ? "secondary" : "ghost"}
+                        className={clsx("w-full justify-start items-center gap-3 h-10 text-sm font-medium", pathname === "/perfil" && "bg-secondary/50 font-semibold")}
+                        asChild
+                        onClick={() => setOpen(false)}
+                      >
+                        <Link href="/perfil">
+                          <Users className="w-4 h-4 opacity-70" />
+                          Perfil
+                        </Link>
+                      </Button>
+
+                      {/* Modo de color */}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            className="w-full justify-start items-center gap-3 h-10 text-sm font-medium"
+                          >
+                            <Moon className="w-4 h-4 opacity-70" />
+                            Modo de color
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent className="w-56" align="start">
+                          <DropdownMenuItem onClick={() => setTheme("dark")}>
+                            <Moon className="w-4 h-4 mr-2" /> Oscuro
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setTheme("light")}>
+                            <Sun className="w-4 h-4 mr-2" /> Claro
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setTheme("system")}>
+                            <Monitor className="w-4 h-4 mr-2" /> Sistema
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+
+                      {/* Instalar App (PWA) */}
+                      <Button
+                        variant="ghost"
+                        className="w-full justify-start items-center gap-3 h-10 text-sm font-bold text-primary"
+                        onClick={handleInstallApp}
+                      >
+                        <Download className="w-4 h-4" />
+                        Instalar App
+                      </Button>
+                    </div>
+
+
+                    {/* Grupo: Administración (Admin Only) - Resto de items de Userbar */}
+                    {isAdmin && (
+                      <div className="space-y-1">
+                        <p className="text-xs font-semibold text-muted-foreground ml-3 mb-2 uppercase tracking-wide">Administración</p>
+
+                        <Button
+                          variant={pathname === "/registro_de_actividad" ? "secondary" : "ghost"}
+                          className={clsx("w-full justify-start items-center gap-3 h-10 text-sm font-medium", pathname === "/registro_de_actividad" && "bg-secondary/50 font-semibold")}
+                          asChild
+                          onClick={() => setOpen(false)}
+                        >
+                          <Link href="/registro_de_actividad">
+                            <ClipboardList className="w-4 h-4 opacity-70" />
+                            Registro de actividad
+                          </Link>
+                        </Button>
+
+                        <Button
+                          variant={pathname === "/accept-orphans" ? "secondary" : "ghost"}
+                          className={clsx("w-full justify-start items-center gap-3 h-10 text-sm font-medium", pathname === "/accept-orphans" && "bg-secondary/50 font-semibold")}
+                          asChild
+                          onClick={() => setOpen(false)}
+                        >
+                          <Link href="/accept-orphans">
+                            <Users className="w-4 h-4 opacity-70" />
+                            Aceptar Huérfanos
+                          </Link>
+                        </Button>
+
+                        <Button
+                          variant={pathname === "/gestion-usuarios" ? "secondary" : "ghost"}
+                          className={clsx("w-full justify-start items-center gap-3 h-10 text-sm font-medium", pathname === "/gestion-usuarios" && "bg-secondary/50 font-semibold")}
+                          asChild
+                          onClick={() => setOpen(false)}
+                        >
+                          <Link href="/gestion-usuarios">
+                            <Users className="w-4 h-4 opacity-70" />
+                            Gestión de usuarios
+                          </Link>
+                        </Button>
+                      </div>
+                    )}
+
+                    {session && (
+                      <div className="space-y-4">
+                        <div className="pt-2">
+                          <Button
+                            variant="ghost"
+                            className="w-full justify-start items-center gap-3 h-10 text-sm font-medium text-destructive hover:bg-destructive/10 hover:text-destructive"
+                            onClick={() => {
+                              setOpen(false);
+                              handleLogout();
+                            }}
+                          >
+                            <LogOut className="w-4 h-4 opacity-70" />
+                            Cerrar sesión
+                          </Button>
                         </div>
 
-                        {permissionStatus !== 'granted' && (
-                          <div className="px-3 mt-4">
-                            <Button
-                              variant="destructive"
-                              size="sm"
-                              className="w-full justify-start gap-2 h-9 text-xs font-bold animate-pulse"
-                              onClick={requestPermission}
-                            >
-                              <Bell className="w-3 h-3" />
-                              Habilitar Notificaciones
-                            </Button>
+                        <div className="pt-4 border-t">
+                          <div className="px-3 flex items-center justify-between text-[10px] opacity-60">
+                            <span>Estado del Sistema</span>
+                            <div className="flex items-center gap-2">
+                              <div className={clsx("w-1.5 h-1.5 rounded-full", realtimeStatus === 'connected' ? "bg-green-500" : "bg-red-500")} title="Base de Datos" />
+                              <div className={clsx("w-1.5 h-1.5 rounded-full", permissionStatus === 'granted' ? "bg-green-500" : "bg-amber-500")} title="Notificaciones" />
+                            </div>
                           </div>
-                        )}
+
+                          {permissionStatus !== 'granted' && (
+                            <div className="px-3 mt-4">
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                className="w-full justify-start gap-2 h-9 text-xs font-bold animate-pulse"
+                                onClick={requestPermission}
+                              >
+                                <Bell className="w-3 h-3" />
+                                Habilitar Notificaciones
+                              </Button>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  )}
-                </nav>
-              </div>
-            </SheetContent>
-          </Sheet>
+                    )}
+                  </nav>
+                </div>
+              </SheetContent>
+            </Sheet>
+          </div >
         </div >
-      </div >
-    </header >
+      </header >
+      {/* Floating Social Buttons (Solo No-Admins) */}
+      {!isAdmin && !maintenanceMode && (
+        <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-3 items-end">
+          {/* Instagram */}
+          <a
+            href="https://www.instagram.com/sanseperfumes?igsh=MWR0aTg0bWRhd3Rnbw=="
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bg-gradient-to-br from-purple-600 via-pink-600 to-orange-500 text-white p-3 rounded-full shadow-xl transition-all hover:scale-110 flex items-center gap-2 group border-4 border-white/10"
+            aria-label="Instagram"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              className="w-6 h-6"
+            >
+              <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z" />
+            </svg>
+          </a>
+
+          {/* WhatsApp */}
+          <a
+            href="https://wa.me/5491123529147?text=Hola.%20Queria%20consultarte%20el%20stock%20disponible."
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bg-[#25D366] hover:bg-[#128C7E] text-white p-3 rounded-full shadow-2xl transition-all hover:scale-110 flex items-center gap-2 group border-4 border-white/10"
+            aria-label="Consultar por WhatsApp"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              className="w-6 h-6"
+            >
+              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487 2.009.86 2.79.689 3.21.643.421-.048 1.758-.718 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z" />
+            </svg>
+          </a>
+        </div>
+      )}
+    </>
   );
 }

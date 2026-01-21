@@ -31,11 +31,16 @@ const loginSchema = z.object({
 
 type LoginFormValues = z.infer<typeof loginSchema>;
 
+import { Checkbox } from "@/components/ui/checkbox";
+
+// ... existing imports
+
 export function LoginForm({
   className,
   ...props
 }: React.ComponentProps<"div">) {
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
   const router = useRouter();
 
   const form = useForm<LoginFormValues>({
@@ -46,8 +51,27 @@ export function LoginForm({
     },
   });
 
+  React.useEffect(() => {
+    const savedUser = localStorage.getItem("sanse_user");
+    const savedPass = localStorage.getItem("sanse_pass"); // Insecure but requested
+    if (savedUser && savedPass) {
+      form.setValue("username", savedUser);
+      form.setValue("password", savedPass);
+      setRememberMe(true);
+    }
+  }, [form]);
+
+
   const handleSubmit = async (values: LoginFormValues) => {
     const supabase = createClient();
+
+    if (rememberMe) {
+      localStorage.setItem("sanse_user", values.username);
+      localStorage.setItem("sanse_pass", values.password);
+    } else {
+      localStorage.removeItem("sanse_user");
+      localStorage.removeItem("sanse_pass");
+    }
 
     // Verificar si la entrada es un correo electrónico (contiene @) o un nombre de usuario
     const isEmail = values.username.includes('@');
@@ -138,6 +162,20 @@ export function LoginForm({
               </FormItem>
             )}
           />
+
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="remember"
+              checked={rememberMe}
+              onCheckedChange={(checked) => setRememberMe(checked as boolean)}
+            />
+            <label
+              htmlFor="remember"
+              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+            >
+              Recordar usuario y contraseña
+            </label>
+          </div>
 
           <Button
             type="submit"

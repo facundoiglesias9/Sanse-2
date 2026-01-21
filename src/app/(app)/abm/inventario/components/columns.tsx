@@ -109,7 +109,36 @@ export const inventarioColumns = (
     {
       accessorKey: "cantidad",
       header: () => <div className="text-center">Cantidad</div>,
-      cell: ({ row }) => <div className="text-center font-medium">{row.getValue("cantidad") as number}</div>,
+      cell: ({ row }) => {
+        const cantidad = Number(row.original.cantidad) || 0;
+
+        // Reutilizar lógica de stock bajo
+        const preLow = (row.original as any)._lowStock as boolean | undefined;
+        const nombre = row.original.nombre || "";
+        const tipo = row.original.tipo || "";
+
+        const meta = preLow !== undefined
+          ? { low: preLow }
+          : getLowStockMeta({ tipo, nombre, cantidad });
+
+        let variant: "default" | "secondary" | "destructive" | "outline" | "success" | "warning" = "secondary";
+
+        if (meta.low || cantidad === 0) {
+          variant = "destructive"; // Rojo para crítico
+        } else if (cantidad < 20) {
+          variant = "warning"; // Amarillo para bajo pero no crítico
+        } else {
+          variant = "success"; // Verde para saludable
+        }
+
+        return (
+          <div className="flex justify-center">
+            <Badge variant={variant} className="min-w-[40px] justify-center">
+              {cantidad}
+            </Badge>
+          </div>
+        )
+      },
     },
     {
       accessorKey: "updated_at",

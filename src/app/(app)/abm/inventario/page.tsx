@@ -8,7 +8,7 @@ import { inventarioColumns } from "@/app/(app)/abm/inventario/components/columns
 import { toast } from "sonner";
 import { LoaderTable } from "@/app/(app)/components/loader-table";
 import { Button } from "@/components/ui/button";
-import { Loader2 } from "lucide-react";
+import { Loader2, Package, AlertTriangle } from "lucide-react";
 import type { ColumnFiltersState, SortingState } from "@tanstack/react-table";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
@@ -17,6 +17,7 @@ import {
   InventarioTipoRecord,
   TipoManagerDialog,
 } from "@/app/(app)/abm/inventario/components/tipo-manager-dialog";
+import { getLowStockMeta } from "@/app/helpers/stock-logic";
 
 const FALLBACK_TIPOS = ["Perfume", "Frasco", "Etiqueta", "Esencia", "Insumo"];
 
@@ -298,6 +299,47 @@ export default function InventarioPage() {
           entre <span className="underline font-semibold">mayúsculas</span> y{" "}
           <span className="underline font-semibold">minúsculas</span>.
         </h4>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2 mb-8">
+        <div className="bg-white dark:bg-zinc-900 border dark:border-zinc-800 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all group flex items-center justify-between">
+          <div className="flex flex-col gap-1">
+            <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Productos Registrados</span>
+            <span className="text-4xl font-black text-indigo-600 dark:text-indigo-400 font-mono tracking-tighter">
+              {inventario.length.toLocaleString('es-AR')}
+            </span>
+          </div>
+          <div className="bg-indigo-50 dark:bg-indigo-900/20 p-4 rounded-full group-hover:scale-110 transition-transform">
+            <Package className="w-8 h-8 text-indigo-500" />
+          </div>
+        </div>
+
+        <div className="bg-white dark:bg-zinc-900 border border-red-100 dark:border-red-900/30 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all group flex items-center justify-between relative overflow-hidden">
+          {/* Gradient glow bg */}
+          <div className="absolute top-0 right-0 w-32 h-32 bg-red-500/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
+
+          <div className="flex flex-col gap-1 z-10">
+            <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Stock Crítico</span>
+            <div className="flex items-baseline gap-3">
+              <span className="text-4xl font-black text-red-600 dark:text-red-400 font-mono tracking-tighter">
+                {inventario.filter(i => {
+                  const meta = getLowStockMeta({
+                    tipo: i.tipo || "",
+                    nombre: i.nombre || "",
+                    cantidad: Number(i.cantidad) || 0
+                  });
+                  return meta.low;
+                }).length}
+              </span>
+              <span className="text-[10px] font-extrabold text-red-600 bg-red-100 dark:bg-red-900/30 px-2 py-1 rounded-full animate-pulse">
+                REQUIERE ATENCIÓN
+              </span>
+            </div>
+          </div>
+          <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-full group-hover:scale-110 transition-transform z-10">
+            <AlertTriangle className="w-8 h-8 text-red-500" />
+          </div>
+        </div>
       </div>
 
       {loadingTableInventario ? (
