@@ -1,25 +1,26 @@
 
 import { NextResponse } from "next/server";
-import { Resend } from "resend";
 import { createClient } from "@/utils/supabase/server";
+import nodemailer from "nodemailer";
 
 export async function POST(request: Request) {
   try {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
+    // SMTP Credentials from .env
+    const smtpEmail = process.env.SMTP_EMAIL;
+    const smtpPassword = process.env.SMTP_PASSWORD;
+
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { items, total, clientName } = await request.json();
-
-    const resendApiKey = process.env.RESEND_API_KEY;
-    if (!resendApiKey) {
-      return NextResponse.json({ error: "Missing Resend API Key" }, { status: 500 });
+    if (!smtpEmail || !smtpPassword) {
+      return NextResponse.json({ error: "Missing SMTP configuration" }, { status: 500 });
     }
 
-    const resend = new Resend(resendApiKey);
+    const { items, total, clientName } = await request.json();
 
     // Obtener detalles del revendedor si no se proporcionan (aunque el cliente envía clientName)
     let resellerName = clientName;
@@ -77,9 +78,17 @@ export async function POST(request: Request) {
       </div>
     `;
 
-    await resend.emails.send({
-      from: "Sanse Perfumes Pedidos <onboarding@resend.dev>",
-      to: ["sanseperfumes@gmail.com"], // Email del administrador
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: smtpEmail,
+        pass: smtpPassword,
+      },
+    });
+
+    await transporter.sendMail({
+      from: `"Sanse Perfumes Pedidos" <${smtpEmail}>`,
+      to: "sanseperfumes@gmail.com", // Email del administrador
       subject: `📦 Nuevo Pedido de ${resellerName} - $${total.toLocaleString('es-AR')}`,
       html: emailHtml,
     });

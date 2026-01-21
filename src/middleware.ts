@@ -14,6 +14,6 @@ export const config = {
      * - favicon.ico (archivo de icono de sitio)
      * Siéntete libre de modificar este patrón para incluir más rutas.
      */
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|sw.js|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };

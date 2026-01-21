@@ -1,4 +1,5 @@
 "use client";
+// Deploy timestamp: 2026-01-18 22:58
 
 import { useState, useEffect } from "react";
 import { createClient } from "@/utils/supabase/client";
@@ -9,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { NumberInput } from "@/components/ui/number-input";
+import Link from "next/link";
 import { Plus, Trash2, TrendingUp, TrendingDown, Wallet } from "lucide-react";
 import {
     Table,
@@ -145,7 +147,6 @@ export default function CajaPage() {
         const { data: ventasData } = await supabase
             .from("ventas")
             .select("*")
-            .or("is_reseller_sale.is.null,is_reseller_sale.eq.false")
             .order("created_at", { ascending: false });
         setVentas(ventasData || []);
 
@@ -311,19 +312,7 @@ export default function CajaPage() {
     // Total ventas regulares (para widget Ganancias)
     const totalVentas = ventas.reduce((sum, v) => sum + v.precio_total, 0);
 
-    // Total TODAS las ventas (incluyendo ventas revendedores para cálculo Sanse)
-    const [totalAllVentas, setTotalAllVentas] = useState(0);
-
-    useEffect(() => {
-        const fetchAllVentas = async () => {
-            const { data } = await supabase.from("ventas").select("precio_total");
-            const total = (data || []).reduce((sum, v) => sum + v.precio_total, 0);
-            setTotalAllVentas(total);
-        };
-        if (!loading) fetchAllVentas();
-    }, [loading]);
-
-    const cajaSanse = totalAllVentas - gastosSanse;
+    const cajaSanse = totalVentas - gastosSanse;
 
     console.log("💰 Debug - Total Facundo:", totalFacundo);
     console.log("💰 Debug - Total Lukas:", totalLukas);
@@ -331,7 +320,15 @@ export default function CajaPage() {
 
     return (
         <div className="container mx-auto py-8 px-4 max-w-7xl">
-            <h1 className="text-3xl font-bold mb-8">Caja Unificada</h1>
+            <div className="text-center mb-8">
+                <h1 className="text-3xl font-bold">Caja Unificada</h1>
+                <Link
+                    href="/caja/dashboard"
+                    className="text-sm font-medium text-primary hover:underline mt-2 inline-block"
+                >
+                    Dashboards
+                </Link>
+            </div>
 
             {/* Fila de Widgets */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">

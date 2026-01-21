@@ -146,6 +146,42 @@ export function DataTable({
       fetchProfileName();
     }
   }, [userRole]);
+
+  // Estado para Descuentos
+  const [discountPercentage, setDiscountPercentage] = useState(0);
+  const [isDiscountManual, setIsDiscountManual] = useState(false);
+
+  // Lógica de Descuento Automático
+  useEffect(() => {
+    // Si el usuario es ADMIN y ya tocó manualmente el descuento, no sobreescribimos automágicamente
+    if (userRole === "admin" && isDiscountManual) return;
+
+    // Si el usuario es REVENDEDOR, según la regla no aplica ("minorista"). 
+    // La regla dice: rol "COMPRADOR" o rol "ADMINISTRADOR".
+    // Asumimos que para "revendedor" (que ve precios mayoristas) NO aplica este descuento del 15%. 
+    if (view === "mayorista" && userRole !== "admin") {
+      setDiscountPercentage(0);
+      return;
+    }
+
+    const countFina = ventaPerfumes.reduce((acc, item) => {
+      const catId = item.perfume.insumos_categorias_id;
+      const cat = insumosCategorias.find(c => c.id === catId);
+      // Detección robusta de categoría
+      const catName = (cat?.nombre || "").toLowerCase();
+      if (catName.includes("fina") || catName.includes("perfumería fina") || catName.includes("perfumeria fina")) {
+        return acc + item.cantidad;
+      }
+      return acc;
+    }, 0);
+
+    if (countFina >= 4) {
+      setDiscountPercentage(15);
+    } else {
+      setDiscountPercentage(0);
+    }
+  }, [ventaPerfumes, userRole, insumosCategorias, isDiscountManual, view]);
+
   const [isAddingInsumo, setIsAddingInsumo] = useState(false);
   const [selectedInsumoId, setSelectedInsumoId] = useState("");
   const [newInsumoQty, setNewInsumoQty] = useState("1");
@@ -826,7 +862,11 @@ export function DataTable({
     setIsDialogOpen(true);
   };
 
-  const handleCloseModal = () => setIsDialogOpen(false);
+  const handleCloseModal = () => {
+    setIsDialogOpen(false);
+    setDiscountPercentage(0);
+    setIsDiscountManual(false);
+  };
 
   function findInventario<T extends { nombre: string; tipo: string; genero?: string | null; }>(
     items: T[] | null | undefined,
@@ -1061,6 +1101,10 @@ export function DataTable({
                             <div className="flex h-9 items-center px-3 text-sm font-medium text-muted-foreground bg-muted/50 rounded-md border border-transparent">
                               Mayorista
                             </div>
+                          ) : (userRole !== "admin" ? (
+                            <div className="flex h-9 items-center px-3 text-sm font-medium text-muted-foreground bg-muted/50 rounded-md border border-transparent">
+                              Precio Lista
+                            </div>
                           ) : (
                             <Select
                               value={item.priceType}
@@ -1076,7 +1120,7 @@ export function DataTable({
                                 <SelectItem value="costo">Al Costo</SelectItem>
                               </SelectContent>
                             </Select>
-                          )}
+                          ))}
                         </TableCell>
 
                         {/* Envase (solo LP) */}
@@ -1102,27 +1146,30 @@ export function DataTable({
                                 </SelectContent>
                               </Select>
 
-                              <div className="flex items-center space-x-2 pt-1">
-                                <Checkbox
-                                  id={`envase-${item.perfume.id}`}
-                                  checked={!!item.devuelveEnvase}
-                                  onCheckedChange={(checked) =>
-                                    setVentaPerfumes((prev) =>
-                                      prev.map((p) =>
-                                        p.perfume.id === item.perfume.id
-                                          ? { ...p, devuelveEnvase: checked === true }
-                                          : p
-                                      ),
-                                    )
-                                  }
-                                />
-                                <label
-                                  htmlFor={`envase-${item.perfume.id}`}
-                                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                                >
-                                  Devolvió envase
-                                </label>
-                              </div>
+                              {/* Checkbox solo para Bidón (5L) */}
+                              {item.frascoLP === "bidon" && (
+                                <div className="flex items-center space-x-2 pt-1">
+                                  <Checkbox
+                                    id={`envase-${item.perfume.id}`}
+                                    checked={!!item.devuelveEnvase}
+                                    onCheckedChange={(checked) =>
+                                      setVentaPerfumes((prev) =>
+                                        prev.map((p) =>
+                                          p.perfume.id === item.perfume.id
+                                            ? { ...p, devuelveEnvase: checked === true }
+                                            : p
+                                        ),
+                                      )
+                                    }
+                                  />
+                                  <label
+                                    htmlFor={`envase-${item.perfume.id}`}
+                                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                  >
+                                    Devolvió envase
+                                  </label>
+                                </div>
+                              )}
                             </div>
                           ) : (
                             <span className="text-muted-foreground text-sm italic">No aplica</span>
@@ -1227,20 +1274,26 @@ export function DataTable({
                       {view !== "mayorista" && (
                         <div className="space-y-1">
                           <Label className="text-[10px] text-muted-foreground uppercase tracking-wider">Tipo</Label>
-                          <Select
-                            value={item.priceType}
-                            onValueChange={(val: "precio" | "costo") => {
-                              setVentaPerfumes(prev => prev.map(p => p.perfume.id === item.perfume.id ? { ...p, priceType: val } : p));
-                            }}
-                          >
-                            <SelectTrigger className="h-8 text-xs w-full">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="precio">Precio Lista</SelectItem>
-                              <SelectItem value="costo">Al Costo</SelectItem>
-                            </SelectContent>
-                          </Select>
+                          {userRole !== 'admin' ? (
+                            <div className="h-8 flex items-center text-xs font-medium text-muted-foreground">
+                              Precio Lista
+                            </div>
+                          ) : (
+                            <Select
+                              value={item.priceType}
+                              onValueChange={(val: "precio" | "costo") => {
+                                setVentaPerfumes(prev => prev.map(p => p.perfume.id === item.perfume.id ? { ...p, priceType: val } : p));
+                              }}
+                            >
+                              <SelectTrigger className="h-8 text-xs w-full">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="precio">Precio Lista</SelectItem>
+                                <SelectItem value="costo">Al Costo</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          )}
                         </div>
                       )}
 
@@ -1266,8 +1319,8 @@ export function DataTable({
                       )}
                     </div>
 
-                    {/* Envase Return Checkbox for LP - Full Width */}
-                    {esLP && (
+                    {/* Envase Return Checkbox for LP - Only for Bidon (5L) */}
+                    {esLP && item.frascoLP === "bidon" && (
                       <div className="flex items-center space-x-2">
                         <Checkbox
                           id={`envase-m-${item.perfume.id}`}
@@ -1316,6 +1369,46 @@ export function DataTable({
           <div className="hidden lg:block">
             <Table className="table-fixed">
               <TableFooter>
+                {/* Descuento Row */}
+                {(discountPercentage > 0 || userRole === "admin") && view !== "mayorista" && (
+                  <TableRow className="bg-muted/20 hover:bg-muted/30">
+                    <TableCell colSpan={3} className="text-right pr-4 align-middle">
+                      <div className="flex items-center justify-end gap-2">
+                        <span className="text-sm font-medium text-muted-foreground">Descuento Global:</span>
+                        {userRole === "admin" ? (
+                          <div className="flex items-center gap-1">
+                            <Input
+                              type="number"
+                              className="h-8 w-16 text-right"
+                              value={discountPercentage}
+                              onChange={(e) => {
+                                setIsDiscountManual(true);
+                                setDiscountPercentage(Number(e.target.value));
+                              }}
+                            />
+                            <span className="text-sm text-muted-foreground">%</span>
+                          </div>
+                        ) : (
+                          <Badge variant="secondary" className="text-xs">
+                            {discountPercentage}% (Promo 4+ Perfumes)
+                          </Badge>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell colSpan={2} className="text-right font-medium text-red-500 align-middle">
+                      - {formatCurrency(
+                        ventaPerfumes.reduce((acc, it) => {
+                          const base = computePrecioUnitario(it.perfume, false, it.frascoLP, it.priceType);
+                          const d = it.devuelveEnvase ? getEnvaseUnitCost(it.perfume, it.frascoLP) : 0;
+                          return acc + Math.max(0, base - d) * it.cantidad;
+                        }, 0) * (discountPercentage / 100),
+                        "ARS",
+                        0
+                      )}
+                    </TableCell>
+                  </TableRow>
+                )}
+
                 <TableRow>
                   <TableCell colSpan={4} className="font-bold text-lg text-right pr-4">
                     Total Final
@@ -1326,7 +1419,7 @@ export function DataTable({
                         const base = computePrecioUnitario(it.perfume, view === "mayorista", it.frascoLP, it.priceType);
                         const d = it.devuelveEnvase ? getEnvaseUnitCost(it.perfume, it.frascoLP) : 0;
                         return acc + Math.max(0, base - d) * it.cantidad;
-                      }, 0),
+                      }, 0) * (1 - discountPercentage / 100),
                       "ARS",
                       0,
                     )}
@@ -1338,7 +1431,33 @@ export function DataTable({
           </div>
 
           {/* Mobile Footer */}
-          <div className="lg:hidden border-t pt-4 mt-2">
+          <div className="lg:hidden border-t pt-4 mt-2 space-y-2">
+
+            {/* Mobile Discount Row */}
+            {(discountPercentage > 0 || userRole === "admin") && view !== "mayorista" && (
+              <div className="flex justify-between items-center px-3 text-sm">
+                <span className="text-muted-foreground">Descuento {userRole !== 'admin' && '(Promo 4+)'}</span>
+                {userRole === "admin" ? (
+                  <div className="flex items-center gap-1">
+                    <Input
+                      type="number"
+                      className="h-7 w-14 text-right px-1"
+                      value={discountPercentage}
+                      onChange={(e) => {
+                        setIsDiscountManual(true);
+                        setDiscountPercentage(Number(e.target.value));
+                      }}
+                    />
+                    <span>%</span>
+                  </div>
+                ) : (
+                  <span className="font-medium text-red-500">
+                    -{discountPercentage}%
+                  </span>
+                )}
+              </div>
+            )}
+
             <div className="flex justify-between items-center bg-muted/20 p-3 rounded-lg border">
               <span className="font-bold">Total Final</span>
               <span className="font-bold text-xl text-emerald-600">
@@ -1347,7 +1466,7 @@ export function DataTable({
                     const base = computePrecioUnitario(it.perfume, view === "mayorista", it.frascoLP, it.priceType);
                     const d = it.devuelveEnvase ? getEnvaseUnitCost(it.perfume, it.frascoLP) : 0;
                     return acc + Math.max(0, base - d) * it.cantidad;
-                  }, 0),
+                  }, 0) * (1 - discountPercentage / 100),
                   "ARS",
                   0,
                 )}
@@ -1423,7 +1542,9 @@ export function DataTable({
                       total += Math.max(0, base - d) * item.cantidad;
                       return { ...item, cliente: cliente.trim() };
                     });
-                    handleSubmit(total, ventaConCliente, true);
+                    // Aplicar Descuento
+                    const totalConDescuento = total * (1 - discountPercentage / 100);
+                    handleSubmit(totalConDescuento, ventaConCliente, true);
                   }}
                 >
                   {isLoadingForm ? <Loader2 width={18} className="animate-spin" /> : <ClipboardList width={18} />}
@@ -1447,7 +1568,9 @@ export function DataTable({
                             total += Math.max(0, base - d) * item.cantidad;
                             return { ...item, cliente: cliente.trim() };
                           });
-                          handleSubmit(total, ventaConCliente);
+                          // Aplicar Descuento
+                          const totalConDescuento = total * (1 - discountPercentage / 100);
+                          handleSubmit(totalConDescuento, ventaConCliente);
                         }}
                       >
                         {isLoadingForm && <Loader2 width={18} className="animate-spin" />}

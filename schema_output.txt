@@ -1,0 +1,11 @@
+id
+created_at
+precio_total
+cantidad_perfumes
+perfumes
+cliente
+created_by
+updated_by
+updated_at
+is_reseller_sale
+metodo_pago

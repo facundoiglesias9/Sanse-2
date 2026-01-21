@@ -1,0 +1,1358 @@
+"use client";
+
+
+import { usePathname, useSearchParams } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import {
+  Menu, LogOut, Info, X, Package, Check, Bell, Gift, Truck, Trash2, RotateCcw,
+  DollarSign, Moon, Sun, Monitor, SoapDispenserDroplet, Boxes, Users,
+  ClipboardList, ShoppingBag, PlusCircle, Calculator, FileText, Download
+} from "lucide-react";
+import Link from "next/link";
+import clsx from "clsx";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { useEffect, useState, useRef } from "react";
+import { createClient } from "@/utils/supabase/client";
+import { useRouter } from "next/navigation";
+import { useCurrencies } from "@/app/contexts/CurrencyContext";
+import { useTheme } from "next-themes";
+import { formatCurrency } from "@/app/helpers/formatCurrency";
+import { toast } from "sonner";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuPortal,
+} from "@/components/ui/dropdown-menu";
+import {
+  NavigationMenu,
+  NavigationMenuContent,
+  NavigationMenuItem,
+  NavigationMenuLink,
+  NavigationMenuList,
+  NavigationMenuTrigger,
+  navigationMenuTriggerStyle,
+} from "@/components/ui/navigation-menu";
+
+const linksNavbar = [
+  { href: "/", label: "Lista de precios" },
+  { href: "/agregar-producto", label: "Agregar producto" },
+];
+
+const stockLinks = [
+  { href: "/abm/inventario", label: "Inventario" },
+  { href: "/pedido-mayorista", label: "Pedido Mayorista" },
+];
+
+const abmLinks = [
+  { href: "/abm/esencias", label: "Esencias", icon: <SoapDispenserDroplet /> },
+  { href: "/abm/insumos", label: "Insumos", icon: <Boxes /> },
+  { href: "/abm/proveedores", label: "Proveedores", icon: <Users /> },
+];
+
+const herramientasLinks = [
+  {
+    href: "/herramientas/calculadora-margen",
+    label: "Calculadora de margen",
+    description: "Calcular márgenes de ganancia y precios sugeridos.",
+  },
+  {
+    href: "/herramientas/notas",
+    label: "Notas",
+    description: "Gestionar notas.",
+  },
+  {
+    href: "/herramientas/combos",
+    label: "Configuración de Combos",
+    description: "Definir combos de insumos que se descuentan al vender.",
+  },
+  {
+    href: "/herramientas/insumos-por-stock",
+    label: "Insumos por Stock",
+    description: "Información sobre qué insumos utiliza cada producto base.",
+  },
+];
+
+const linksUserbar = [
+  { href: "/perfil", label: "Perfil" },
+  { href: "/registro_de_actividad", label: "Registro de actividad" },
+  { href: "/accept-orphans", label: "Aceptar Huérfanos" },
+  { href: "/gestion-usuarios", label: "Gestión de usuarios" },
+];
+
+/* 
+   ... imports ...
+*/
+
+// ... (previous imports)
+
+export function NavigationBar({ maintenanceMode = false }: { maintenanceMode?: boolean; }) {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [session, setSession] = useState<any>(null);
+  const [userRole, setUserRole] = useState<string>("revendedor"); // Seguro por defecto
+  const router = useRouter();
+  const supabase = createClient();
+  const { currencies, isLoading: loadingCurrencies } = useCurrencies();
+  const { setTheme } = useTheme();
+  const [open, setOpen] = useState(false);
+  const [pendingPrizes, setPendingPrizes] = useState<any[]>([]);
+  const [solicitudNotifications, setSolicitudNotifications] = useState<any[]>([]);
+  const [notificationAudio, setNotificationAudio] = useState<HTMLAudioElement | null>(null);
+  const [userName, setUserName] = useState<string | null>(null);
+  const [dismissedIds, setDismissedIds] = useState<string[]>([]);
+  const [realtimeStatus, setRealtimeStatus] = useState<'connecting' | 'connected' | 'error'>('connecting');
+  const [permissionStatus, setPermissionStatus] = useState<string>('default');
+  const [audioUnlocked, setAudioUnlocked] = useState(false);
+  const APP_VERSION = "2.1.8";
+
+
+  // Refs para que el listener de Realtime siempre tenga el valor actual
+  const userRoleRef = useRef(userRole);
+  const userNameRef = useRef(userName);
+
+  useEffect(() => {
+    userRoleRef.current = userRole;
+    userNameRef.current = userName;
+  }, [userRole, userName]);
+
+  // Seguimiento de notificaciones previas para sonido por comparación (Polling backup)
+  const prevNotificationsRef = useRef<string[]>([]);
+
+  useEffect(() => {
+    if (solicitudNotifications.length > 0) {
+      const currentIds = solicitudNotifications.map(n => n.id);
+      const lastIds = prevNotificationsRef.current;
+
+      // Si hay un ID nuevo que es 'pendiente' (venta nueva) -> Suena
+      const newRequests = solicitudNotifications.filter(n =>
+        n.estado === 'pendiente' && !lastIds.includes(n.id)
+      );
+
+      if (newRequests.length > 0 && lastIds.length > 0) {
+        const currentRole = userRoleRef.current?.toLowerCase()?.trim();
+        console.log("!!! TRIGGER: New pending requests found in Polling:", newRequests.length);
+
+        if (currentRole === 'admin') {
+          playNotificationSound();
+          newRequests.forEach(req => {
+            sendSystemNotification("Sanse Perfumes", `${req.cliente} inició un pedido`);
+            toast.info(`🔔 NUEVO PEDIDO de ${req.cliente}`);
+          });
+        }
+      }
+
+      prevNotificationsRef.current = currentIds;
+    }
+  }, [solicitudNotifications]);
+
+  useEffect(() => {
+    // Intentar "desbloquear" el audio en el primer toque/clic
+    const unlock = () => {
+      const audio = new Audio("https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3");
+      audio.volume = 0;
+      audio.play().then(() => {
+        console.log("Audio Unlocked!");
+        setAudioUnlocked(true);
+        setNotificationAudio(audio);
+        window.removeEventListener('click', unlock);
+        window.removeEventListener('touchstart', unlock);
+      }).catch(e => console.log("Unlock failed", e));
+    };
+
+    window.addEventListener('click', unlock);
+    window.addEventListener('touchstart', unlock);
+
+    if ("Notification" in window) {
+      setPermissionStatus(Notification.permission);
+    }
+
+    return () => {
+      window.removeEventListener('click', unlock);
+      window.removeEventListener('touchstart', unlock);
+    };
+  }, []);
+
+  const requestPermission = async () => {
+    if ("Notification" in window) {
+      const permission = await Notification.requestPermission();
+      setPermissionStatus(permission);
+      if (permission === 'granted') {
+        toast.success("Notificaciones activadas");
+        sendSystemNotification("Sanse Perfumes", "¡Las notificaciones están funcionando!");
+      } else {
+        toast.error("Permiso denegado");
+      }
+    }
+  };
+
+  const playNotificationSound = () => {
+    if ("vibrate" in navigator) {
+      navigator.vibrate([300, 100, 300, 100, 300]); // Vibración más larga
+    }
+
+    const soundUrl = "https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3";
+    const audio = notificationAudio || new Audio(soundUrl);
+    audio.volume = 1.0;
+    audio.currentTime = 0;
+
+    audio.play()
+      .then(() => console.log("Sound played successfully"))
+      .catch(e => {
+        console.log("Sound blocked, trying fallback toast", e);
+        toast.info("🔔 ¡NUEVA VENTA! (Sonido bloqueado por el celu)");
+      });
+  };
+
+  const testSound = () => {
+    playNotificationSound();
+    toast.success("Prueba de sonido enviada");
+    sendSystemNotification("Prueba de Sanse", "Si ves esto, las notificaciones visuales están OK.");
+  };
+
+  const testDelayedNotification = () => {
+    setOpen(false);
+    toast.info("Aviso en 5 seg. SALÍ DE LA APP AHORA para probar el cartel arriba...");
+    setTimeout(() => {
+      playNotificationSound();
+      sendSystemNotification("Sanse Perfumes", "🚨 PRUEBA: Nueva venta recibida ahora mismo");
+    }, 5000);
+  };
+
+  const forceUpdate = () => {
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.getRegistrations().then(registrations => {
+        for (let registration of registrations) {
+          registration.update();
+        }
+        toast.info("Buscando actualizaciones...");
+        setTimeout(() => window.location.reload(), 1000);
+      });
+    } else {
+      window.location.reload();
+    }
+  };
+
+  const sendSystemNotification = (title: string, body: string) => {
+    if ("Notification" in window && Notification.permission === "granted") {
+      // Intentar vía Service Worker (más fiable en móviles/PWA)
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.ready.then(registration => {
+          registration.showNotification(title, {
+            body,
+            icon: "/icon.png",
+            // quitamos 'badge' para evitar el cuadrado blanco en Samsung/Android
+            vibrate: [500, 100, 500, 100, 500],
+            tag: "venta-" + Date.now(),
+            renotify: true,
+            requireInteraction: true,
+            data: { url: "/" }
+          } as any);
+        });
+      } else {
+        // Fallback básico
+        new Notification(title, { body, icon: "/icon.png" });
+      }
+    }
+  };
+
+
+  // PWA Install Prompt
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [isInstallable, setIsInstallable] = useState(false);
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setIsInstallable(true);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    // Verificar si ya está instalada
+    if (window.matchMedia('(display-mode: standalone)').matches) {
+      setIsInstallable(false);
+    }
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  const handleInstallApp = async () => {
+    if (!deferredPrompt) {
+      alert("La opción de instalación se está preparando. Si no aparece en unos segundos, puedes instalarla desde el menú de opciones de tu navegador (los tres puntos arriba a la derecha) buscando 'Instalar aplicación'.");
+      return;
+    }
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      setDeferredPrompt(null);
+      setIsInstallable(false);
+    }
+  };
+
+  // Cargar IDs descartados del localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem("dismissedNotifications");
+    if (saved) {
+      setDismissedIds(JSON.parse(saved));
+    }
+  }, []);
+
+  // Estado para controlar el montaje en cliente y evitar errores de hidratación
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // 1. Resolver usuario y rol
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setSession(session);
+
+      if (session?.user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('rol, nombre')
+          .eq('id', session.user.id)
+          .single();
+
+        let resolvedName = profile?.nombre;
+        if (!resolvedName) {
+          const meta = session.user.user_metadata;
+          resolvedName = meta?.nombre || meta?.full_name || meta?.name || session.user.email || "";
+        }
+
+        const role = profile?.rol || session.user.user_metadata?.rol || "revendedor";
+        console.log("Resolved Role:", role, "for user:", resolvedName);
+        setUserRole(role);
+        setUserName(resolvedName);
+      }
+    };
+    getUser();
+  }, []);
+
+
+
+  // 2. Fetch inicial y Suscripción Realtime
+  useEffect(() => {
+    if (!userName) return;
+
+    let channel: any;
+
+    const fetchNotifications = async () => {
+      if (!userName) return;
+
+      // 1. Buscar premios pendientes (Solo para el usuario actual)
+      const { data: prizes } = await supabase
+        .from('premios')
+        .select('*')
+        .eq('revendedor_nombre', userName)
+        .eq('estado', 'pendiente')
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      if (prizes) {
+        setPendingPrizes(prizes.filter(p => !dismissedIds.includes(p.id)));
+      }
+
+      // 2. Buscar solicitudes
+      let requestQuery = supabase
+        .from('solicitudes')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      // Si es ADMIN, ve TODOS los pedidos PENDIENTES
+      if (userRole === 'admin') {
+        requestQuery = requestQuery.eq('estado', 'pendiente');
+      } else {
+        // Si no es admin, ve SUS pedidos
+        // Agregamos 'pendiente' y 'cancelado' para que vea sus propios movimientos recientes
+        requestQuery = requestQuery
+          .ilike('cliente', userName)
+          .in('estado', ['pendiente', 'rechazado', 'en_preparacion', 'preparado', 'cancelado']);
+      }
+
+      const { data: requestUpdates } = await requestQuery;
+
+      if (requestUpdates) {
+        setSolicitudNotifications(
+          requestUpdates.filter(req => !dismissedIds.includes(req.id))
+        );
+      }
+    };
+
+    // Llamada inicial
+    fetchNotifications();
+
+    // Polling cada 2 segundos (Backup para Realtime más rápido)
+    const interval = setInterval(fetchNotifications, 2000);
+
+    // Suscripción Realtime (Actualización inmediata)
+    channel = supabase
+      .channel('nav_notifications_realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'solicitudes' }, (payload: any) => {
+        const currentRole = userRoleRef.current?.toLowerCase()?.trim();
+        const currentName = userNameRef.current;
+
+        console.log("REALTIME EVENT:", payload.eventType, "Table:", payload.table, "State:", payload.new?.estado, "CurrentRole:", currentRole);
+
+        // Lógica de Sonido y Notificación de Sistema
+        if (payload.eventType === 'INSERT') {
+          console.log("INSERT detected. Checking if user is admin...");
+          if (currentRole === 'admin') {
+            console.log("USER IS ADMIN - TRIGGERING SOUND");
+            playNotificationSound();
+            toast.info(`🔔 NUEVO PEDIDO de ${payload.new.cliente || 'Desconocido'}`);
+            sendSystemNotification("Sanse Perfumes", `${payload.new.cliente} inició un pedido`);
+          } else if (payload.new.cliente === currentName) {
+            console.log("USER OWNED REQUEST - TRIGGERING SOUND");
+            playNotificationSound();
+          } else {
+            console.log("Ignoring insert: Not admin and not owner. Role:", currentRole);
+          }
+        } else if (payload.eventType === 'UPDATE') {
+          // Si actualizan un pedido de este usuario -> Suena
+          if (payload.new.cliente === currentName) {
+            // Solo si cambió el estado
+            if (payload.new.estado !== payload.old?.estado) {
+              playNotificationSound();
+
+              let msg = "";
+              switch (payload.new.estado) {
+                case 'en_preparacion': msg = "Estamos armando tu pedido"; break;
+                case 'preparado': msg = "¡Tu pedido está listo!"; break;
+                case 'rechazado': msg = "Tu pedido fue rechazado"; break;
+                case 'cancelado': msg = "Tu pedido fue cancelado"; break;
+              }
+
+              if (msg) {
+                toast.success(msg);
+                sendSystemNotification("Aviso de Pedido", msg);
+              }
+            }
+          }
+        }
+
+        fetchNotifications();
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'premios' }, (payload: any) => {
+        if (payload.new.revendedor_nombre === userName) {
+          playNotificationSound();
+        }
+        fetchNotifications();
+      });
+
+    channel.subscribe((status: string) => {
+      console.log("Realtime status:", status);
+      if (status === 'SUBSCRIBED') setRealtimeStatus('connected');
+      if (status === 'CLOSED' || status === 'CHANNEL_ERROR') setRealtimeStatus('error');
+    });
+
+    return () => {
+      clearInterval(interval);
+      supabase.removeChannel(channel);
+    };
+  }, [userName, userRole, dismissedIds]);
+
+
+  const handleDismiss = (id: string) => {
+    const newDismissed = [...dismissedIds, id];
+    setDismissedIds(newDismissed);
+    localStorage.setItem("dismissedNotifications", JSON.stringify(newDismissed));
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut(); // Cierra la sesión en Supabase
+    setSession(null); // Actualiza el estado de la sesión
+    router.push("/login"); // Redirige al login
+  };
+
+
+  // Filtrar enlaces basados en el rol
+  const isAdmin = userRole === "admin";
+
+  // Admin ve todo. Revendedor ve lista restringida.
+  // Revendedor: Lista de precios (y ¿'Pedido Mayorista' implícito quizás? No, estricto a la solicitud: "Lista precios" y "Agregar ventas").
+  // La funcionalidad "Agregar ventas" suele estar integrada en la vista principal o en una página específica /ventas.
+  // Asumiendo que "/" (Lista de precios) contiene la lógica de ventas.
+
+  // Barra de navegación:
+  // Admin: Todo (Lista, Agregar Prod, Inventario, pedidos)
+  // Revendedor: Lista de precios.
+  const filteredNavbar = linksNavbar.filter(link => {
+    if (isAdmin) return true;
+    return ["/"].includes(link.href);
+  });
+
+  // ABM:
+  // Admin: Todo
+  // Revendedor: Ninguno
+  const filteredABM = isAdmin ? abmLinks : [];
+
+  // Herramientas:
+  // Admin: Todo
+  // Revendedor: Ninguno
+  const filteredHerramientas = isAdmin ? herramientasLinks : [];
+
+  // Caja:
+  // Admin: Sí
+  // Revendedor: No (pero accede a Solicitudes por "Mis pedidos")
+  const showCaja = isAdmin;
+
+  // Barra de usuario:
+  // Admin: Todo
+  // Revendedor/Comprador: Solo Perfil (Modo color y Cerrar sesión son fijos)
+  const filteredUserbar = linksUserbar.filter(link => {
+    if (isAdmin) return true;
+    return link.href === "/perfil";
+  });
+
+  // Render simplificado para el servidor / pre-hidratación
+  if (!mounted) {
+    return (
+      <header className="sticky top-0 z-50 flex items-center justify-between w-full backdrop-blur-lg bg-background/70 py-3 xl:py-4 shadow-sm transition-all">
+        <div className="flex flex-1 justify-center xl:justify-start px-3 xl:pl-6">
+          <span className="text-xl xl:text-2xl font-semibold tracking-tight text-center xl:text-left whitespace-nowrap">
+            Sanse perfumes
+          </span>
+        </div>
+      </header>
+    );
+  }
+
+  return (
+    // ... Renderizar con listas filtradas ...
+    // (Reconstruiré el componente usando estas variables filtradas)
+    <header
+      className={clsx(
+        "sticky top-0 z-50 flex items-center justify-between w-full backdrop-blur-lg bg-background/70 py-3 xl:py-4 shadow-sm transition-all",
+      )}
+    >
+      {/* Logo */}
+      <div className="flex flex-1 justify-center xl:justify-start px-3 xl:pl-6">
+        <Link
+          href="/"
+          className="text-xl xl:text-2xl font-semibold tracking-tight text-center xl:text-left whitespace-nowrap"
+        >
+          Sanse perfumes
+        </Link>
+      </div>
+
+      {/* Navegación Desktop */}
+      <NavigationMenu viewport={false} className="hidden xl:flex mx-auto">
+        <NavigationMenuList>
+          {!maintenanceMode && filteredNavbar.map((link) => {
+            // Admin obtiene desplegable para "Lista de precios", Revendedor obtiene enlace simple
+            if (link.href === "/" && isAdmin) {
+              return (
+                <NavigationMenuItem key={link.href}>
+                  <NavigationMenuTrigger className={pathname === "/" ? "bg-accent text-accent-foreground" : ""}>Lista de precios</NavigationMenuTrigger>
+                  <NavigationMenuContent>
+                    <ul className="grid w-[200px] gap-2 p-2">
+                      <li>
+                        <NavigationMenuLink asChild>
+                          <Link
+                            href="/"
+                            className={clsx(
+                              navigationMenuTriggerStyle(),
+                              pathname === "/" && (!searchParams.get("view") || searchParams.get("view") === "minorista") && "bg-accent text-accent-foreground"
+                            )}
+                          >
+                            Minorista
+                          </Link>
+                        </NavigationMenuLink>
+                      </li>
+                      <li>
+                        <NavigationMenuLink asChild>
+                          <Link
+                            href="/?view=mayorista"
+                            className={clsx(
+                              navigationMenuTriggerStyle(),
+                              pathname === "/" && searchParams.get("view") === "mayorista" && "bg-accent text-accent-foreground"
+                            )}
+                          >
+                            Mayorista
+                          </Link>
+                        </NavigationMenuLink>
+                      </li>
+                    </ul>
+                  </NavigationMenuContent>
+                </NavigationMenuItem>
+              );
+            } else if (link.href === "/" && !isAdmin) {
+              // Revendedor: Enlace simple solo a mayorista
+              return (
+                <NavigationMenuItem key={link.href}>
+                  <NavigationMenuLink asChild>
+                    <Link
+                      href={userRole === "comprador" ? "/?view=minorista" : "/?view=mayorista"}
+                      className={clsx(
+                        navigationMenuTriggerStyle(),
+                        pathname === "/" && "bg-accent text-accent-foreground"
+                      )}
+                    >
+                      Lista de precios
+                    </Link>
+                  </NavigationMenuLink>
+                </NavigationMenuItem>
+              );
+            }
+            return (
+              <NavigationMenuItem key={link.href}>
+                <NavigationMenuLink asChild>
+                  <Link
+                    href={link.href}
+                    className={clsx(
+                      navigationMenuTriggerStyle(),
+                      pathname === link.href && "bg-accent text-accent-foreground"
+                    )}
+                  >
+                    {link.label}
+                  </Link>
+                </NavigationMenuLink>
+              </NavigationMenuItem>
+            );
+          })}
+        </NavigationMenuList>
+
+        {isAdmin && (
+          <NavigationMenuList>
+            <NavigationMenuItem>
+              <NavigationMenuTrigger className={pathname.startsWith("/abm/inventario") || pathname === "/pedido-mayorista" ? "bg-accent text-accent-foreground" : ""}>
+                Stock
+              </NavigationMenuTrigger>
+              <NavigationMenuContent>
+                <ul className="grid w-[200px] gap-2 p-2">
+                  {stockLinks.map((link) => (
+                    <li key={link.href}>
+                      <NavigationMenuLink asChild>
+                        <Link
+                          href={link.href}
+                          className={clsx(
+                            navigationMenuTriggerStyle(),
+                            pathname === link.href && "bg-accent text-accent-foreground"
+                          )}
+                        >
+                          {link.label}
+                        </Link>
+                      </NavigationMenuLink>
+                    </li>
+                  ))}
+                </ul>
+              </NavigationMenuContent>
+            </NavigationMenuItem>
+          </NavigationMenuList>
+        )}
+        {/* Enlace "Mis pedidos" para No-Admins (Revendedores/Compradores) */}
+        {!isAdmin && !maintenanceMode && (
+          <NavigationMenuList>
+            <NavigationMenuItem>
+              <NavigationMenuLink asChild>
+                <Link
+                  href="/caja/solicitudes"
+                  className={clsx(
+                    navigationMenuTriggerStyle(),
+                    pathname === "/caja/solicitudes" && "bg-accent text-accent-foreground"
+                  )}
+                >
+                  Mis pedidos
+                </Link>
+              </NavigationMenuLink>
+            </NavigationMenuItem>
+          </NavigationMenuList>
+        )}
+
+        {(filteredABM.length > 0 || showCaja || filteredHerramientas.length > 0) && (
+          <NavigationMenuList>
+            {filteredABM.length > 0 && (
+              <NavigationMenuItem>
+                <NavigationMenuTrigger className={pathname.startsWith("/abm") && !pathname.startsWith("/abm/inventario") ? "bg-accent text-accent-foreground" : ""}>ABMs</NavigationMenuTrigger>
+                <NavigationMenuContent>
+                  <ul className="grid w-[200px] gap-2">
+                    {filteredABM.map((link) => {
+                      return (
+                        <li key={link.href}>
+                          <NavigationMenuLink asChild>
+                            <Link
+                              href={link.href}
+                              className="flex-row items-center gap-x-3"
+                            >
+                              {link.icon}
+                              {link.label}
+                            </Link>
+                          </NavigationMenuLink>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </NavigationMenuContent>
+              </NavigationMenuItem>
+            )}
+
+            {showCaja && (
+              <NavigationMenuItem>
+                <NavigationMenuTrigger className={pathname.startsWith("/caja") ? "bg-accent text-accent-foreground" : ""}>Caja</NavigationMenuTrigger>
+                <NavigationMenuContent>
+                  <ul className="grid w-[300px] gap-2">
+                    <li>
+                      <NavigationMenuLink asChild>
+                        <Link
+                          href="/caja"
+                          className={clsx(
+                            "block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground",
+                            pathname === "/caja" && "bg-accent text-accent-foreground"
+                          )}
+                        >
+                          <div className="text-sm font-medium leading-none">Caja Unificada</div>
+                          <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
+                            Ver ganancias, gastos y deudas
+                          </p>
+                        </Link>
+                      </NavigationMenuLink>
+                    </li>
+                    <li>
+                      <NavigationMenuLink asChild>
+                        <Link
+                          href="/caja/solicitudes"
+                          className={clsx(
+                            "block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground",
+                            pathname === "/caja/solicitudes" && "bg-accent text-accent-foreground"
+                          )}
+                        >
+                          <div className="text-sm font-medium leading-none">Solicitudes de Compra</div>
+                          <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
+                            Gestionar pedidos de compradores
+                          </p>
+                        </Link>
+                      </NavigationMenuLink>
+                    </li>
+                    <li>
+                      <NavigationMenuLink asChild>
+                        <Link
+                          href="/caja/ventas-revendedores"
+                          className={clsx(
+                            "block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground",
+                            pathname === "/caja/ventas-revendedores" && "bg-accent text-accent-foreground"
+                          )}
+                        >
+                          <div className="text-sm font-medium leading-none">Ventas Revendedores</div>
+                          <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
+                            Historial de ventas por revendedor
+                          </p>
+                        </Link>
+                      </NavigationMenuLink>
+                    </li>
+                  </ul>
+                </NavigationMenuContent>
+              </NavigationMenuItem>
+            )}
+
+            {filteredHerramientas.length > 0 && (
+              <NavigationMenuItem>
+                <NavigationMenuTrigger className={pathname.startsWith("/herramientas") ? "bg-accent text-accent-foreground" : ""}>Herramientas</NavigationMenuTrigger>
+                <NavigationMenuContent>
+                  <ul className="grid w-[300px] gap-2">
+                    {filteredHerramientas.map((link) => {
+                      return (
+                        <li key={link.href}>
+                          <NavigationMenuLink asChild>
+                            <Link href={link.href}>
+                              <div className="font-medium">{link.label}</div>
+                              <div className="text-muted-foreground">
+                                {link.description}
+                              </div>
+                            </Link>
+                          </NavigationMenuLink>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </NavigationMenuContent>
+              </NavigationMenuItem>
+            )}
+          </NavigationMenuList>
+        )}
+
+      </NavigationMenu>
+
+      {/* Sección derecha */}
+      <div className="flex flex-1 justify-end items-center gap-2 xl:gap-4 pr-3 xl:pr-6">
+        {/* Cotización del dólar SOLO visible en desktop y para ADMINS */}
+        {isAdmin && (
+          <div className="hidden xl:flex items-center gap-2 text-sm font-bold px-3 py-1 rounded-md border border-muted-foreground/20 bg-muted-foreground/5">
+            <DollarSign className="w-4 h-4 text-success" />
+            <span>
+              Dólar:{" "}
+              {!loadingCurrencies && currencies["ARS"] ? (
+                `$${currencies["ARS"].toLocaleString("es-AR", { maximumFractionDigits: 2 })} `
+              ) : (
+                <span className="opacity-50">—</span>
+              )}
+            </span>
+          </div>
+        )}
+
+        {session && (
+          // Avatar y menú de usuario
+          <div className="flex items-center gap-2">
+
+            {/* Notificaciones */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="relative">
+                  <Bell className="w-5 h-5 text-muted-foreground" />
+                  {(pendingPrizes.length > 0 || solicitudNotifications.length > 0) && (
+                    <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                  )}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-72">
+                <DropdownMenuLabel>Notificaciones</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {pendingPrizes.length === 0 && solicitudNotifications.length === 0 ? (
+                  <div className="p-4 text-center text-sm text-muted-foreground">
+                    No tienes nuevas notificaciones
+                  </div>
+                ) : (
+                  <div className="max-h-[300px] overflow-y-auto">
+                    {/* Premios */}
+                    {pendingPrizes.map((prize) => (
+                      <div key={prize.id} className="p-3 border-b last:border-0 hover:bg-muted/50 transition-colors">
+                        <div className="flex items-start gap-3">
+                          <div className="bg-primary/10 p-2 rounded-full shrink-0">
+                            <Gift className="w-4 h-4 text-primary" />
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-foreground leading-none">¡Premio Recibido!</p>
+                            <p className="text-xs text-muted-foreground mt-1 text-wrap break-words">{prize.premio}</p>
+                            <p className="text-[10px] text-muted-foreground mt-2 text-right">
+                              {new Date(prize.created_at).toLocaleDateString()}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+
+                    {/* Solicitudes Updates */}
+                    {solicitudNotifications.map((req) => {
+                      let icon = <Info className="w-4 h-4 text-blue-500" />;
+                      let bgClass = "bg-blue-100";
+                      let title = "Actualización de pedido";
+
+                      switch (req.estado) {
+                        case 'pendiente':
+                          icon = <PlusCircle className="w-4 h-4 text-primary" />;
+                          bgClass = "bg-primary/10";
+                          title = "Nueva Solicitud";
+                          break;
+                        case 'rechazado':
+                          icon = <X className="w-4 h-4 text-red-500" />;
+                          bgClass = "bg-red-100";
+                          title = "Pedido Rechazado";
+                          break;
+                        case 'cancelado':
+                          icon = <Trash2 className="w-4 h-4 text-gray-500" />;
+                          bgClass = "bg-gray-100";
+                          title = "Pedido Cancelado";
+                          break;
+                        case 'en_preparacion':
+                          icon = <Package className="w-4 h-4 text-amber-500" />;
+                          bgClass = "bg-amber-100";
+                          title = "Pedido en Preparación";
+                          break;
+                        case 'preparado':
+                          icon = <Check className="w-4 h-4 text-green-500" />;
+                          bgClass = "bg-green-100";
+                          title = "¡Pedido Listo para Retirar!";
+                          break;
+                      }
+
+                      return (
+                        <div key={req.id} className="p-3 border-b last:border-0 hover:bg-muted/50 transition-colors group relative">
+                          <div className="flex items-start gap-3">
+                            <div className={`${bgClass} p-2 rounded-full shrink-0`}>
+                              {icon}
+                            </div>
+                            <div className="flex-1">
+                              <div className="flex justify-between items-start">
+                                <p className="text-sm font-medium text-foreground leading-none">{title}</p>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-5 w-5 text-muted-foreground hover:text-destructive -mt-1 -mr-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDismiss(req.id);
+                                  }}
+                                  title="Eliminar notificación"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </Button>
+                              </div>
+                              <p className="text-xs text-muted-foreground mt-1 pr-4">
+                                {req.estado === 'rechazado' ? "Tu pedido no pudo ser procesado." :
+                                  req.estado === 'en_preparacion' ? "Estamos armando tu pedido." :
+                                    req.estado === 'preparado' ? "Pasa a buscarlo por el local." :
+                                      req.estado === 'cancelado' ? "El pedido ha sido cancelado." :
+                                        req.estado === 'pendiente' ? `${req.cliente} ha enviado un nuevo pedido.` : ""}
+                                <span className="block font-semibold mt-0.5">{formatCurrency(req.total, "ARS", 0)}</span>
+                              </p>
+                              <p className="text-[10px] text-muted-foreground mt-2 text-right">
+                                {new Date(req.created_at).toLocaleDateString()} {new Date(req.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger>
+                <Avatar>
+                  <AvatarFallback>
+                    {session.user?.email?.charAt(0).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuLabel>Mi cuenta ({userRole === 'admin' ? 'Admin' : userRole.charAt(0).toUpperCase() + userRole.slice(1)})</DropdownMenuLabel>
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger>Modo de color</DropdownMenuSubTrigger>
+                  <DropdownMenuPortal>
+                    <DropdownMenuSubContent>
+                      <DropdownMenuItem onClick={() => setTheme("dark")}>
+                        <Moon className="w-4 h-4 mr-2" /> Oscuro
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setTheme("light")}>
+                        <Sun className="w-4 h-4 mr-2" /> Claro
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setTheme("system")}>
+                        <Monitor className="w-4 h-4 mr-2" /> Sistema
+                      </DropdownMenuItem>
+                    </DropdownMenuSubContent>
+                  </DropdownMenuPortal>
+                </DropdownMenuSub>
+                <DropdownMenuSeparator />
+                {filteredUserbar.map((link) => {
+                  return (
+                    <DropdownMenuItem key={link.href} asChild>
+                      <Link href={link.href}>{link.label}</Link>
+                    </DropdownMenuItem>
+                  );
+                })}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleInstallApp} className="text-primary font-bold">
+                  <Download className="w-4 h-4 mr-2" />
+                  Instalar App
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleLogout}>
+                  <div className="flex items-center gap-2">
+                    <LogOut width={24} className="text-destructive" />
+                    Cerrar sesión
+                  </div>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        )}
+
+        {/* Menú Mobile */}
+        <div className="xl:hidden">
+          <Sheet open={open} onOpenChange={setOpen}>
+            <SheetTrigger asChild>
+              <Button aria-label="Abrir menú" variant="ghost" size="icon">
+                <Menu width={24} />
+              </Button>
+            </SheetTrigger>
+            <SheetContent
+              side="left"
+              aria-describedby={undefined}
+              className="flex flex-col h-full w-[85vw] sm:w-[350px] p-0 gap-0 border-r-0 bg-background"
+            >
+              <SheetHeader className="p-6 pb-2 text-left border-b bg-muted/10">
+                <SheetTitle className="text-xl font-bold flex items-center gap-2">
+                  <Menu className="w-5 h-5" /> Menú
+                </SheetTitle>
+              </SheetHeader>
+
+              {/* Scrollable Area */}
+              <div className="flex-1 overflow-y-auto py-4 px-4 min-h-0">
+                {/* Cotización - Mobile Only */}
+                {isAdmin && (
+                  <div className="mb-6 p-4 rounded-xl bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border border-emerald-500/20 shadow-sm">
+                    <div className="flex items-center gap-3">
+                      <div className="bg-emerald-500/20 p-2 rounded-full">
+                        <DollarSign className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Dólar Oficial</p>
+                        <p className="text-lg font-bold text-foreground">
+                          {!loadingCurrencies && currencies["ARS"] ? (
+                            `$${currencies["ARS"].toLocaleString("es-AR", { maximumFractionDigits: 2 })}`
+                          ) : (
+                            "Cargando..."
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <nav className="flex flex-col gap-6 pb-10">
+
+                  {/* Grupo: Lista de precios (Admin & User) */}
+                  <div className="space-y-1">
+                    <p className="text-xs font-semibold text-muted-foreground ml-3 mb-2 uppercase tracking-wide">Lista de precios</p>
+
+                    {/* Botones de Lista (Minorista/Mayorista) */}
+                    {isAdmin ? (
+                      <>
+                        <Button
+                          variant={pathname === "/" && (!searchParams.get("view") || searchParams.get("view") === "minorista") ? "secondary" : "ghost"}
+                          className={clsx("w-full justify-start items-center gap-3 h-10 text-sm font-medium", pathname === "/" && (!searchParams.get("view") || searchParams.get("view") === "minorista") && "bg-secondary/50 font-semibold")}
+                          asChild
+                          onClick={() => setOpen(false)}
+                        >
+                          <Link href="/">
+                            <ClipboardList className="w-4 h-4 opacity-70" />
+                            Lista Minorista
+                          </Link>
+                        </Button>
+                        <Button
+                          variant={searchParams.get("view") === "mayorista" ? "secondary" : "ghost"}
+                          className={clsx("w-full justify-start items-center gap-3 h-10 text-sm font-medium", searchParams.get("view") === "mayorista" && "bg-secondary/50 font-semibold")}
+                          asChild
+                          onClick={() => setOpen(false)}
+                        >
+                          <Link href="/?view=mayorista">
+                            <ClipboardList className="w-4 h-4 opacity-70" />
+                            Lista Mayorista
+                          </Link>
+                        </Button>
+                      </>
+                    ) : (
+                      !maintenanceMode && (
+                        <Button
+                          variant={pathname === "/" ? "secondary" : "ghost"}
+                          className={clsx("w-full justify-start items-center gap-3 h-10 text-sm font-medium", pathname === "/" && "bg-secondary/50 font-semibold")}
+                          asChild
+                          onClick={() => setOpen(false)}
+                        >
+                          <Link href={userRole === "comprador" ? "/?view=minorista" : "/?view=mayorista"}>
+                            <ClipboardList className="w-4 h-4 opacity-70" />
+                            Lista de precios
+                          </Link>
+                        </Button>
+                      )
+                    )}
+
+                    {/* Botón Agregar Producto */}
+                    {!maintenanceMode && filteredNavbar.find(l => l.href === "/agregar-producto") && (
+                      <Button
+                        variant={pathname === "/agregar-producto" ? "secondary" : "ghost"}
+                        className={clsx("w-full justify-start items-center gap-3 h-10 text-sm font-medium", pathname === "/agregar-producto" && "bg-secondary/50 font-semibold")}
+                        asChild
+                        onClick={() => setOpen(false)}
+                      >
+                        <Link href="/agregar-producto">
+                          <PlusCircle className="w-4 h-4 opacity-70" />
+                          Agregar producto
+                        </Link>
+                      </Button>
+                    )}
+
+                    {/* Revendedor: Mis Pedidos (Si no es admin, agregarlo aquí o en un grupo "Mis cosas") */}
+                    {!isAdmin && !maintenanceMode && (
+                      <Button
+                        variant={pathname === "/caja/solicitudes" ? "secondary" : "ghost"}
+                        className={clsx("w-full justify-start items-center gap-3 h-10 text-sm font-medium", pathname === "/caja/solicitudes" && "bg-secondary/50 font-semibold")}
+                        asChild
+                        onClick={() => setOpen(false)}
+                      >
+                        <Link href="/caja/solicitudes">
+                          <ShoppingBag className="w-4 h-4 opacity-70" />
+                          Mis pedidos
+                        </Link>
+                      </Button>
+                    )}
+                  </div>
+
+                  {/* Grupo: Stock (Admin Only) */}
+                  {isAdmin && (
+                    <div className="space-y-1">
+                      <p className="text-xs font-semibold text-muted-foreground ml-3 mb-2 uppercase tracking-wide">Stock</p>
+                      {stockLinks.map((link) => {
+                        const isActive = pathname === link.href;
+                        let Icon = Boxes;
+                        if (link.href.includes("inventario")) Icon = Boxes;
+                        if (link.href.includes("pedido-mayorista")) Icon = Truck;
+
+                        return (
+                          <Button
+                            key={link.href}
+                            variant={isActive ? "secondary" : "ghost"}
+                            className={clsx("w-full justify-start items-center gap-3 h-10 text-sm font-medium", isActive && "bg-secondary/50 font-semibold")}
+                            asChild
+                            onClick={() => setOpen(false)}
+                          >
+                            <Link href={link.href}>
+                              <Icon className="w-4 h-4 opacity-70" />
+                              {link.label}
+                            </Link>
+                          </Button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Grupo: ABMs (Admin Only) */}
+                  {isAdmin && filteredABM.length > 0 && (
+                    <div className="space-y-1">
+                      <p className="text-xs font-semibold text-muted-foreground ml-3 mb-2 uppercase tracking-wide">ABMs</p>
+                      {filteredABM.map((link) => {
+                        const isActive = pathname === link.href;
+                        return (
+                          <Button
+                            key={link.href}
+                            variant={isActive ? "secondary" : "ghost"}
+                            className={clsx("w-full justify-start items-center gap-3 h-10 text-sm font-medium", isActive && "bg-secondary/50 font-semibold")}
+                            asChild
+                            onClick={() => setOpen(false)}
+                          >
+                            <Link href={link.href}>
+                              <span className="opacity-70 text-base flex items-center justify-center w-4 h-4 [&_svg]:w-4 [&_svg]:h-4">{link.icon}</span>
+                              {link.label}
+                            </Link>
+                          </Button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Grupo: Caja (Admin Only) */}
+                  {isAdmin && showCaja && (
+                    <div className="space-y-1">
+                      <p className="text-xs font-semibold text-muted-foreground ml-3 mb-2 uppercase tracking-wide">Caja</p>
+                      {/* Caja Unificada */}
+                      <Button
+                        variant={pathname === "/caja" ? "secondary" : "ghost"}
+                        className={clsx("w-full justify-start items-center gap-3 h-10 text-sm font-medium", pathname === "/caja" && "bg-secondary/50 font-semibold")}
+                        asChild
+                        onClick={() => setOpen(false)}
+                      >
+                        <Link href="/caja">
+                          <DollarSign className="w-4 h-4 opacity-70" />
+                          Caja Unificada
+                        </Link>
+                      </Button>
+
+                      {/* Solicitudes de Compra */}
+                      <Button
+                        variant={pathname === "/caja/solicitudes" ? "secondary" : "ghost"}
+                        className={clsx("w-full justify-start items-center gap-3 h-10 text-sm font-medium", pathname === "/caja/solicitudes" && "bg-secondary/50 font-semibold")}
+                        asChild
+                        onClick={() => setOpen(false)}
+                      >
+                        <Link href="/caja/solicitudes">
+                          <ShoppingBag className="w-4 h-4 opacity-70" />
+                          Solicitudes de Compra
+                        </Link>
+                      </Button>
+
+                      {/* Ventas Revendedores */}
+                      <Button
+                        variant={pathname === "/caja/ventas-revendedores" ? "secondary" : "ghost"}
+                        className={clsx("w-full justify-start items-center gap-3 h-10 text-sm font-medium", pathname === "/caja/ventas-revendedores" && "bg-secondary/50 font-semibold")}
+                        asChild
+                        onClick={() => setOpen(false)}
+                      >
+                        <Link href="/caja/ventas-revendedores">
+                          <Users className="w-4 h-4 opacity-70" />
+                          Ventas Revendedores
+                        </Link>
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* Grupo: Herramientas (Admin Only) */}
+                  {isAdmin && filteredHerramientas.length > 0 && (
+                    <div className="space-y-1">
+                      <p className="text-xs font-semibold text-muted-foreground ml-3 mb-2 uppercase tracking-wide">Herramientas</p>
+                      {filteredHerramientas.map((link) => {
+                        const isActive = pathname === link.href;
+                        let Icon = Calculator;
+                        if (link.label.includes("Notas")) Icon = FileText;
+
+                        return (
+                          <Button
+                            key={link.href}
+                            variant={isActive ? "secondary" : "ghost"}
+                            className={clsx("w-full justify-start items-center gap-3 h-10 text-sm font-medium", isActive && "bg-secondary/50 font-semibold")}
+                            asChild
+                            onClick={() => setOpen(false)}
+                          >
+                            <Link href={link.href}>
+                              <Icon className="w-4 h-4 opacity-70" />
+                              {link.label}
+                            </Link>
+                          </Button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Grupo: Configuraciones (Para todos) */}
+                  <div className="space-y-1">
+                    <p className="text-xs font-semibold text-muted-foreground ml-3 mb-2 uppercase tracking-wide">Configuraciones</p>
+
+                    {/* Perfil */}
+                    <Button
+                      variant={pathname === "/perfil" ? "secondary" : "ghost"}
+                      className={clsx("w-full justify-start items-center gap-3 h-10 text-sm font-medium", pathname === "/perfil" && "bg-secondary/50 font-semibold")}
+                      asChild
+                      onClick={() => setOpen(false)}
+                    >
+                      <Link href="/perfil">
+                        <Users className="w-4 h-4 opacity-70" />
+                        Perfil
+                      </Link>
+                    </Button>
+
+                    {/* Modo de color */}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          className="w-full justify-start items-center gap-3 h-10 text-sm font-medium"
+                        >
+                          <Moon className="w-4 h-4 opacity-70" />
+                          Modo de color
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent className="w-56" align="start">
+                        <DropdownMenuItem onClick={() => setTheme("dark")}>
+                          <Moon className="w-4 h-4 mr-2" /> Oscuro
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setTheme("light")}>
+                          <Sun className="w-4 h-4 mr-2" /> Claro
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setTheme("system")}>
+                          <Monitor className="w-4 h-4 mr-2" /> Sistema
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+
+                    {/* Instalar App (PWA) */}
+                    <Button
+                      variant="ghost"
+                      className="w-full justify-start items-center gap-3 h-10 text-sm font-bold text-primary"
+                      onClick={handleInstallApp}
+                    >
+                      <Download className="w-4 h-4" />
+                      Instalar App
+                    </Button>
+                  </div>
+
+
+                  {/* Grupo: Administración (Admin Only) - Resto de items de Userbar */}
+                  {isAdmin && (
+                    <div className="space-y-1">
+                      <p className="text-xs font-semibold text-muted-foreground ml-3 mb-2 uppercase tracking-wide">Administración</p>
+
+                      <Button
+                        variant={pathname === "/registro_de_actividad" ? "secondary" : "ghost"}
+                        className={clsx("w-full justify-start items-center gap-3 h-10 text-sm font-medium", pathname === "/registro_de_actividad" && "bg-secondary/50 font-semibold")}
+                        asChild
+                        onClick={() => setOpen(false)}
+                      >
+                        <Link href="/registro_de_actividad">
+                          <ClipboardList className="w-4 h-4 opacity-70" />
+                          Registro de actividad
+                        </Link>
+                      </Button>
+
+                      <Button
+                        variant={pathname === "/accept-orphans" ? "secondary" : "ghost"}
+                        className={clsx("w-full justify-start items-center gap-3 h-10 text-sm font-medium", pathname === "/accept-orphans" && "bg-secondary/50 font-semibold")}
+                        asChild
+                        onClick={() => setOpen(false)}
+                      >
+                        <Link href="/accept-orphans">
+                          <Users className="w-4 h-4 opacity-70" />
+                          Aceptar Huérfanos
+                        </Link>
+                      </Button>
+
+                      <Button
+                        variant={pathname === "/gestion-usuarios" ? "secondary" : "ghost"}
+                        className={clsx("w-full justify-start items-center gap-3 h-10 text-sm font-medium", pathname === "/gestion-usuarios" && "bg-secondary/50 font-semibold")}
+                        asChild
+                        onClick={() => setOpen(false)}
+                      >
+                        <Link href="/gestion-usuarios">
+                          <Users className="w-4 h-4 opacity-70" />
+                          Gestión de usuarios
+                        </Link>
+                      </Button>
+                    </div>
+                  )}
+
+                  {session && (
+                    <div className="pt-4 border-t">
+                      <div className="px-3 flex items-center justify-between text-[10px] opacity-60 mb-4">
+                        <span>Estado del Sistema</span>
+                        <div className="flex items-center gap-2">
+                          <div className={clsx("w-1.5 h-1.5 rounded-full", realtimeStatus === 'connected' ? "bg-green-500" : "bg-red-500")} />
+                          <div className={clsx("w-1.5 h-1.5 rounded-full", permissionStatus === 'granted' ? "bg-green-500" : "bg-amber-500")} />
+                        </div>
+                      </div>
+
+                      {permissionStatus !== 'granted' && (
+                        <div className="px-3 pb-4">
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            className="w-full justify-start gap-2 h-9 text-xs font-bold animate-pulse"
+                            onClick={requestPermission}
+                          >
+                            <Bell className="w-3 h-3" />
+                            Habilitar Notificaciones
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                    </div>
+                  )}
+            </nav>
+        </div>
+      </SheetContent>
+    </Sheet>
+        </div >
+      </div >
+    </header >
+  );
+}
