@@ -1398,7 +1398,7 @@ export function DataTable({
                     <TableCell colSpan={2} className="text-right font-medium text-red-500 align-middle">
                       - {formatCurrency(
                         ventaPerfumes.reduce((acc, it) => {
-                          const base = computePrecioUnitario(it.perfume, view === "mayorista", it.frascoLP, it.priceType);
+                          const base = computePrecioUnitario(it.perfume, false, it.frascoLP, it.priceType);
                           const d = it.devuelveEnvase ? getEnvaseUnitCost(it.perfume, it.frascoLP) : 0;
                           return acc + Math.max(0, base - d) * it.cantidad;
                         }, 0) * (discountPercentage / 100),
