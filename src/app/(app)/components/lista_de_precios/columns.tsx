@@ -85,6 +85,34 @@ const allColumns: ColumnDef<Perfume>[] = [
     cell: ({ row }) => <p className="font-bold break-words">{row.getValue("nombre")}</p>,
   },
   {
+    id: "disponibilidad",
+    header: () => <div className="text-center">Disponibilidad</div>,
+    cell: ({ row }) => {
+      const stock = row.original.stock_al_momento;
+      return (
+        <div className="flex justify-center">
+          <Badge
+            variant="outline"
+            className={
+              stock
+                ? "bg-green-100 text-green-800 hover:bg-green-200 border-transparent whitespace-nowrap"
+                : "bg-gray-100 text-gray-800 hover:bg-gray-200 border-transparent whitespace-nowrap"
+            }
+          >
+            {stock ? "Stock disponible" : "A pedido"}
+          </Badge>
+        </div>
+      );
+    },
+    filterFn: (row, id, value) => {
+      if (value === "todos") return true;
+      const stock = row.original.stock_al_momento;
+      if (value === "disponibles") return stock === true;
+      if (value === "pedidos") return stock === false;
+      return true;
+    },
+  },
+  {
     accessorKey: "insumos_categorias.nombre", // Accessor para ordenamiento potencial
     id: "categoria",
     header: ({ column }) => {
@@ -164,6 +192,20 @@ const allColumns: ColumnDef<Perfume>[] = [
     cell: ({ row }) => {
       const costo = row.getValue("costo") as number;
       return <div className="text-center font-medium text-muted-foreground">{formatCurrency(costo, "ARS", 0)}</div>;
+    },
+  },
+  {
+    id: "cantidad",
+    header: () => <div className="text-center">Cantidad</div>,
+    cell: ({ row }) => {
+      const categoria = row.original.insumos_categorias?.nombre || "";
+      const isPerfumeria = categoria.toLowerCase().includes("perfumería fina") || categoria.toLowerCase() === "fina";
+
+      if (isPerfumeria) {
+        // Visualmente "100 ml" como solicitado, sin tocar datos ni leer nada
+        return <div className="text-center">100 ml</div>;
+      }
+      return <div className="text-center text-muted-foreground text-xs">N/A</div>;
     },
   },
   {

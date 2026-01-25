@@ -114,6 +114,7 @@ export function DataTable<TData>({
     onColumnFiltersChange: setColumnFilters,
     getFilteredRowModel: getFilteredRowModel(),
     getSortedRowModel: getSortedRowModel(),
+    autoResetPageIndex: false,
     state: { sorting, columnFilters },
   });
 
@@ -136,7 +137,7 @@ export function DataTable<TData>({
     setIsDialogOpen(open);
     if (!open) {
       setTimeout(() => {
-        if (onEditReset) onEditReset();
+        // if (onEditReset) onEditReset(); // Comentado para evitar reseteo prematuro que reabre el modal
       }, 300);
     }
   };
@@ -180,7 +181,7 @@ export function DataTable<TData>({
               </div>
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="todos">Todos los proveedores</SelectItem>
+              <SelectItem value="todos">Todos los géneros</SelectItem>
               <SelectItem value="masculino">Masculino</SelectItem>
               <SelectItem value="femenino">Femenino</SelectItem>
               <SelectItem value="ambiente">Ambiente</SelectItem>
@@ -201,7 +202,7 @@ export function DataTable<TData>({
               </div>
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="todos">Todos los géneros</SelectItem>
+              <SelectItem value="todos">Todos los proveedores</SelectItem>
               {proveedores.map((p) => (
                 <SelectItem key={p.id} value={p.id}>
                   {p.nombre}

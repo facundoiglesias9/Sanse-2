@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -63,6 +63,7 @@ import {
     DialogTrigger,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { Textarea } from "@/components/ui/textarea";
 
 // Schema modificado: se eliminan precios y cantidad
 const formSchema = z.object({
@@ -70,6 +71,7 @@ const formSchema = z.object({
     genero: z.enum(["masculino", "femenino", "unisex", "ambiente", "otro"]),
     proveedor_id: z.string().min(1, { message: "Selecciona un proveedor." }),
     insumos_categorias_id: z.string().optional().nullable(),
+    cantidad_gramos: z.coerce.number().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -83,6 +85,8 @@ export default function AgregarProductoPage() {
     const [insumoRecipes, setInsumoRecipes] = useState<any[]>([]);
     const [comboRules, setComboRules] = useState<any[]>([]);
     const [inventario, setInventario] = useState<any[]>([]);
+
+
 
     // Estado de agregar categoría
     const [isAddCategoryOpen, setIsAddCategoryOpen] = useState(false);
@@ -161,7 +165,8 @@ export default function AgregarProductoPage() {
                             id,
                             nombre,
                             gramos_configurados
-                        )
+                        ),
+                        insumos_categorias_id
                     `)
                     .order("nombre");
                 if (esenciasData) setEsencias(esenciasData);
@@ -234,24 +239,115 @@ export default function AgregarProductoPage() {
         }
     }, [activeTab, categories, form]);
 
-    // Lógica unificada para auto-cargar insumos (Prioriza Combos > Sugerencias por Género)
-    useEffect(() => {
-        const selectedGenero = form.watch("genero");
-        const categoryId = activeTab;
-        const currentCat = categories.find(c => c.id === categoryId);
 
-        if (!selectedGenero || selectedGenero === "otro" || (insumoRecipes.length === 0 && comboRules.length === 0)) return;
+
+    // Calcular TODAS las esencias en stock (para el buscador general)
+    const allStockEssences = useMemo(() => {
+        if (!inventario.length) return [];
+        return inventario
+            .filter(inv => inv.tipo && inv.tipo.toLowerCase() === 'esencia')
+            .map(inv => {
+                const ins = insumos.find(i => i.id === inv.id);
+                // CORRECCIÓN: Vincular por nombre ya que el ID de inventario podría no coincidir con el de productos
+                const ese = esencias.find(e => e.nombre.toLowerCase().trim() === inv.nombre.toLowerCase().trim());
+
+                // Prioridad: Insumos > Esencias (para datos de compra/costo)
+                const proveedorId = ins?.proveedor_id || ese?.proveedor_id;
+                const prov = proveedorId ? proveedores.find(p => p.id === proveedorId) : null;
+
+                // Normalizar precios y cantidades
+                // Si viene de insumos (Materia Prima), usamos precio_lote y cantidad_lote
+                // Si viene de esencias (Producto), usamos precio_usd/ars y cantidad_gramos
+                let precio = 0;
+                let cantidadRef = 1;
+                let moneda: "ARS" | "USD" = "ARS"; // Default
+
+                if (ins) {
+                    precio = ins.precio_lote;
+                    cantidadRef = ins.cantidad_lote || 1;
+                    moneda = "ARS"; // Insumos siempre en ARS (por ahora)
+                } else if (ese) {
+                    // Prioridad: ARS si existe, sino USD
+                    if (ese.precio_ars && ese.precio_ars > 0) {
+                        precio = ese.precio_ars;
+                        moneda = "ARS";
+                    } else if (ese.precio_usd && ese.precio_usd > 0) {
+                        precio = ese.precio_usd;
+                        moneda = "USD";
+                    }
+                    cantidadRef = ese.cantidad_gramos > 0 ? ese.cantidad_gramos : 1;
+                }
+
+                return {
+                    ...inv,
+                    precio_lote: precio,
+                    cantidad_lote: cantidadRef,
+                    proveedor_id: proveedorId,
+                    proveedor_nombre: prov?.nombre || "Sin proveedor",
+                    source: ins ? 'insumo' : 'esencia',
+                    moneda_origen: moneda // Pasamos la moneda detectada
+                };
+            })
+            .sort((a, b) => a.nombre.localeCompare(b.nombre));
+    }, [inventario, insumos, esencias, proveedores]);
+
+    // Calcular ESENCIAS FALTANTES (Sugerencias)
+    // Calcular ESENCIAS FALTANTES (Sugerencias)
+    const missingEssences = useMemo(() => {
+        const currentCat = categories.find(c => c.id === activeTab);
+        if (!currentCat) return [];
+
+        const catName = currentCat.nombre.toLowerCase();
+
+        // 1°. PEDIDO DEL USUARIO: "solo para aromatizante" 
+        // Filtramos estrictamente si la categoría actual es aromatizante.
+        if (!catName.includes("aromatizante") && !catName.includes("auto")) {
+            return [];
+        }
+
+        if (!allStockEssences.length) return [];
+
+        const selectedIds = new Set(selectedInsumos.map(i => i.id));
+        const selectedNames = new Set(selectedInsumos.map(i => i.nombre.toLowerCase().trim()));
+
+        return allStockEssences
+            .filter(item => {
+                // Si ya está en la calculadora (por ID o por Nombre), no lo sugerimos
+                if (selectedIds.has(item.id)) return false;
+                if (selectedNames.has(item.nombre.toLowerCase().trim())) return false;
+
+                // CORRECCIÓN: Filtrar items que YA existen en la lista de precios de la categoría actual.
+                // Buscamos si existe algun producto con el mismo nombre y la misma categoría.
+                const existsInCurrentCategory = esencias.some(e =>
+                    e.nombre.toLowerCase().trim() === item.nombre.toLowerCase().trim() &&
+                    e.insumos_categorias_id === activeTab
+                );
+
+                // Si ya existe en esta categoría, NO lo sugerimos (porque ya está agregado)
+                if (existsInCurrentCategory) return false;
+
+                // Si no existe en esta categoría, lo sugerimos como "faltante"
+                return true;
+            });
+
+    }, [activeTab, categories, allStockEssences, esencias, proveedores]);
+
+
+    // Función utilitaria para calcular insumos (Reutilizada para carga masiva)
+    const getInsumosForConfig = (categoryId: string, gender: string, productName: string) => {
+        const currentCat = categories.find(c => c.id === categoryId);
+        if (!gender || (insumoRecipes.length === 0 && comboRules.length === 0)) return [];
 
         const categoryName = currentCat?.nombre || "";
         const newItems: any[] = [];
         const addedNames = new Set<string>();
 
-        // 1. Procesar Reglas de Combos (Prioridad: traen cantidades específicas)
+        // 1. Procesar Reglas de Combos
         if (comboRules.length > 0 && currentCat) {
             const matchingComboRules = comboRules.filter(rule => {
                 return rule.conditions.every((cond: any) => {
                     let itemValue = "";
-                    if (cond.field === "genero") itemValue = selectedGenero;
+                    if (cond.field === "genero") itemValue = gender;
                     else if (cond.field === "categoria") itemValue = categoryName;
                     else return true;
 
@@ -301,7 +397,6 @@ export default function AgregarProductoPage() {
                             }
                         }
                     } else if (ded.type === "dynamic_label") {
-                        const productName = form.getValues("nombre");
                         if (!productName) return;
                         const foundInsumo = insumos.find(i => i.nombre.toLowerCase() === productName.toLowerCase() || i.nombre.toLowerCase().includes(productName.toLowerCase()));
                         if (foundInsumo && !addedNames.has(foundInsumo.nombre.toLowerCase())) {
@@ -322,10 +417,10 @@ export default function AgregarProductoPage() {
             });
         }
 
-        // 2. Procesar Insumos por Stock (Sugerencias genéricas con cantidad 1)
+        // 2. Procesar Insumos por Stock
         if (insumoRecipes.length > 0) {
             const matchingRecipes = insumoRecipes.filter(r => {
-                const genderMatch = r.genero === selectedGenero;
+                const genderMatch = r.genero === gender;
                 const categoryMatch = !r.categoriaId || r.categoriaId === categoryId;
                 return genderMatch && categoryMatch;
             });
@@ -369,11 +464,27 @@ export default function AgregarProductoPage() {
             });
         }
 
-        if (newItems.length > 0) {
+        return newItems;
+    };
+
+    // Lógica unificada para auto-cargar insumos (Prioriza Combos > Sugerencias por Género)
+    useEffect(() => {
+        const selectedGenero = form.watch("genero");
+        const categoryId = activeTab;
+        const productName = form.watch("nombre"); // Watch name for dynamic label
+
+        // Solo ejecutar si hay datos suficientes
+        if (insumos.length === 0 && esencias.length === 0 && inventario.length === 0) return;
+
+        const newItems = getInsumosForConfig(categoryId, selectedGenero, productName);
+
+        if (JSON.stringify(newItems) !== JSON.stringify(selectedInsumos)) {
             setSelectedInsumos(newItems);
-            toast.info(`Se cargaron automáticamente ${newItems.length} insumos sugeridos.`);
+            // toast.info(`Se cargaron automáticamente ${newItems.length} insumos sugeridos.`); // Comentado para no spamear
         }
     }, [form.watch("genero"), activeTab, insumoRecipes, comboRules, inventario, insumos, esencias]);
+
+
 
     const handleAddItem = () => {
         if (!currentInsumoId || !currentCantidad) return;
@@ -404,30 +515,20 @@ export default function AgregarProductoPage() {
                 unidad: currentUnidad
             };
         } else {
-            const esencia = esencias.find(e => e.id === currentInsumoId);
+            // Lógica para ESENCIA (Busca en allStockEssences para permitir cualquiera)
+            const esencia = allStockEssences.find(e => e.id === currentInsumoId);
             if (!esencia) return;
 
-            let precioBase = 0;
-            let moneda: "USD" | "ARS" = "ARS";
-
-            if (esencia.precio_usd) {
-                precioBase = esencia.precio_usd;
-                moneda = "USD";
-            } else if (esencia.precio_ars) {
-                precioBase = esencia.precio_ars;
-                moneda = "ARS";
-            }
-
-            // @ts-ignore
-            const cantidadBase = esencia.cantidad_gramos > 0 ? esencia.cantidad_gramos : 1;
-            const costoTotal = (precioBase / cantidadBase) * cantidad;
+            // Calcular costo basado en precio_lote (igual que insumo)
+            const costoUnitario = esencia.cantidad_lote > 0 ? (esencia.precio_lote / esencia.cantidad_lote) : 0;
+            const costoTotal = costoUnitario * cantidad; // Asumimos 'gr' siempre
 
             newItem = {
                 id: esencia.id,
                 nombre: esencia.nombre,
                 cantidad: cantidad,
                 costoOriginal: costoTotal,
-                moneda: moneda,
+                moneda: "ARS" as const, // Asumimos ARS para materia prima
                 type: "esencia" as const,
                 unidad: "gr"
             };
@@ -439,20 +540,18 @@ export default function AgregarProductoPage() {
             setCurrentCantidad("");
             setOpenCombobox(false);
 
+            // Auto-fill form fields logic
             if (itemType === "esencia") {
-                const esencia = esencias.find(e => e.id === newItem.id);
-                if (esencia) {
-                    if (esencia.proveedor_id) {
-                        form.setValue("proveedor_id", esencia.proveedor_id);
-                    }
-                    if (esencia.genero) {
-                        const validGeneros = ["masculino", "femenino", "ambiente", "otro", "unisex"];
-                        if (validGeneros.includes(esencia.genero)) {
-                            // @ts-ignore
-                            form.setValue("genero", esencia.genero);
-                        }
-                    }
+                // Si el nombre del producto está vacío, poner el nombre de la esencia
+                const currentName = form.getValues("nombre");
+                if (!currentName) {
+                    form.setValue("nombre", newItem.nombre);
                 }
+
+                /*
+                // Ya no copiamos género/proveedor del producto base porque esto ES un producto nuevo
+                // Pero si 'pendingEssence' tuviera info extra, la podríamos usar.
+                */
             }
         }
     };
@@ -504,8 +603,28 @@ export default function AgregarProductoPage() {
     async function onSubmit(data: FormValues) {
         setLoading(true);
         try {
+            // Validar que haya al menos una Esencia
+            const hasEssence = selectedInsumos.some(i => i.type === "esencia");
+            if (!hasEssence) {
+                toast.error("Debes agregar al menos una Esencia para crear el producto.");
+                setLoading(false);
+                return;
+            }
+
             // activeTab ahora contiene el ID directamente
             const categoryId = activeTab;
+
+            // VALIDACIÓN ESTRICTA: Si es Perfumería Fina, debe tener cantidad
+            const currentCat = categories.find(c => c.id === categoryId);
+            const isPerfumeria = currentCat?.nombre.toLowerCase().includes("perfumeria fina") ||
+                currentCat?.nombre.toLowerCase().includes("perfumería fina") ||
+                currentCat?.nombre.toLowerCase() === "fina";
+
+            if (isPerfumeria && (!data.cantidad_gramos || data.cantidad_gramos <= 0)) {
+                toast.error("Para Perfumería Fina, debes ingresar la Cantidad (ml).");
+                setLoading(false);
+                return;
+            }
 
             const custom_insumos = selectedInsumos.map(item => ({
                 id: item.id,
@@ -525,7 +644,7 @@ export default function AgregarProductoPage() {
                 custom_insumos: custom_insumos,
                 precio_usd: null,
                 precio_ars: null,
-                cantidad_gramos: null,
+                cantidad_gramos: data.cantidad_gramos || null, // Guardar cantidad si viene
                 is_consultar: false,
                 created_by: (await supabase.auth.getUser()).data.user?.id,
             });
@@ -602,6 +721,8 @@ export default function AgregarProductoPage() {
                             </TabsTrigger>
                         );
                     })}
+
+
 
                     <Dialog open={isAddCategoryOpen} onOpenChange={setIsAddCategoryOpen}>
                         <DialogTrigger asChild>
@@ -716,8 +837,38 @@ export default function AgregarProductoPage() {
                                         )}
                                     />
 
-                                    {/* Campo Categoría (Etiqueta) */}
-                                    {/* Campo Categoría (Etiqueta) - Eliminado, se define por Tab */}
+                                    {/* Campo Cantidad (ml) OBLIGATORIO solo para Perfumería Fina */}
+                                    {(() => {
+                                        // Detectar si la categoría actual es Perfumería Fina
+                                        const currentCat = categories.find(c => c.id === activeTab);
+                                        const isPerfumeria = currentCat?.nombre.toLowerCase().includes("perfumeria fina") ||
+                                            currentCat?.nombre.toLowerCase().includes("perfumería fina") ||
+                                            currentCat?.nombre.toLowerCase() === "fina";
+
+                                        if (isPerfumeria) {
+                                            return (
+                                                <FormField
+                                                    control={form.control}
+                                                    name="cantidad_gramos"
+                                                    render={({ field }) => (
+                                                        <FormItem className="w-full">
+                                                            <FormLabel>Cantidad (ml) *</FormLabel>
+                                                            <FormControl>
+                                                                <Input
+                                                                    type="number"
+                                                                    placeholder="Ej: 100"
+                                                                    {...field}
+                                                                    className="bg-background/80"
+                                                                />
+                                                            </FormControl>
+                                                            <FormMessage />
+                                                        </FormItem>
+                                                    )}
+                                                />
+                                            );
+                                        }
+                                        return null;
+                                    })()}
                                 </div>
 
                                 <Separator />
@@ -834,27 +985,31 @@ export default function AgregarProductoPage() {
                                                                 className="w-full h-11 justify-between bg-background/50 border-muted-foreground/20 font-normal hover:bg-background/80"
                                                             >
                                                                 {currentInsumoId
-                                                                    ? esencias.find((e) => e.id === currentInsumoId)?.nombre
-                                                                    : "Buscar esencia..."}
+                                                                    ? allStockEssences.find((e) => e.id === currentInsumoId)?.nombre
+                                                                    : "Buscar esencia (Stock)..."}
                                                                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                                                             </Button>
                                                         </PopoverTrigger>
                                                         <PopoverContent className="w-[400px] p-0" align="start">
                                                             <Command>
-                                                                <CommandInput placeholder="Escribe para buscar esencia..." />
+                                                                <CommandInput placeholder="Buscar esencia en stock..." />
                                                                 <CommandList>
-                                                                    <CommandEmpty>No se encontró la esencia.</CommandEmpty>
+                                                                    <CommandEmpty>No se encontraron esencias.</CommandEmpty>
                                                                     <CommandGroup>
-                                                                        {esencias.filter(esencia => {
+                                                                        {allStockEssences.filter((esencia: any) => {
                                                                             if (filterGenero !== "todos" && esencia.genero !== filterGenero) return false;
-                                                                            if (filterProveedor !== "todos" && esencia.proveedor_id !== filterProveedor) return false;
                                                                             return true;
-                                                                        }).map((esencia) => (
+                                                                        }).map((esencia: any) => (
                                                                             <CommandItem
                                                                                 key={esencia.id}
                                                                                 value={`${esencia.nombre}-${esencia.id}`} // Valor único para cmdk
                                                                                 onSelect={() => {
                                                                                     setCurrentInsumoId(esencia.id);
+                                                                                    // Auto-fill Name IMMEDIATELY on selection
+                                                                                    const currentName = form.getValues("nombre");
+                                                                                    if (!currentName) {
+                                                                                        form.setValue("nombre", esencia.nombre);
+                                                                                    }
                                                                                     setOpenCombobox(false);
                                                                                 }}
                                                                             >
@@ -867,7 +1022,7 @@ export default function AgregarProductoPage() {
                                                                                 <div className="flex flex-col">
                                                                                     <span>{esencia.nombre}</span>
                                                                                     <span className="text-[10px] text-muted-foreground">
-                                                                                        {esencia.genero} • {esencia.proveedores?.nombre}
+                                                                                        {esencia.genero || 'Sin género'} | {esencia.proveedor_nombre}
                                                                                     </span>
                                                                                 </div>
                                                                             </CommandItem>
@@ -926,6 +1081,66 @@ export default function AgregarProductoPage() {
                                             </div>
                                         </div>
                                     </div>
+
+                                    {/* SUGERENCIAS DE ESENCIAS FALTANTES (Dentro de Calculadora) */}
+                                    {missingEssences.length > 0 && (
+                                        <div className="mt-4 border rounded-lg overflow-hidden bg-orange-50/50 dark:bg-orange-950/10 border-orange-100 dark:border-orange-900/30">
+                                            <div className="bg-orange-100/30 dark:bg-orange-900/10 px-3 py-2 border-b border-orange-200/50 dark:border-orange-800/30 flex items-center justify-between">
+                                                <div className="flex items-center gap-1.5">
+                                                    <Sparkles className="w-3.5 h-3.5 text-orange-600 dark:text-orange-400" />
+                                                    <h3 className="font-medium text-xs text-orange-800 dark:text-orange-200 uppercase tracking-wide">
+                                                        Sugerencias ({missingEssences.length})
+                                                    </h3>
+                                                </div>
+                                            </div>
+                                            <div className="p-3">
+                                                <div className="flex flex-wrap gap-2">
+                                                    {missingEssences.map(item => (
+                                                        <Button
+                                                            key={item.id}
+                                                            variant="outline"
+                                                            size="sm"
+                                                            type="button"
+                                                            className="text-xs h-7 bg-background hover:bg-orange-50 hover:text-orange-700 hover:border-orange-300 transition-colors"
+                                                            onClick={() => {
+                                                                // 1. Setear nombre del producto
+                                                                form.setValue("nombre", item.nombre);
+                                                                setCurrentInsumoId(item.id);
+
+                                                                // 2. Agregar automáticamente a la lista de insumos (Calculadora)
+                                                                // Lógica similar a handleAddItem pero directa
+                                                                const cantidadDefault = 1;
+                                                                const costoUnitario = item.cantidad_lote > 0 ? (item.precio_lote / item.cantidad_lote) : 0;
+                                                                const costoTotal = costoUnitario * cantidadDefault;
+
+                                                                const newItem = {
+                                                                    id: item.id,
+                                                                    nombre: item.nombre,
+                                                                    cantidad: cantidadDefault,
+                                                                    costoOriginal: costoTotal,
+                                                                    moneda: (item.moneda_origen || "ARS") as "ARS" | "USD",
+                                                                    type: "esencia" as const, // Asumimos esencia ya que viene de missingEssences
+                                                                    unidad: "gr"
+                                                                };
+
+                                                                setSelectedInsumos(prev => [...prev, newItem]);
+
+                                                                toast("Esencia agregada: " + item.nombre, {
+                                                                    icon: <Check className="w-4 h-4" />
+                                                                });
+                                                            }}
+                                                        >
+                                                            <Plus className="w-3 h-3 mr-1" />
+                                                            {item.nombre}
+                                                        </Button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+
+
 
                                     {selectedInsumos.length > 0 ? (
                                         <div className="rounded-xl border bg-card/40 overflow-hidden shadow-sm animate-in fade-in-50 slide-in-from-bottom-2">
@@ -1069,9 +1284,13 @@ export default function AgregarProductoPage() {
                                                 <Package className="w-8 h-8 text-muted-foreground/50" />
                                             </div>
                                             <h3 className="text-lg font-medium text-foreground">No hay insumos agregados</h3>
-                                            <p className="text-sm text-muted-foreground max-w-sm mt-1">Usa la calculadora arriba para agregar insumos o esencias.</p>
+                                            <p className="text-sm text-muted-foreground max-w-sm mt-1">
+                                                Debes agregar al menos una <strong>Esencia</strong> para crear el producto.
+                                            </p>
                                         </div>
                                     )}
+
+
 
                                     <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold py-6 text-lg tracking-wide rounded-xl shadow-lg mt-8" disabled={loading}>
                                         {loading ? (
@@ -1087,8 +1306,8 @@ export default function AgregarProductoPage() {
                             </form>
                         </Form>
                     </CardContent>
-                </Card>
-            </Tabs>
-        </motion.div>
+                </Card >
+            </Tabs >
+        </motion.div >
     );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Inventario } from "@/app/types/inventario";
 import { createClient } from "@/utils/supabase/client";
 import { DataTable } from "@/app/(app)/abm/inventario/components/data-table";
@@ -111,10 +111,10 @@ export default function InventarioPage() {
     fetchTipos();
   }, []);
 
-  const confirmDelete = (id: string) => {
+  const confirmDelete = useCallback((id: string) => {
     setDeleteId(id);
     setDialogOpen(true);
-  };
+  }, []);
 
   const handleDelete = async () => {
     if (!deleteId) return;
@@ -133,10 +133,10 @@ export default function InventarioPage() {
     toast.success("¡Item eliminado correctamente!");
   };
 
-  const handleEdit = (inv: Inventario) => {
+  const handleEdit = useCallback((inv: Inventario) => {
     setInventarioToEdit(null);
     setTimeout(() => setInventarioToEdit(inv), 0);
-  };
+  }, []);
 
   const resetEdit = () => setInventarioToEdit(null);
 
@@ -289,6 +289,11 @@ export default function InventarioPage() {
     return true;
   };
 
+  const memoizedColumns = useMemo(
+    () => inventarioColumns(confirmDelete, handleEdit),
+    [confirmDelete, handleEdit]
+  );
+
   return (
     <div className="flex flex-col gap-4 p-4 max-w-4xl mx-auto">
       <div className="text-center mb-6">
@@ -346,7 +351,7 @@ export default function InventarioPage() {
         <LoaderTable />
       ) : (
         <DataTable
-          columns={inventarioColumns(confirmDelete, handleEdit)}
+          columns={memoizedColumns}
           data={inventario}
           sorting={sorting}
           setSorting={setSorting}

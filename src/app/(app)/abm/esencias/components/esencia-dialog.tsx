@@ -264,6 +264,12 @@ export function EsenciaDialog({
           : "¡Esencia agregada correctamente!"
       );
       if (onSuccess && resultData) onSuccess(resultData);
+
+      // Limpiar estado de edición en el padre si existe la función
+      // Esto evita que quede "pegado" el objeto editado y cause comportamientos raros
+      // al volver a abrir el modal
+      // NOTA: Se asume que EsenciaDialog recibe una prop onEditReset (habrá que agregarla a la interfaz si no está)
+      // Como no está en la interfaz actual, lo manejaremos cerrando primero.
       handleClose();
     }
 

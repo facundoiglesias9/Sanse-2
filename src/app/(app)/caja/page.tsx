@@ -44,6 +44,12 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { toast } from "sonner";
 
 type Gasto = {
@@ -67,6 +73,7 @@ type Venta = {
     id: string;
     precio_total: number;
     created_at: Date;
+    perfumes: string; // Detail string
 };
 
 type Profile = {
@@ -440,6 +447,7 @@ export default function CajaPage() {
                                 <TableRow>
                                     <TableHead>Fecha</TableHead>
                                     <TableHead>Cliente</TableHead>
+                                    <TableHead>Productos</TableHead>
                                     <TableHead className="text-center">Cant.</TableHead>
                                     <TableHead className="text-right">Total</TableHead>
                                 </TableRow>
@@ -451,6 +459,20 @@ export default function CajaPage() {
                                             {formatDate(new Date(venta.created_at))}
                                         </TableCell>
                                         <TableCell>{(venta as any).cliente || "-"}</TableCell>
+                                        <TableCell className="max-w-[200px] text-xs text-muted-foreground">
+                                            <TooltipProvider>
+                                                <Tooltip>
+                                                    <TooltipTrigger asChild>
+                                                        <span className="block truncate cursor-pointer hover:underline">
+                                                            {venta.perfumes || "-"}
+                                                        </span>
+                                                    </TooltipTrigger>
+                                                    <TooltipContent className="max-w-[300px] bg-black text-white p-2 text-xs border border-zinc-800">
+                                                        <p className="whitespace-pre-wrap font-mono">{venta.perfumes?.replace(/; /g, "\n")}</p>
+                                                    </TooltipContent>
+                                                </Tooltip>
+                                            </TooltipProvider>
+                                        </TableCell>
                                         <TableCell className="text-center">
                                             {(venta as any).cantidad_perfumes || "-"}
                                         </TableCell>

@@ -1607,6 +1607,25 @@ export function DataTable({
             />
           </div>
 
+          {/* Filtro Disponibilidad */}
+          <Select
+            onValueChange={(value) =>
+              table.getColumn("disponibilidad")?.setFilterValue(value === "todos" ? undefined : value)
+            }
+          >
+            <SelectTrigger className="w-full min-[960px]:w-[180px] bg-background">
+              <div className="flex items-center gap-2 truncate">
+                <Filter className="w-3.5 h-3.5 text-muted-foreground" />
+                <SelectValue placeholder="Disponibilidad" />
+              </div>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todas</SelectItem>
+              <SelectItem value="disponibles">Stock disponible</SelectItem>
+              <SelectItem value="pedidos">A pedido</SelectItem>
+            </SelectContent>
+          </Select>
+
           {/* Filtro Género */}
           <Select
             onValueChange={(value) =>

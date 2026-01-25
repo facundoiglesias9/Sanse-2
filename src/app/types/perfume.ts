@@ -44,4 +44,5 @@ export type Perfume = {
   margen_minorista?: number | null;
   margen_mayorista?: number | null;
   custom_insumos?: any | null;
+  stock_al_momento?: boolean; // Nuevo campo para aviso de stock
 };

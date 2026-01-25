@@ -149,6 +149,7 @@ export function DataTable<TData extends { tipo?: string; nombre?: string; cantid
     getFilteredRowModel: getFilteredRowModel(),
     getSortedRowModel: getSortedRowModel(),
     state: { sorting, columnFilters },
+    autoResetPageIndex: false,
   });
 
   const filterValue =

@@ -68,7 +68,8 @@ export default function ListaDePreciosPage() {
         `
           *,
           insumos_categorias:insumos_categorias_id(id, nombre),
-          proveedores(id, nombre, gramos_configurados, color, margen_venta)
+          proveedores(id, nombre, gramos_configurados, color, margen_venta),
+          stock_al_momento
         `,
       )
       .order("nombre", { ascending: true });
@@ -180,6 +181,7 @@ export default function ListaDePreciosPage() {
           margen_minorista: esencia.margen_minorista,
           margen_mayorista: esencia.margen_mayorista,
           custom_insumos: esencia.custom_insumos,
+          stock_al_momento: esencia.stock_al_momento,
         };
       });
 

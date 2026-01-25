@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { DataTable } from "@/app/(app)/abm/esencias/components/data-table";
 import { esenciasColumns as columnasMasculinas } from "@/app/(app)/abm/esencias/components/columns";
@@ -78,8 +78,8 @@ export default function EsenciasPage() {
 
 
 
-  const fetchEsencias = async () => {
-    setLoadingEsencias(true);
+  const fetchEsencias = async (showLoader = true) => {
+    if (showLoader) setLoadingEsencias(true);
 
     // 1) Esencias (consulta actualizada para incluir nuevas columnas)
     const { data: esenciasDB, error: eEs } = await supabase
@@ -89,7 +89,7 @@ export default function EsenciasPage() {
 
     if (eEs) {
       toast.error("Error al cargar esencias");
-      setLoadingEsencias(false);
+      if (showLoader) setLoadingEsencias(false);
       return;
     }
 
@@ -142,7 +142,7 @@ export default function EsenciasPage() {
 
     setPendingVR(pendientes);
     setEsencias(deco);
-    setLoadingEsencias(false);
+    if (showLoader) setLoadingEsencias(false);
   };
 
   useEffect(() => {
@@ -187,10 +187,10 @@ export default function EsenciasPage() {
     return calculateDerived(e, activeGrams, activePrice);
   });
 
-  const confirmDelete = (id: string) => {
+  const confirmDelete = useCallback((id: string) => {
     setDeleteId(id);
     setDialogOpen(true);
-  };
+  }, []);
 
   const handleDelete = async () => {
     if (!deleteId) return;
@@ -210,12 +210,14 @@ export default function EsenciasPage() {
     toast.success("¡Esencia eliminada correctamente!");
   };
 
-  const handleEdit = (esencia: Esencia) => {
-    setEsenciaToEdit(null);
-    setTimeout(() => setEsenciaToEdit(esencia), 0);
-  };
+  const handleEdit = useCallback((esencia: Esencia) => {
+    // setEsenciaToEdit(null); // No forzar null antes para evitar parpadeos o cierres
+    setEsenciaToEdit(esencia);
+  }, []);
 
   const resetEdit = () => setEsenciaToEdit(null);
+
+  const columns = useMemo(() => columnasMasculinas(confirmDelete, handleEdit), [confirmDelete, handleEdit]);
 
   return (
     <div className="flex flex-col gap-4 p-4 max-w-7xl mx-auto">
@@ -240,14 +242,17 @@ export default function EsenciasPage() {
         <LoaderTable />
       ) : (
         <DataTable
-          columns={columnasMasculinas(confirmDelete, handleEdit)}
+          columns={columns}
           data={displayedEsencias}
           sorting={sorting}
           setSorting={setSorting}
           columnFilters={columnFilters}
           setColumnFilters={setColumnFilters}
           isLoading={false}
-          onEsenciaCreated={fetchEsencias}
+          onEsenciaCreated={() => {
+            fetchEsencias(false);
+            resetEdit();
+          }}
           esenciaToEdit={esenciaToEdit}
           onEditReset={resetEdit}
           dolarARS={currencies["ARS"]}

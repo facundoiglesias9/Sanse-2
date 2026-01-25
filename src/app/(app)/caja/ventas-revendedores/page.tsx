@@ -93,7 +93,7 @@ export default function VentasRevendedoresPage() {
             console.error("Error fetching profiles:", profilesError);
         }
 
-        const resellerNames = (profiles || []).map((p: any) => p.nombre);
+        const resellerNames = (profiles || []).map((p: any) => p.nombre).filter((n: any) => n);
 
         // 2. Obtener Premios
         const { data: prizesData } = await supabase

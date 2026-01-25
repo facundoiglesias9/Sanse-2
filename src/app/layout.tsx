@@ -35,6 +35,8 @@ export const metadata: Metadata = {
   },
 };
 
+import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
+
 export default function RootLayout({
   children,
 }: {
@@ -46,6 +48,7 @@ export default function RootLayout({
         className={`${inter.className} antialiased`}
         suppressHydrationWarning
       >
+        <ServiceWorkerRegister />
         <Providers
           attribute="class"
           defaultTheme="system"

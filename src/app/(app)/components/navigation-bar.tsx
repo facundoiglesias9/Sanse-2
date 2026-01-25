@@ -592,6 +592,20 @@ export function NavigationBar({ maintenanceMode = false }: { maintenanceMode?: b
                             </Link>
                           </NavigationMenuLink>
                         </li>
+                        <DropdownMenuSeparator />
+                        <li>
+                          <NavigationMenuLink asChild>
+                            <Link
+                              href="/lista-de-precios/aviso-de-stock"
+                              className={clsx(
+                                navigationMenuTriggerStyle(),
+                                pathname === "/lista-de-precios/aviso-de-stock" && "bg-accent text-accent-foreground"
+                              )}
+                            >
+                              Aviso de stock
+                            </Link>
+                          </NavigationMenuLink>
+                        </li>
                       </ul>
                     </NavigationMenuContent>
                   </NavigationMenuItem>
